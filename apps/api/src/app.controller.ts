@@ -1,15 +1,5 @@
-import { Controller, Get } from '@nestjs/common';
-
-import { env } from './lib/env';
-
-@Controller()
-export class AppController {
-  /**
-   * 最小存活端点。仅确认进程在运行，不连接数据库或外部服务。
-   * 完整的 liveness/readiness 拆分会作为 P0-08 单独引入。
-   */
-  @Get('health')
-  health(): { status: 'ok'; service: 'api'; appEnv: string } {
-    return { status: 'ok', service: 'api', appEnv: env.APP_ENV };
-  }
-}
+/**
+ * 保留此文件占位；具体路由（health、auth、contents 等）拆分到各 feature module。
+ * P0 阶段 HealthController 已接手 health 端点；本文件留待 P1 接入新端点。
+ */
+export {};

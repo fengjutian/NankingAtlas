@@ -1,21 +1,23 @@
 import 'reflect-metadata';
 
-import { Logger } from '@nestjs/common';
+import { Logger as PinoLogger } from 'nestjs-pino';
 import { NestFactory } from '@nestjs/core';
-
-import { AppModule } from './app.module';
-import { env } from './lib/env';
 
 import type { NestExpressApplication } from '@nestjs/platform-express';
 
+import { AppModule } from './app.module';
+
+import { env } from './lib/env.js';
+
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    logger: ['error', 'warn', 'log'],
+    bufferLogs: true,
   });
+  app.useLogger(app.get(PinoLogger));
 
-  // 业务接口使用 /api/v1 前缀
+  // 业务接口使用 /api/v1 前缀；health 走顶层
   app.setGlobalPrefix('api/v1', {
-    exclude: ['health'],
+    exclude: ['health', 'health/(.*)'],
   });
 
   // P0-02 阶段：仅启用最小 CORS 占位；正式白名单来自 WEB_ORIGIN / ADMIN_ORIGIN（P1）
@@ -30,9 +32,8 @@ async function bootstrap(): Promise<void> {
   }
 
   await app.listen(env.API_PORT);
-  Logger.log(
+  app.get(PinoLogger).log(
     `Nanking Atlas API listening on http://localhost:${String(env.API_PORT)} (appEnv=${env.APP_ENV})`,
-    'Bootstrap',
   );
 }
 

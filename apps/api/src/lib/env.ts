@@ -17,14 +17,33 @@ import { z } from 'zod';
 
 const APP_ENV = z.enum(['development', 'test', 'staging', 'production']);
 
-const optionalUrl = z.preprocess(
-  (val) => (val === '' || val === undefined ? undefined : val),
-  z.string().url().optional(),
-);
+const blankToUndefined = (val: unknown): unknown =>
+  val === '' || val === undefined ? undefined : val;
+
+const optionalUrl = z.preprocess(blankToUndefined, z.string().url().optional());
 
 const apiPort = z.preprocess(
-  (val) => (val === '' || val === undefined ? undefined : Number(val)),
+  blankToUndefined,
   z.number().int().positive().max(65535).default(4000),
+);
+
+const logLevel = z.preprocess(
+  blankToUndefined,
+  z
+    .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
+    .default('info'),
+);
+
+const requestIdHeader = z.preprocess(
+  blankToUndefined,
+  z
+    .string()
+    .min(1)
+    .max(64)
+    .regex(/^[A-Za-z0-9_-]+$/u, {
+      message: 'request id header 只能包含 ASCII 字母、数字、连字符与下划线',
+    })
+    .default('x-request-id'),
 );
 
 const schema = z.object({
@@ -33,6 +52,8 @@ const schema = z.object({
   API_PORT: apiPort,
   WEB_ORIGIN: optionalUrl,
   ADMIN_ORIGIN: optionalUrl,
+  LOG_LEVEL: logLevel,
+  REQUEST_ID_HEADER: requestIdHeader,
 });
 
 const parsed = schema.safeParse({
@@ -41,6 +62,8 @@ const parsed = schema.safeParse({
   API_PORT: process.env.API_PORT,
   WEB_ORIGIN: process.env.WEB_ORIGIN,
   ADMIN_ORIGIN: process.env.ADMIN_ORIGIN,
+  LOG_LEVEL: process.env.LOG_LEVEL,
+  REQUEST_ID_HEADER: process.env.REQUEST_ID_HEADER,
 });
 
 if (!parsed.success) {
@@ -56,6 +79,8 @@ export const env = Object.freeze({
   API_PORT: parsed.data.API_PORT,
   WEB_ORIGIN: parsed.data.WEB_ORIGIN ?? null,
   ADMIN_ORIGIN: parsed.data.ADMIN_ORIGIN ?? null,
+  LOG_LEVEL: parsed.data.LOG_LEVEL,
+  REQUEST_ID_HEADER: parsed.data.REQUEST_ID_HEADER,
 });
 
 export type ApiEnv = typeof env;

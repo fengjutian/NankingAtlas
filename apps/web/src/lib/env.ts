@@ -13,22 +13,26 @@ import { z } from 'zod';
 
 const APP_ENV = z.enum(['development', 'test', 'staging', 'production']);
 
+/** 把 '' 归一化为 undefined，与 zod 校验层的约定保持一致。 */
+const blankToUndefined = (val: unknown): unknown =>
+  val === '' || val === undefined ? undefined : val;
+
 const optionalUrl = z.preprocess(
-  (val) => (val === '' || val === undefined ? undefined : val),
+  blankToUndefined,
   z.string().url().optional(),
 );
-
-const schema = z.object({
-  NEXT_PUBLIC_APP_ENV: APP_ENV,
-  NEXT_PUBLIC_API_BASE_URL: optionalUrl.describe('API 基础 URL；P0 阶段可选，业务接入后必须配置'),
-});
 
 // `next dev` always sets NODE_ENV=development. Use that safe local default so
 // a fresh checkout starts without requiring an untracked .env.local file.
 // Non-development runtimes must still declare the public environment.
 const appEnv =
-  process.env.NEXT_PUBLIC_APP_ENV ||
+  (blankToUndefined(process.env.NEXT_PUBLIC_APP_ENV) as string | undefined) ??
   (process.env.NODE_ENV === 'development' ? 'development' : undefined);
+
+const schema = z.object({
+  NEXT_PUBLIC_APP_ENV: APP_ENV,
+  NEXT_PUBLIC_API_BASE_URL: optionalUrl.describe('API 基础 URL；P0 阶段可选，业务接入后必须配置'),
+});
 
 const parsed = schema.safeParse({
   NEXT_PUBLIC_APP_ENV: appEnv,
