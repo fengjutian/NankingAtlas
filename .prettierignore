@@ -8,3 +8,10 @@ out/
 coverage/
 *.lock
 pnpm-lock.yaml
+.turbo/
+
+# 用户提供的原始文档不参与格式化（保持原貌）
+AGENTS.md
+docs/PRODUCT_REQUIREMENTS.md
+docs/MINIMAX_IMPLEMENTATION_GUIDE.md
+docs/TECHNICAL_IMPLEMENTATION.md

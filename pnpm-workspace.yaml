@@ -1,7 +1,10 @@
 packages:
-  - "apps/*"
-  - "packages/*"
+  - 'apps/*'
+  - 'packages/*'
+
+# pnpm 11+ 把 onlyBuiltDependencies 重命名为 allowBuilds（map 形式）。
+# 只允许真正需要构建脚本的包跑 install script，其他全部拒绝执行。
 allowBuilds:
-  '@nestjs/core': set this to true or false
-  esbuild: set this to true or false
-  unrs-resolver: set this to true or false
+  '@nestjs/core': true
+  esbuild: true
+  unrs-resolver: true

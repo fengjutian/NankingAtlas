@@ -39,7 +39,13 @@ export default function HomePage() {
         </ul>
       </section>
 
-      <footer style={{ marginTop: '3rem', borderTop: '1px solid var(--color-border)', paddingTop: '1rem' }}>
+      <footer
+        style={{
+          marginTop: '3rem',
+          borderTop: '1px solid var(--color-border)',
+          paddingTop: '1rem',
+        }}
+      >
         <p style={{ fontSize: '0.85rem', color: 'var(--color-muted)' }}>
           当前页面不索引、不被搜索引擎收录（robots noindex）。完整{' '}
           <Link href="https://github.com/" rel="noopener noreferrer">

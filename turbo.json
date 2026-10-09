@@ -17,13 +17,7 @@
         "!**/*.spec.ts",
         "!**/*.spec.tsx"
       ],
-      "outputs": [
-        "!.next/cache/**",
-        ".next/**",
-        "dist/**",
-        "build/**",
-        "coverage/**"
-      ]
+      "outputs": ["!.next/cache/**", ".next/**", "dist/**", "build/**", "coverage/**"]
     },
     "lint": {
       "dependsOn": ["^build"],

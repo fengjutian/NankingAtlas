@@ -35,8 +35,7 @@ export default function GlobalError({
           }}
         >
           重试
-        </button>
-        {' '}
+        </button>{' '}
         <Link href="/">返回首页</Link>
       </p>
     </main>

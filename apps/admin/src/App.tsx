@@ -9,7 +9,8 @@ export function App() {
       </header>
 
       <section className="banner" role="status" aria-label="在建状态提示">
-        <strong>示例 / 待核验</strong> · 当前为 P0 工程骨架占位页。登录、内容编辑、审核、媒体上传等功能将在 P1 阶段交付。
+        <strong>示例 / 待核验</strong> · 当前为 P0
+        工程骨架占位页。登录、内容编辑、审核、媒体上传等功能将在 P1 阶段交付。
       </section>
 
       <section style={{ marginTop: '1.5rem' }}>

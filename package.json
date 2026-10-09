@@ -10,8 +10,8 @@
   },
   "type": "module",
   "scripts": {
-    "format": "prettier --write \"**/*.{ts,tsx,js,cjs,mjs,md,json,yaml,yml,css}\" --ignore-path .gitignore",
-    "format:check": "prettier --check \"**/*.{ts,tsx,js,cjs,mjs,md,json,yaml,yml,css}\" --ignore-path .gitignore",
+    "format": "prettier --write \"**/*.{ts,tsx,js,cjs,mjs,md,json,yaml,yml,css}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,cjs,mjs,md,json,yaml,yml,css}\"",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
@@ -25,12 +25,5 @@
     "rimraf": "^5.0.10",
     "turbo": "^2.5.0",
     "typescript": "^5.6.3"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@nestjs/core",
-      "esbuild",
-      "unrs-resolver"
-    ]
   }
 }
