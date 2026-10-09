@@ -44,4 +44,23 @@ describe('api env validation', () => {
     vi.stubEnv('WEB_ORIGIN', 'not-a-url');
     await expect(import('./env.js')).rejects.toThrow(/invalid environment configuration/);
   });
+
+  it('requires DATABASE_URL outside of test env', async () => {
+    vi.stubEnv('APP_ENV', 'development');
+    vi.stubEnv('DATABASE_URL', '');
+    await expect(import('./env.js')).rejects.toThrow(/DATABASE_URL/);
+  });
+
+  it('allows missing DATABASE_URL only in test env', async () => {
+    vi.stubEnv('APP_ENV', 'test');
+    vi.stubEnv('DATABASE_URL', '');
+    const mod = await import('./env.js');
+    expect(mod.env.DATABASE_URL).toBeNull();
+  });
+
+  it('rejects non-postgres DATABASE_URL schemes', async () => {
+    vi.stubEnv('APP_ENV', 'development');
+    vi.stubEnv('DATABASE_URL', 'mysql://u:p@h:3306/db');
+    await expect(import('./env.js')).rejects.toThrow(/postgresql.*DATABASE_URL/);
+  });
 });

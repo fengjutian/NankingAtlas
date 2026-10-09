@@ -6,5 +6,8 @@ packages:
 # 只允许真正需要构建脚本的包跑 install script，其他全部拒绝执行。
 allowBuilds:
   '@nestjs/core': true
+  '@prisma/client': set this to true or false
+  '@prisma/engines': set this to true or false
   esbuild: true
+  prisma: set this to true or false
   unrs-resolver: true

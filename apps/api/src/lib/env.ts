@@ -4,15 +4,14 @@ import { z } from 'zod';
  * API 环境变量校验。
  *
  * 设计：
- * - 仅校验 API 自身需要的变量；不要在前端创建真实凭据或生产数据库 URL。
- * - 解析在模块加载阶段完成，启动期失败立即抛错。
+ *   - 仅校验 API 自身需要的变量；不要在前端创建真实凭据或生产数据库 URL。
+ *   - 解析在模块加载阶段完成，启动期失败立即抛错。
  *
  * 兼容约定：空串（''）视为"未设置"，与 undefined 等价。
  *
  * 后续阶段会逐步扩展：
- * - DATABASE_URL（Prisma + PostGIS，P1）
- * - AUTH_ACCESS_SECRET / AUTH_REFRESH_SECRET（P1）
- * - S3_* / REVALIDATION_*（P2+）
+ *   - AUTH_ACCESS_SECRET / AUTH_REFRESH_SECRET（P1-02）
+ *   - S3_* / REVALIDATION_*（P2+）
  */
 
 const APP_ENV = z.enum(['development', 'test', 'staging', 'production']);
@@ -44,15 +43,45 @@ const requestIdHeader = z.preprocess(
     .default('x-request-id'),
 );
 
-const schema = z.object({
-  APP_ENV,
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  API_PORT: apiPort,
-  WEB_ORIGIN: optionalUrl,
-  ADMIN_ORIGIN: optionalUrl,
-  LOG_LEVEL: logLevel,
-  REQUEST_ID_HEADER: requestIdHeader,
-});
+/**
+ * Prisma `postgresql://` 连接串。
+ *
+ * 校验目标：URL 结构合法；具体 host/db/user 是否可达由启服后 `$connect()` 决定。
+ * 测试环境（APP_ENV=test）允许为空——Vitest 单测不连数据库；连库的集成测试
+ * 由 vitest.config.ts 注入 DATABASE_URL。
+ */
+const databaseUrl = z.preprocess(
+  blankToUndefined,
+  z
+    .string()
+    .url()
+    .refine(
+      (value) => value.startsWith('postgresql://') || value.startsWith('postgres://'),
+      { message: 'DATABASE_URL 必须以 postgresql:// 或 postgres:// 开头' },
+    )
+    .optional(),
+);
+
+const schema = z
+  .object({
+    APP_ENV,
+    NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+    API_PORT: apiPort,
+    WEB_ORIGIN: optionalUrl,
+    ADMIN_ORIGIN: optionalUrl,
+    LOG_LEVEL: logLevel,
+    REQUEST_ID_HEADER: requestIdHeader,
+    DATABASE_URL: databaseUrl,
+  })
+  .superRefine((data, ctx) => {
+    if (data.APP_ENV !== 'test' && !data.DATABASE_URL) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['DATABASE_URL'],
+        message: '非 test 环境必须配置 DATABASE_URL',
+      });
+    }
+  });
 
 const parsed = schema.safeParse({
   APP_ENV: process.env.APP_ENV,
@@ -62,6 +91,7 @@ const parsed = schema.safeParse({
   ADMIN_ORIGIN: process.env.ADMIN_ORIGIN,
   LOG_LEVEL: process.env.LOG_LEVEL,
   REQUEST_ID_HEADER: process.env.REQUEST_ID_HEADER,
+  DATABASE_URL: process.env.DATABASE_URL,
 });
 
 if (!parsed.success) {
@@ -79,6 +109,7 @@ export const env = Object.freeze({
   ADMIN_ORIGIN: parsed.data.ADMIN_ORIGIN ?? null,
   LOG_LEVEL: parsed.data.LOG_LEVEL,
   REQUEST_ID_HEADER: parsed.data.REQUEST_ID_HEADER,
+  DATABASE_URL: parsed.data.DATABASE_URL ?? null,
 });
 
 export type ApiEnv = typeof env;

@@ -16,7 +16,6 @@
     "clean": "rimraf dist coverage"
   },
   "dependencies": {
-    "@nanking-atlas/api-contract": "workspace:*",
     "@nanking-atlas/database": "workspace:*",
     "@nanking-atlas/validation": "workspace:*",
     "@nestjs/common": "^10.4.15",
