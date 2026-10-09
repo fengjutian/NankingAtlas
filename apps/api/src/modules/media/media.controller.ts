@@ -4,9 +4,9 @@ import { z } from 'zod';
 
 import { MEDIA_RIGHTS_STATUSES } from '@nanking-atlas/database';
 
-import { RequireRoles } from '../../common/auth/roles.decorator.js';
-import { requireUser } from '../../common/auth/auth.guard.js';
 import { MediaService, ALLOWED_IMAGE_MIMES, MAX_UPLOAD_BYTES } from './media.service.js';
+import { requireUser } from '../../common/auth/auth.guard.js';
+import { RequireRoles } from '../../common/auth/roles.decorator.js';
 
 /**
  * 媒体控制器（P1-09）。

@@ -1,23 +1,27 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
-import { LoggerModule } from 'nestjs-pino';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { LoggerModule } from 'nestjs-pino';
 
 import { HealthController } from './common/health/health.controller.js';
-import { RequestIdMiddleware } from './common/request-id/request-id.middleware.js';
 import { GlobalExceptionFilter } from './common/http/global-exception.filter.js';
-import { UsersAuthModule } from './modules/users/users-auth.module.js';
+import { RequestIdMiddleware } from './common/request-id/request-id.middleware.js';
+import { env } from './lib/env.js';
 import { ContentModule } from './modules/contents/content.module.js';
 import { MediaModule } from './modules/media/media.module.js';
-import { env } from './lib/env.js';
+import { UsersAuthModule } from './modules/users/users-auth.module.js';
 
 import type { Params } from 'nestjs-pino';
 
 const pinoParams: Params = {
   pinoHttp: {
     level: env.LOG_LEVEL,
-    // P0 阶段人类可读；P4 上线时切到 prettyPrint: false 走 JSON 上 ELK / Loki。
-    ...(env.APP_ENV !== 'production'
+    // 非 production 走 pino-pretty 人类可读；P4 上线时切到 JSON 上 ELK / Loki。
+    //
+    // test 环境例外：pino-pretty 是 worker-thread transport，在 vitest 里
+    // 会抛 `unable to determine transport target`，且日志本来就该被静音。
+    // 所以 test 强制走纯 JSON。
+    ...(env.APP_ENV !== 'production' && env.APP_ENV !== 'test'
       ? {
           transport: {
             target: 'pino-pretty',

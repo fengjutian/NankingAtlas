@@ -121,11 +121,11 @@ function parseClaims(value: unknown): AccessTokenClaims {
     throw new Error('claims must be object');
   }
   const rec = value as Record<string, unknown>;
-  const sub = rec['sub'];
-  const roles = rec['roles'];
-  const iat = rec['iat'];
-  const exp = rec['exp'];
-  const jti = rec['jti'];
+  const sub = rec.sub;
+  const roles = rec.roles;
+  const iat = rec.iat;
+  const exp = rec.exp;
+  const jti = rec.jti;
   if (
     typeof sub !== 'string' ||
     !Array.isArray(roles) ||

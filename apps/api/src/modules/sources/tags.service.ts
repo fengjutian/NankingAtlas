@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 
 import { slugSchema } from '@nanking-atlas/validation';
 
-import { prisma } from '../../lib/prisma.js';
 import { ForbiddenError } from '../../common/auth/roles.guard.js';
+import { prisma } from '../../lib/prisma.js';
 
 /**
  * 标签（P1-05）：`tags` / `content_tags`。

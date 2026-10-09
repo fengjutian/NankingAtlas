@@ -57,7 +57,12 @@ export function assertPasswordAcceptable(password: string): void {
 
 export async function hashPassword(password: string): Promise<string> {
   assertPasswordAcceptable(password);
-  return argon2.hash(password, ARGON2_OPTIONS);
+  return argon2.hash(password, {
+    type: ARGON2_OPTIONS.type,
+    memoryCost: ARGON2_OPTIONS.memoryCost,
+    timeCost: ARGON2_OPTIONS.timeCost,
+    parallelism: ARGON2_OPTIONS.parallelism,
+  });
 }
 
 /**
@@ -69,7 +74,7 @@ export async function hashPassword(password: string): Promise<string> {
 export async function verifyPassword(hash: string | null, password: string): Promise<boolean> {
   if (hash === null) {
     try {
-      await argon2.verify(DUMMY_HASH, password, ARGON2_OPTIONS);
+      await argon2.verify(DUMMY_HASH, password);
     } catch {
       // dummy hash 与 password 不匹配是预期结果；吞掉只是为了走完等时路径。
     }
@@ -85,5 +90,10 @@ export async function verifyPassword(hash: string | null, password: string): Pro
 
 /** 生成本地 DUMMY_HASH 用（ADMIN 手动跑；不要在生产调用）。 */
 export async function generateDummyHash(): Promise<string> {
-  return argon2.hash(`dummy-${Date.now().toString(36)}`, ARGON2_OPTIONS);
+  return argon2.hash(`dummy-${Date.now().toString(36)}`, {
+    type: ARGON2_OPTIONS.type,
+    memoryCost: ARGON2_OPTIONS.memoryCost,
+    timeCost: ARGON2_OPTIONS.timeCost,
+    parallelism: ARGON2_OPTIONS.parallelism,
+  });
 }

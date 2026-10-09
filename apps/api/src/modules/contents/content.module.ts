@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 
-import { ContentService } from './content.service.js';
 import { ContentController } from './content.controller.js';
-import { SourcesService } from '../sources/sources.service.js';
-import { SourcesController } from '../sources/sources.controller.js';
-import { TagsService } from '../sources/tags.service.js';
+import { ContentService } from './content.service.js';
 import { RelationsService } from '../sources/relations.service.js';
+import { SourcesController } from '../sources/sources.controller.js';
+import { SourcesService } from '../sources/sources.service.js';
+import { TagsService } from '../sources/tags.service.js';
 
 /**
  * 内容模块（P1-04 / P1-05 / P1-08）。

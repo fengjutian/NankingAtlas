@@ -2,9 +2,9 @@ import { Injectable, type CanActivate, type ExecutionContext } from '@nestjs/com
 import { Reflector } from '@nestjs/core';
 import { type Request } from 'express';
 
+import { IS_PUBLIC_KEY } from './roles.decorator.js';
 import { env } from '../../lib/env.js';
 import { verifyAccessToken } from '../../lib/token.js';
-import { IS_PUBLIC_KEY } from './roles.decorator.js';
 
 /**
  * 认证守卫：校验 access token，把身份挂到 request 上。
@@ -68,7 +68,7 @@ export function extractBearer(header: string | string[] | undefined): string | n
     return null;
   }
   const match = /^Bearer\s+(\S+)$/i.exec(raw.trim());
-  if (match === null || match[1] === undefined) {
+  if (match?.[1] === undefined) {
     return null;
   }
   return match[1];

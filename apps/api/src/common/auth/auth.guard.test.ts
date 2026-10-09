@@ -1,8 +1,8 @@
+import { type Request } from 'express';
 import { describe, expect, it, beforeEach, vi } from 'vitest';
 
 import { UnauthorizedError, extractBearer, requireUser } from './auth.guard.js';
 import { ForbiddenError, assertAnyRole } from './roles.guard.js';
-import { type Request } from 'express';
 
 /**
  * 认证 / 授权纯函数单测（P1-03）。

@@ -18,11 +18,29 @@ import { CONTENT_TYPES } from '@nanking-atlas/database';
 import { slugSchema } from '@nanking-atlas/validation';
 import { parseTiptapDocument } from '@nanking-atlas/validation';
 
-import { RequireRoles, Public } from '../../common/auth/roles.decorator.js';
+import { ContentService, ContentNotFoundError, type ContentRecord } from './content.service.js';
 import { requireUser } from '../../common/auth/auth.guard.js';
-import { ContentService, ContentNotFoundError } from './content.service.js';
+import { RequireRoles, Public } from '../../common/auth/roles.decorator.js';
+import { prisma } from '../../lib/prisma.js';
+
 import type { TypeExtension } from './content.service.js';
-import type { ContentAction } from './content-state-machine.js';
+
+/** 公开内容查询：只返回 PUBLISHED 且未归档，按发布时间倒序。 */
+async function listPublishedContent(input: {
+  type?: string;
+  limit: number;
+}): Promise<ContentRecord[]> {
+  const rows = await prisma.content.findMany({
+    where: {
+      status: 'PUBLISHED',
+      archivedAt: null,
+      ...(input.type !== undefined ? { type: input.type } : {}),
+    },
+    orderBy: { publishedAt: 'desc' },
+    take: input.limit,
+  });
+  return rows as ContentRecord[];
+}
 
 /**
  * 后台内容管理 + 公开内容读取（技术方案 §7.3）。
@@ -129,7 +147,10 @@ export class ContentController {
   @Get('contents')
   async listPublic(@Query() rawQuery: unknown): Promise<{ data: unknown }> {
     const query = listQuerySchema.parse(rawQuery);
-    const rows = await this.listPublished({ type: query.type, limit: query.limit });
+    const rows = await listPublishedContent({
+      ...(query.type !== undefined ? { type: query.type } : {}),
+      limit: query.limit,
+    });
     return { data: rows.map(toPublicDto) };
   }
 
@@ -138,26 +159,11 @@ export class ContentController {
   @Get('contents/:slug')
   async getPublicBySlug(@Param('slug') slug: string): Promise<{ data: unknown }> {
     const row = await this.contents.findBySlug(slug);
-    if (row === null || row.status !== 'PUBLISHED' || row.archivedAt !== null) {
+    // 草稿 / 归档 / 不存在统一按 404 处理：公开接口不泄露"内容存在但未发布"。
+    if (row?.status !== 'PUBLISHED' || row.archivedAt !== null) {
       throw new ContentNotFoundError(slug);
     }
     return { data: toPublicDto(row) };
-  }
-
-  private async listPublished(input: { type?: string; limit: number }): Promise<
-    Awaited<ReturnType<ContentService['findBySlug']>>[]
-  > {
-    // 直接走 prisma 查询，避免逐条 N+1。
-    const { prisma } = await import('../../lib/prisma.js');
-    return prisma.content.findMany({
-      where: {
-        status: 'PUBLISHED',
-        archivedAt: null,
-        ...(input.type !== undefined ? { type: input.type } : {}),
-      },
-      orderBy: { publishedAt: 'desc' },
-      take: input.limit,
-    });
   }
 
   // -------------------------------------------------------------------------
@@ -169,7 +175,6 @@ export class ContentController {
   @RequireRoles('EDITOR', 'REVIEWER', 'ADMIN')
   async listAdmin(@Query() rawQuery: unknown): Promise<{ data: unknown }> {
     const query = listQuerySchema.parse(rawQuery);
-    const { prisma } = await import('../../lib/prisma.js');
     const rows = await prisma.content.findMany({
       where: {
         archivedAt: null,
@@ -271,7 +276,7 @@ export class ContentController {
     const user = requireUser(req);
     const updated = await this.contents.transition({
       id,
-      action: body.action as ContentAction,
+      action: body.action,
       actorId: user.id,
       actorRoles: user.roles,
       requestId: req.requestId ?? 'unknown',
@@ -298,7 +303,7 @@ function parseIfMatch(header: string | undefined): number {
     throw new IfMatchRequiredError();
   }
   const match = ifMatchPattern.exec(header.trim());
-  if (match === null || match[1] === undefined) {
+  if (match?.[1] === undefined) {
     throw new IfMatchRequiredError();
   }
   const version = Number.parseInt(match[1], 10);

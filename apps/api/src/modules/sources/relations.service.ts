@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
-import { prisma } from '../../lib/prisma.js';
 import { ForbiddenError } from '../../common/auth/roles.guard.js';
+import { prisma } from '../../lib/prisma.js';
 import { isRelationType } from '../contents/content-state-machine.js';
 
 /**

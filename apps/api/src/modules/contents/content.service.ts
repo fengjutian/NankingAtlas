@@ -1,9 +1,13 @@
 import { Injectable } from '@nestjs/common';
 
-import { CONTENT_STATUSES, CONTENT_TYPES, type ContentStatus, type ContentType } from '@nanking-atlas/database';
+import {
+  CONTENT_STATUSES,
+  CONTENT_TYPES,
+  PrismaClient,
+  type ContentStatus,
+  type ContentType,
+} from '@nanking-atlas/database';
 
-import { prisma } from '../../lib/prisma.js';
-import { ForbiddenError } from '../../common/auth/roles.guard.js';
 import {
   checkPublicationReadiness,
   decideTransition,
@@ -11,6 +15,8 @@ import {
   type ContentAction,
   type ReadinessIssue,
 } from './content-state-machine.js';
+import { ForbiddenError } from '../../common/auth/roles.guard.js';
+import { prisma } from '../../lib/prisma.js';
 
 /**
  * 内容服务（P1-04 CRUD + P1-07 revisions/audit + P1-08 状态机接入）。
@@ -46,10 +52,22 @@ export type TypeExtension =
   | { kind: 'PERSON'; birthText?: string | null; deathText?: string | null; biographyNote?: string | null }
   | { kind: 'EVENT'; startDate?: string | null; endDate?: string | null; datePrecision?: string; dateNote?: string | null }
   | { kind: 'ARCHITECTURE'; builtPeriod?: string | null; currentCondition?: string | null; heritageLevel?: string | null }
-  | { kind: 'TRADITION'; traditionType?: string; transmissionMethod?: string | null }
+  | { kind: 'TRADITION'; traditionType: string; transmissionMethod?: string | null }
   | { kind: 'TOPIC'; curatorNote?: string | null }
   | { kind: 'ROUTE'; durationMinutes?: number | null; distanceMeters?: number | null };
 
+/**
+ * Prisma 事务客户端类型.
+ *
+ * `$transaction(cb)` 传入的 `tx` 与 `PrismaClient` 共享全部模型方法，
+ * 但 `Prisma.TransactionClient` 未从 @prisma/client 顶层导出，故用等价推导。
+ */
+type PrismaTransactionClient = Omit<
+  PrismaClient,
+  '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'
+>;
+
+/** 内容类型 → 扩展表 kind 的映射；新增 ContentType 时这里必须同步。 */
 const TYPE_TO_EXTENSION: Record<ContentType, TypeExtension['kind']> = {
   PLACE: 'PLACE',
   PERSON: 'PERSON',
@@ -398,11 +416,19 @@ export class ContentService {
 
   /** 写类型扩展表（upsert，保证 content_id 主键唯一）。 */
   private async writeExtension(
-    tx: Parameters<Parameters<typeof prisma.$transaction>[0]>[0],
+    tx: PrismaTransactionClient,
     contentId: string,
     type: ContentType,
     extension: TypeExtension,
   ): Promise<void> {
+    // 分派前再确认一次类型一致：调用方可能传入与 content.type 不符的扩展
+    // （例如把 PERSON 的扩展写到 PLACE 上），那会静默写入错误的扩展表。
+    if (TYPE_TO_EXTENSION[type] !== extension.kind) {
+      throw new ForbiddenError(
+        `内容类型 ${type} 需要 ${TYPE_TO_EXTENSION[type]} 扩展，实际收到 ${extension.kind}`,
+      );
+    }
+
     switch (extension.kind) {
       case 'PLACE': {
         assertCoordinateRange(extension.lon ?? null, extension.lat ?? null);
@@ -493,7 +519,6 @@ export class ContentService {
             transmissionMethod: extension.transmissionMethod ?? null,
           },
           update: {
-            traditionType: extension.traditionType,
             ...(extension.transmissionMethod !== undefined
               ? { transmissionMethod: extension.transmissionMethod }
               : {}),
@@ -533,7 +558,6 @@ export class ContentService {
         throw new ForbiddenError(`未处理的内容扩展类型：${JSON.stringify(exhaustive)}`);
       }
     }
-    void type;
   }
 }
 

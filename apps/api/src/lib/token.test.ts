@@ -3,7 +3,6 @@ import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 import {
   constantTimeEqualHex,
   generateRefreshToken,
-  hashIp,
   hashRefreshToken,
   issueAccessToken,
   verifyAccessToken,
@@ -55,9 +54,8 @@ describe('access token (HS256)', () => {
   });
 
   it('rejects a token signed with a different secret', async () => {
-    const { token } = await import('./token.js').then(async (m) => ({
-      token: m.issueAccessToken({ userId: 'user-1', roles: [] }).token,
-    }));
+    const first = await import('./token.js');
+    const { token } = first.issueAccessToken({ userId: 'user-1', roles: [] });
     vi.resetModules();
     vi.stubEnv('APP_ENV', 'test');
     vi.stubEnv('AUTH_ACCESS_SECRET', 'a-completely-different-secret-value-32b');

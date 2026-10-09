@@ -9,16 +9,16 @@ import {
 import { type Request, type Response } from 'express';
 import { ZodError } from 'zod';
 
-import { UnauthorizedError } from '../auth/auth.guard.js';
-import { ForbiddenError } from '../auth/roles.guard.js';
+import { AuthError } from '../../modules/auth/auth.service.js';
+import { IfMatchRequiredError } from '../../modules/contents/content.controller.js';
 import {
   ContentNotFoundError,
   ContentVersionConflictError,
   PublicationNotReadyError,
 } from '../../modules/contents/content.service.js';
-import { IfMatchRequiredError } from '../../modules/contents/content.controller.js';
 import { UserNotFoundError, InvalidRoleError } from '../../modules/users/users.service.js';
-import { AuthError } from '../../modules/auth/auth.service.js';
+import { UnauthorizedError } from '../auth/auth.guard.js';
+import { ForbiddenError } from '../auth/roles.guard.js';
 
 /**
  * 全局异常过滤器 —— 统一错误契约。
@@ -57,7 +57,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     if (status >= 500) {
       // 5xx 记完整错误到服务端日志；4xx 只记简要（避免日志被刷爆）。
       this.logger.error(
-        `[${requestId}] ${req.method} ${req.url} -> ${status}`,
+        `[${requestId}] ${req.method} ${req.url} -> ${String(status)}`,
         exception instanceof Error ? exception.stack : String(exception),
       );
     }
@@ -84,10 +84,40 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     if (exception instanceof UserNotFoundError) {
       return { status: HttpStatus.NOT_FOUND, body: wrap('NOT_FOUND', '用户不存在', requestId) };
     }
+    if (exception instanceof ContentNotFoundError) {
+      return { status: HttpStatus.NOT_FOUND, body: wrap('NOT_FOUND', '内容不存在', requestId) };
+    }
     if (exception instanceof InvalidRoleError) {
       return {
         status: HttpStatus.BAD_REQUEST,
         body: wrap('VALIDATION_FAILED', `无效角色：${exception.role}`, requestId),
+      };
+    }
+    if (exception instanceof IfMatchRequiredError) {
+      return {
+        status: HttpStatus.BAD_REQUEST,
+        body: wrap('VALIDATION_FAILED', exception.message, requestId),
+      };
+    }
+
+    // ---- 乐观锁冲突（AGENTS.md §5.5：版本冲突返回 409，禁止静默覆盖）----
+    if (exception instanceof ContentVersionConflictError) {
+      return {
+        status: HttpStatus.CONFLICT,
+        body: wrap('CONTENT_VERSION_CONFLICT', '内容已被他人修改，请重新加载后再保存', requestId, {
+          currentVersion: exception.currentVersion,
+          expectedVersion: exception.expectedVersion,
+        }),
+      };
+    }
+
+    // ---- 发布前校验未通过（技术方案 §6：结构化 422）----
+    if (exception instanceof PublicationNotReadyError) {
+      return {
+        status: HttpStatus.UNPROCESSABLE_ENTITY,
+        body: wrap('PUBLICATION_NOT_READY', '内容未满足发布条件', requestId, {
+          issues: exception.issues,
+        }),
       };
     }
 
@@ -113,7 +143,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       }
       const message =
         typeof raw === 'object' && raw !== null && 'message' in raw
-          ? String((raw as { message: unknown }).message)
+          ? String((raw).message)
           : exception.message;
       return { status, body: wrap(httpStatusToCode(status), message, requestId) };
     }

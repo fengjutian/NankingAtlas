@@ -1,12 +1,12 @@
 import { Global, Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, Reflector } from '@nestjs/core';
 
-import { UsersService } from './users/users.service.js';
-import { UsersController } from './users/users.controller.js';
-import { AuthService } from './auth/auth.service.js';
-import { AuthController } from './auth/auth.controller.js';
+import { UsersController } from './users.controller.js';
+import { UsersService } from './users.service.js';
 import { AuthGuard } from '../../common/auth/auth.guard.js';
 import { RolesGuard } from '../../common/auth/roles.guard.js';
+import { AuthController } from '../auth/auth.controller.js';
+import { AuthService } from '../auth/auth.service.js';
 
 /**
  * 用户 + 认证模块（P1-02 / P1-03）。
@@ -19,6 +19,11 @@ import { RolesGuard } from '../../common/auth/roles.guard.js';
  *
  * `@Public()` 端点由 AuthGuard 放行且**不进入** RolesGuard 判定
  * （RolesGuard 只在有 `@RequireRoles` 元数据时生效）。
+ *
+ * 注意：`APP_GUARD` 注册的守卫是普通 provider，**不会**自动拿到
+ * `Reflector`（只有 controller / middleware 才会被自动注入）。
+ * 必须显式 `useFactory` 注入，否则运行时会抛
+ * `Cannot read properties of undefined (reading 'getAllAndOverride')`。
  */
 @Global()
 @Module({
@@ -26,8 +31,16 @@ import { RolesGuard } from '../../common/auth/roles.guard.js';
   providers: [
     UsersService,
     AuthService,
-    { provide: APP_GUARD, useClass: AuthGuard },
-    { provide: APP_GUARD, useClass: RolesGuard },
+    {
+      provide: APP_GUARD,
+      useFactory: (reflector: Reflector) => new AuthGuard(reflector),
+      inject: [Reflector],
+    },
+    {
+      provide: APP_GUARD,
+      useFactory: (reflector: Reflector) => new RolesGuard(reflector),
+      inject: [Reflector],
+    },
   ],
   exports: [UsersService, AuthService],
 })

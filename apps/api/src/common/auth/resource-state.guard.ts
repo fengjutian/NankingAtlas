@@ -47,8 +47,8 @@ export function ResourceStateGuard<TResource>(
   options: ResourceStateGuardOptions<TResource>,
 ): MethodDecorator & ClassDecorator {
   const metadata: ResourceStateMetadata = {
-    loader: options.loader as (id: string, request: unknown) => Promise<unknown>,
-    getStatus: options.getStatus as (resource: never) => string,
+    loader: options.loader,
+    getStatus: options.getStatus,
     allowedStatuses: options.allowedStatuses,
     notFoundMessage: options.notFoundMessage ?? '资源不存在',
   };
@@ -65,7 +65,7 @@ export function ResourceStateGuard<TResource>(
       );
       return descriptor;
     }
-    Reflect.defineMetadata(RESOURCE_STATE_METADATA_KEY, metadata, target as object);
+    Reflect.defineMetadata(RESOURCE_STATE_METADATA_KEY, metadata, target);
     return target as never;
   }) as MethodDecorator & ClassDecorator;
 }

@@ -1,6 +1,18 @@
 import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  // esbuild 需要显式开启 emitDecoratorMetadata，否则 Nest 的构造函数注入
+  // 在测试环境下拿不到 design:paramtypes，表现为 `this.xxx === undefined` 的
+  // 运行时 500（tsc 侧由 apps/api/tsconfig.json 的 emitDecoratorMetadata 保证）。
+  esbuild: {
+    target: 'es2022',
+    tsconfigRaw: {
+      compilerOptions: {
+        experimentalDecorators: true,
+        emitDecoratorMetadata: true,
+      },
+    },
+  },
   test: {
     environment: 'node',
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
@@ -12,6 +24,8 @@ export default defineConfig({
       REQUEST_ID_HEADER: 'x-request-id',
       // 占位 SQLite 文件：单测不需要真建文件；集成测试时另写迁移脚本。
       DATABASE_URL: 'file:../packages/database/prisma/test.db',
+      AUTH_ACCESS_SECRET: 'test-access-secret-value-long-enough-over-32b',
+      AUTH_REFRESH_SECRET: 'test-refresh-secret-value-long-enough-over-32b',
     },
     coverage: {
       reporter: ['text', 'html'],

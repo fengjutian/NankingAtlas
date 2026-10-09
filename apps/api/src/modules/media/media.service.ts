@@ -4,9 +4,8 @@ import { Injectable } from '@nestjs/common';
 
 import { MEDIA_RIGHTS_STATUSES, type MediaRightsStatus } from '@nanking-atlas/database';
 
-import { prisma } from '../../lib/prisma.js';
-import { env } from '../../lib/env.js';
 import { ForbiddenError } from '../../common/auth/roles.guard.js';
+import { prisma } from '../../lib/prisma.js';
 
 /**
  * 上传意图与对象确认（P1-09）。
@@ -131,7 +130,9 @@ export class MediaService {
     assertSize(input.sizeBytes);
 
     const objectKey = buildObjectKey(input.mimeType);
-    const uploadUrl = `${env.API_BASE_URL_FOR_UPLOAD ?? ''}/api/v1/admin/media/upload-target/${encodeURIComponent(objectKey)}`;
+    // 上传目标 URL：P2 接对象存储后改为 API 签发的短期预签名 URL。
+    // 当前阶段返回同源占位路径，前端据此知道该往哪 PUT。
+    const uploadUrl = `/api/v1/admin/media/upload-target/${encodeURIComponent(objectKey)}`;
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
     return prisma.$transaction(async (tx) => {

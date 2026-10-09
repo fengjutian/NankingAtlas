@@ -1,12 +1,12 @@
-import { Controller, Get, Patch, Post, Body, Param, Req, HttpCode } from '@nestjs/common';
+import { Controller, Get, Patch, Post, Body, Param, Req } from '@nestjs/common';
 import { type Request } from 'express';
 import { z } from 'zod';
 
 import { USER_ROLES } from '@nanking-atlas/database';
 
 import { UsersService, InvalidRoleError, UserNotFoundError, normalizeRoles } from './users.service.js';
-import { RequireRoles } from '../../common/auth/roles.decorator.js';
 import { requireUser } from '../../common/auth/auth.guard.js';
+import { RequireRoles } from '../../common/auth/roles.decorator.js';
 import { hashPassword } from '../../lib/password.js';
 import { prisma } from '../../lib/prisma.js';
 

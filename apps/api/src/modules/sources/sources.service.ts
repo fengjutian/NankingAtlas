@@ -3,8 +3,8 @@ import { Injectable } from '@nestjs/common';
 import { SOURCE_KINDS } from '@nanking-atlas/database';
 import { slugSchema } from '@nanking-atlas/validation';
 
-import { prisma } from '../../lib/prisma.js';
 import { ForbiddenError } from '../../common/auth/roles.guard.js';
+import { prisma } from '../../lib/prisma.js';
 
 /**
  * 来源（sources / content_sources）—— P1-05。
@@ -77,7 +77,7 @@ export class SourcesService {
           afterJson: JSON.stringify({ kind: input.kind, title: input.title }),
         },
       });
-      return created as SourceRecord;
+      return created;
     });
   }
 
@@ -116,13 +116,12 @@ export class SourcesService {
           afterJson: JSON.stringify({ title: updated.title, url: updated.url }),
         },
       });
-      return updated as SourceRecord;
+      return updated;
     });
   }
 
   async findById(id: string): Promise<SourceRecord | null> {
-    const row = await prisma.source.findUnique({ where: { id } });
-    return row === null ? null : (row as SourceRecord);
+    return prisma.source.findUnique({ where: { id } });
   }
 
   /** 给内容挂来源；组合唯一由 schema 复合主键保证，重复会抛 P2002。 */
@@ -176,7 +175,7 @@ export class SourcesService {
       claimScope: row.claimScope,
       pageReference: row.pageReference,
       isPrimary: row.isPrimary,
-      source: row.source as SourceRecord,
+      source: row.source,
     }));
   }
 }

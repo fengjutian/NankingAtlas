@@ -1,14 +1,14 @@
 import { Injectable } from '@nestjs/common';
 
 import { env } from '../../lib/env.js';
-import { hashIp } from '../../lib/token.js';
 import { hashPassword, verifyPassword } from '../../lib/password.js';
+import { prisma } from '../../lib/prisma.js';
+import { hashIp } from '../../lib/token.js';
 import {
   generateRefreshToken,
   hashRefreshToken,
   issueAccessToken,
 } from '../../lib/token.js';
-import { prisma } from '../../lib/prisma.js';
 import { getPasswordHashByEmail, UsersService, type UserWithRoles } from '../users/users.service.js';
 
 /**
@@ -62,7 +62,15 @@ export const GENERIC_LOGIN_FAILURE_MESSAGE = '邮箱或密码不正确，或账�
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly users: UsersService) {}
+  /**
+   * 显式 `@Inject` 而非靠构造函数反射。
+   *
+   * vitest 用 esbuild 做 TS transform，不保证产出 `design:paramtypes`；
+   * 只写 `constructor(private readonly users: UsersService)` 在测试环境下
+   * 会得到 `this.users === undefined`，表现为运行时 500。
+   * 显式 `@Inject` 不依赖反射，tsc 与 vitest 下行为一致。
+   */
+  constructor(@Inject(UsersService) private readonly users: UsersService) {}
 
   /**
    * 登录：校验密码 → 签发 access + refresh。

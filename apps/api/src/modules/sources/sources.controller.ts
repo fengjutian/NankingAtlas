@@ -4,11 +4,11 @@ import { z } from 'zod';
 
 import { SOURCE_KINDS } from '@nanking-atlas/database';
 
-import { RequireRoles } from '../../common/auth/roles.decorator.js';
-import { requireUser } from '../../common/auth/auth.guard.js';
+import { RelationsService } from './relations.service.js';
 import { SourcesService } from './sources.service.js';
 import { TagsService } from './tags.service.js';
-import { RelationsService } from './relations.service.js';
+import { requireUser } from '../../common/auth/auth.guard.js';
+import { RequireRoles } from '../../common/auth/roles.decorator.js';
 
 /**
  * 来源 / 标签 / 关联控制器（P1-05）。
