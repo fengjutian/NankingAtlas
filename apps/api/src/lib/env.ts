@@ -7,6 +7,8 @@ import { z } from 'zod';
  * - 仅校验 API 自身需要的变量；不要在前端创建真实凭据或生产数据库 URL。
  * - 解析在模块加载阶段完成，启动期失败立即抛错。
  *
+ * 兼容约定：空串（''）视为"未设置"，与 undefined 等价。
+ *
  * 后续阶段会逐步扩展：
  * - DATABASE_URL（Prisma + PostGIS，P1）
  * - AUTH_ACCESS_SECRET / AUTH_REFRESH_SECRET（P1）
@@ -15,12 +17,22 @@ import { z } from 'zod';
 
 const APP_ENV = z.enum(['development', 'test', 'staging', 'production']);
 
+const optionalUrl = z.preprocess(
+  (val) => (val === '' || val === undefined ? undefined : val),
+  z.string().url().optional(),
+);
+
+const apiPort = z.preprocess(
+  (val) => (val === '' || val === undefined ? undefined : Number(val)),
+  z.number().int().positive().max(65535).default(4000),
+);
+
 const schema = z.object({
   APP_ENV,
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  API_PORT: z.coerce.number().int().positive().max(65535).default(4000),
-  WEB_ORIGIN: z.string().url().optional(),
-  ADMIN_ORIGIN: z.string().url().optional(),
+  API_PORT: apiPort,
+  WEB_ORIGIN: optionalUrl,
+  ADMIN_ORIGIN: optionalUrl,
 });
 
 const parsed = schema.safeParse({

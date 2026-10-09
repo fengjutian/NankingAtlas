@@ -4,6 +4,11 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    // 默认注入一组最小可用的环境变量，避免 env 校验模块在测试加载时抛错
+    env: {
+      APP_ENV: 'test',
+      NODE_ENV: 'test',
+    },
     coverage: {
       reporter: ['text', 'html'],
       include: ['src/**/*.{ts,tsx}'],

@@ -7,17 +7,20 @@ import { z } from 'zod';
  * - 仅校验公开（NEXT_PUBLIC_*）变量；服务端密钥由 API 单独校验。
  * - 解析在模块加载阶段完成，启动期失败立即抛错。
  * - 校验通过后导出强类型对象，调用方无需再做空值判断。
+ *
+ * 兼容约定：process.env 中空串（''）视为"未设置"，与 undefined 等价。
  */
 
 const APP_ENV = z.enum(['development', 'test', 'staging', 'production']);
 
+const optionalUrl = z.preprocess(
+  (val) => (val === '' || val === undefined ? undefined : val),
+  z.string().url().optional(),
+);
+
 const schema = z.object({
   NEXT_PUBLIC_APP_ENV: APP_ENV,
-  NEXT_PUBLIC_API_BASE_URL: z
-    .string()
-    .url()
-    .optional()
-    .describe('API 基础 URL；P0 阶段可选，业务接入后必须配置'),
+  NEXT_PUBLIC_API_BASE_URL: optionalUrl.describe('API 基础 URL；P0 阶段可选，业务接入后必须配置'),
 });
 
 const parsed = schema.safeParse({

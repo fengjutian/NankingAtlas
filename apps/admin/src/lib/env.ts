@@ -6,13 +6,20 @@ import { z } from 'zod';
  * 设计：
  * - Vite 仅会把 VITE_ 前缀的变量暴露给客户端代码；其他敏感值只能在构建期使用。
  * - 解析在模块加载阶段完成，启动期失败立即抛错。
+ *
+ * 兼容约定：空串（''）视为"未设置"。
  */
 
 const APP_ENV = z.enum(['development', 'test', 'staging', 'production']);
 
+const optionalUrl = z.preprocess(
+  (val) => (val === '' || val === undefined ? undefined : val),
+  z.string().url().optional(),
+);
+
 const schema = z.object({
   VITE_APP_ENV: APP_ENV,
-  VITE_API_BASE_URL: z.string().url().optional(),
+  VITE_API_BASE_URL: optionalUrl,
 });
 
 const rawEnv = import.meta.env as unknown as Record<string, string | undefined>;
