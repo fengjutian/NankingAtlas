@@ -16,6 +16,8 @@
 
 generator client {
   provider = "prisma-client-js"
+  // 不显式设置 output：使用 Prisma 默认位置 `node_modules/@prisma/client`。
+  // 单一 client 被 apps/api/src/lib/prisma.ts 单例包装；web/admin 不会直接 import。
 }
 
 datasource db {

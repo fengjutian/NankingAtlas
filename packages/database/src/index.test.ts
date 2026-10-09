@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+
 import {
   DATABASE_PACKAGE_NAME,
   DatabaseError,

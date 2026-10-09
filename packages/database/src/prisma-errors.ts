@@ -16,10 +16,10 @@ interface MaybePrismaKnownError {
 function isPrismaKnownError(err: unknown): err is MaybePrismaKnownError & { code: string } {
   return Boolean(
     err &&
-      typeof err === 'object' &&
-      'code' in (err as MaybePrismaKnownError) &&
-      typeof (err as MaybePrismaKnownError).code === 'string' &&
-      (err as MaybePrismaKnownError).name === 'PrismaClientKnownRequestError',
+    typeof err === 'object' &&
+    'code' in (err as MaybePrismaKnownError) &&
+    typeof (err as MaybePrismaKnownError).code === 'string' &&
+    (err as MaybePrismaKnownError).name === 'PrismaClientKnownRequestError',
   );
 }
 

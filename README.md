@@ -14,7 +14,7 @@
 
 P0-01 ~ P0-09 已交付：三应用骨架、共享 strict 配置与依赖边界、CI、品牌 tokens、响应式 shell、公开站静态首页、API request-id / 健康检查 / 结构化日志、本地启动文档。`pnpm format:check / lint / typecheck / test / build` 在本机全过。
 
-P1-01.a 已落盘：Prisma schema（P1 全部 25 张表）、`@nanking-atlas/database` Prisma client 承载层、`apps/api` Prisma 单例与 `DATABASE_URL` 校验、`docker-compose.yml`（PostGIS 16-3.4 + pg_trgm / citext / pgcrypto）。**实跑迁移尚未在本机完成**（Docker daemon 未启动，AGENTS.md §1.1 要求显式区分"已落盘"与"已实跑验证"）。下一项是 P1-02（users / roles / 登录 / 刷新 / 登出 / 限流）。
+P1-01.a 已落盘：Prisma schema（**SQLite 方案**，P1 全部 25 张表）、`@nanking-atlas/database` Prisma client 承载层、`apps/api` Prisma 单例与 `DATABASE_URL` 校验（`file:./...`）。**与 PostgreSQL 版本的差异**：无空间查询（P3 地图改 R*Tree）、无 pg_trgm 中文模糊搜索（改 LIKE）、所有 enum 改 String + 应用层字面量联合校验。**实跑迁移尚未在本机完成**（schema 已落盘但 SQLite 文件与表尚未生成）；下一项是 P1-02（users / roles / 登录 / 刷新 / 登出 / 限流）。
 
 ## 仓库结构
 
@@ -26,9 +26,7 @@ apps/
 packages/
   eslint-config/       # 共享 ESLint flat config
   tsconfig/            # 共享 strict TypeScript 配置
-  database/            # Prisma schema、迁移与 client 单例（P1-01.a 起）
-docker/
-  postgres/init/       # docker compose 启动时自动执行的扩展启用脚本
+  database/            # Prisma schema、迁移与 client 单例（P1-01.a 起，SQLite 方案）
 docs/
   PRODUCT_REQUIREMENTS.md
   TECHNICAL_IMPLEMENTATION.md
@@ -98,48 +96,32 @@ curl -i -H 'x-request-id: dev-smoke-001' http://localhost:4000/health/ready | he
 
 所有请求都会通过 `nestjs-pino` 写出结构化日志（dev 环境 `pino-pretty`，prod JSON），日志级别由 `LOG_LEVEL` 控制。客户端传入的 request id 会随每条日志一起出现。
 
-### 本地启动 PostgreSQL/PostGIS（P1-01.a 落盘）
+### 本地数据库（SQLite 方案，P1-01.a 落盘）
 
-数据层使用 `postgis/postgis:16-3.4` 镜像，默认端口 `5432`，启用扩展：`postgis` / `pg_trgm` / `citext` / `pgcrypto` / `uuid-ossp`。默认开发凭据：
+数据层使用 Prisma SQLite provider，**无 Docker / 无 PostGIS / 无 pg_trgm**。
+数据库文件由 Prisma 在首次 `migrate dev` 时创建。默认路径：
 
-| 字段 | 默认值 |
-| --- | --- |
-| `POSTGRES_DB` | `nanking_atlas` |
-| `POSTGRES_USER` | `nanking_atlas` |
-| `POSTGRES_PASSWORD` | `nanking_atlas` |
-| `POSTGRES_PORT` | `5432` |
+| 文件     | 路径                               | 用途                     |
+| -------- | ---------------------------------- | ------------------------ |
+| 本地开发 | `packages/database/prisma/dev.db`  | 默认 DATABASE_URL 指向   |
+| 单测     | `packages/database/prisma/test.db` | vitest 注入；CI 即用即丢 |
 
-启动本地数据库：
-
-```bash
-docker compose up -d postgres
-docker compose ps        # 等待 healthcheck=healthy
-docker compose logs postgres | grep -i 'database system is ready'
-```
-
-覆盖默认凭据：在仓库根建 `.env`（已被 `.gitignore` 忽略），写入：
-
-```dotenv
-POSTGRES_PASSWORD=<本地随机串>
-POSTGRES_PORT=5432
-```
-
-随后生成 Prisma client 并跑迁移：
+生成 client + 迁移：
 
 ```bash
 pnpm --filter @nanking-atlas/database prisma:generate
-pnpm --filter @nanking-atlas/database prisma:migrate:dev
+pnpm --filter @nanking-atlas/database prisma:migrate:dev --name init
 ```
 
-`apps/api/.env` 中的 `DATABASE_URL` 必须与 docker-compose 凭据一致（见 `apps/api/.env.example`）。**P1-01.a 阶段未实跑迁移**——`schema.prisma` 与 init SQL 已写入，但本机 Docker daemon 不可用，`prisma migrate dev` 验证留待 P1-01.b（实跑迁移与连通性）。
+应用层 enum：因 SQLite 没有原生 ENUM，所有 enum 列实际存为 String。
+应用层通过 `@nanking-atlas/database` 的字面量联合 + zod 校验保证取值范围
+（见 `packages/database/src/enums.ts`）。
 
-集成测试时另起一个测试库：
+**与 PostgreSQL 版本的功能差异**（需要在 P3 任务里补偿）：
 
-```bash
-docker compose exec postgres createdb -U nanking_atlas nanking_atlas_test
-DATABASE_URL=postgresql://nanking_atlas:nanking_atlas@localhost:5432/nanking_atlas_test?schema=public \
-  pnpm --filter @nanking-atlas/database prisma:migrate:deploy
-```
+- 无空间查询：`places.lon / lat` 浮点列；P3 地图的 bbox 检索改用 SQLite R*Tree 虚表（在 P3 子任务里单独写 migration）。
+- 无 pg_trgm 中文相似度：P3 搜索降级为 LIKE + 应用层分词；FTS5 留作 P3 子任务。
+- 无 UUID / citext / pgcrypto：id 改 `cuid()`，email 应用层 lowercase。
 
 ## 阶段门禁
 
@@ -159,7 +141,7 @@ PR 与 push 到 `main` 都会触发 `.github/workflows/ci.yml`：
 2. `format` — `pnpm format:check`
 3. `lint` — `pnpm lint`（含跨包依赖边界 `no-restricted-imports`）
 4. `typecheck` — `pnpm typecheck`
-5. `test` — `pnpm test`（P1-01.b 起追加 `postgis/postgis:16-3.4` service container + DATABASE_URL 注入）
+5. `test` — `pnpm test`（P1-01.a 起：SQLite 方案无需 service container；DATABASE_URL 由 job env 注入 `file:./packages/database/prisma/test.db`）
 6. `build` — `pnpm build`，产物上传为 artifact
 7. `secret-scan` — gitleaks（AGENTS.md §4.6：禁止提交真实密钥）
 
