@@ -18,17 +18,25 @@ import { z } from 'zod';
 /* 类型                                                                        */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Tiptap JSON 节点 / 文档类型。
+ *
+ * 可选属性显式带 `| undefined`：仓库开启了 `exactOptionalPropertyTypes`，
+ * 而 zod 的 `.optional()` 产出的就是 `attrs?: T | undefined`，
+ * 不写出来无法满足 `tiptapDocumentSchema: z.ZodType<TiptapDocument>` 的标注。
+ * 对消费方语义不变（仍是"可能缺省"，读取用 `node.attrs?.x`）。
+ */
 export interface TiptapMark {
   type: string;
-  attrs?: Record<string, unknown>;
+  attrs?: Record<string, unknown> | undefined;
 }
 
 export interface TiptapNode {
   type: string;
-  attrs?: Record<string, unknown>;
-  content?: TiptapNode[];
-  marks?: TiptapMark[];
-  text?: string;
+  attrs?: Record<string, unknown> | undefined;
+  content?: TiptapNode[] | undefined;
+  marks?: TiptapMark[] | undefined;
+  text?: string | undefined;
 }
 
 export interface TiptapDocument extends TiptapNode {
