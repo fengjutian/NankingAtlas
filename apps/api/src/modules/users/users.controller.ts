@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Post, Body, Param, Req } from '@nestjs/common';
+import { Controller, Get, Inject, Patch, Post, Body, Param, Req } from '@nestjs/common';
 import { type Request } from 'express';
 import { z } from 'zod';
 
@@ -41,7 +41,8 @@ const patchUserSchema = z
 
 @Controller('admin/users')
 export class UsersController {
-  constructor(private readonly users: UsersService) {}
+  /** 显式 @Inject：见 auth.controller.ts 的同款说明（vitest 不产出 paramtypes）。 */
+  constructor(@Inject(UsersService) private readonly users: UsersService) {}
 
   /** GET /admin/users —— 列出用户。 */
   @Get()

@@ -27,8 +27,11 @@ export interface AutosaveState {
 }
 
 export interface AutosaveControllerOptions {
-  /** 真正执行保存的回调；应带上 If-Match 并在 409 时抛 CONTENT_VERSION_CONFLICT。 */
-  save: () => Promise<void>;
+  /**
+   * 真正执行保存的回调；应带上 If-Match 并在 409 时抛 CONTENT_VERSION_CONFLICT。
+   * `signal` 在下一次保存开始时会被 abort —— 用于取消上一次未完成的请求。
+   */
+  save: (signal: AbortSignal) => Promise<void>;
   delayMs?: number;
   onStateChange?: (state: AutosaveState) => void;
   onError?: (error: unknown) => void;
@@ -67,7 +70,7 @@ export function createAutosaveController(options: AutosaveControllerOptions): Au
 
     setState({ ...state, phase: 'saving', errorMessage: null });
     try {
-      await options.save();
+      await options.save(controller.signal);
       if (controller.signal.aborted) {
         return;
       }
@@ -223,7 +226,7 @@ export function useUnsavedChangesWarning(hasUnsavedChanges: boolean): void {
 
 /** 把控制器接到 React 上：controller 惰性创建一次，状态通过 onStateChange 回流。 */
 export function useAutosaveController(options: {
-  save: () => Promise<void>;
+  save: (signal: AbortSignal) => Promise<void>;
   delayMs?: number;
   onError?: (error: unknown) => void;
 }): { controller: AutosaveController; state: AutosaveState } {
@@ -242,7 +245,7 @@ export function useAutosaveController(options: {
   const controllerRef = useRef<AutosaveController | null>(null);
   if (controllerRef.current === null) {
     controllerRef.current = createAutosaveController({
-      save: () => saveRef.current(),
+      save: (signal) => saveRef.current(signal),
       onStateChange: setState,
       onError: (error) => onErrorRef.current?.(error),
       ...(options.delayMs === undefined ? {} : { delayMs: options.delayMs }),

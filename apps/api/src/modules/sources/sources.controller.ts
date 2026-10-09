@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Post, Req } from '@nestjs/common';
 import { type Request } from 'express';
 import { z } from 'zod';
 
@@ -54,10 +54,11 @@ const createRelationSchema = z
 
 @Controller('admin')
 export class SourcesController {
+  /** 显式 @Inject：见 auth.controller.ts 的同款说明（vitest 不产出 paramtypes）。 */
   constructor(
-    private readonly sources: SourcesService,
-    private readonly tags: TagsService,
-    private readonly relations: RelationsService,
+    @Inject(SourcesService) private readonly sources: SourcesService,
+    @Inject(TagsService) private readonly tags: TagsService,
+    @Inject(RelationsService) private readonly relations: RelationsService,
   ) {}
 
   // ---- sources ----

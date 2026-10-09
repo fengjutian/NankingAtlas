@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Headers,
+  Inject,
   Param,
   Patch,
   Post,
@@ -136,7 +137,8 @@ const ifMatchPattern = /^W\/"(\d{1,9})"$/;
 
 @Controller()
 export class ContentController {
-  constructor(private readonly contents: ContentService) {}
+  /** 显式 @Inject：见 auth.controller.ts 的同款说明（vitest 不产出 paramtypes）。 */
+  constructor(@Inject(ContentService) private readonly contents: ContentService) {}
 
   // -------------------------------------------------------------------------
   // 公开读取

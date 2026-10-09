@@ -1,5 +1,5 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
-import { APP_FILTER } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 
@@ -74,7 +74,12 @@ const throttlerModuleOptions = {
   ],
   controllers: [HealthController],
   providers: [
-    // 守卫顺序由 provider 注册顺序决定：先 Auth（401）再 Roles（403）再限流。
+    // 守卫顺序由 provider 注册顺序决定：Auth（401）→ Roles（403）→ 限流。
+    //
+    // ThrottlerGuard 必须在 UsersAuthModule 的 APP_GUARD **之后**注册：
+    // 限流应在鉴权之前跑（对未认证的暴力破解请求也计数），
+    // 但绝不能因为限流而掩盖 401/403 的语义。
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_FILTER, useClass: GlobalExceptionFilter },
   ],
 })

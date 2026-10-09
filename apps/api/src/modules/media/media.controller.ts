@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post, Req } from '@nestjs/common';
+import { Body, Controller, Inject, Param, Post, Req } from '@nestjs/common';
 import { type Request } from 'express';
 import { z } from 'zod';
 
@@ -38,7 +38,8 @@ const completeSchema = z
 
 @Controller('admin/media')
 export class MediaController {
-  constructor(private readonly media: MediaService) {}
+  /** 显式 @Inject：见 auth.controller.ts 的同款说明（vitest 不产出 paramtypes）。 */
+  constructor(@Inject(MediaService) private readonly media: MediaService) {}
 
   /** POST /admin/media/upload-intents —— 签发短期上传凭证 + 占位记录。 */
   @Post('upload-intents')

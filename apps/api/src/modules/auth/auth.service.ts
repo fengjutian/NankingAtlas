@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 
 import { env } from '../../lib/env.js';
 import { hashPassword, verifyPassword } from '../../lib/password.js';
