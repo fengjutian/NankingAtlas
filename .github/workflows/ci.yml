@@ -126,24 +126,9 @@ jobs:
     needs: install
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    services:
-      # P1-01.a 起：PostgreSQL/PostGIS service container 准备就位。
-      # 当前 test 套件（Vitest 单测）尚无集成测试用例，等 P1-02 起写入后再启用 prisma migrate deploy。
-      postgres:
-        image: postgis/postgis:16-3.4
-        env:
-          POSTGRES_DB: nanking_atlas_test
-          POSTGRES_USER: nanking_atlas
-          POSTGRES_PASSWORD: nanking_atlas
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U nanking_atlas -d nanking_atlas_test"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
     env:
-      DATABASE_URL: postgresql://nanking_atlas:nanking_atlas@localhost:5432/nanking_atlas_test?schema=public
+      # SQLite 方案（P1-01.a 切换）：文件路径相对仓库根；CI 上跑完即丢弃。
+      DATABASE_URL: file:./packages/database/prisma/test.db
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

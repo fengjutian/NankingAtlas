@@ -58,9 +58,16 @@ describe('api env validation', () => {
     expect(mod.env.DATABASE_URL).toBeNull();
   });
 
-  it('rejects non-postgres DATABASE_URL schemes', async () => {
+  it('rejects non-file DATABASE_URL schemes', async () => {
     vi.stubEnv('APP_ENV', 'development');
     vi.stubEnv('DATABASE_URL', 'mysql://u:p@h:3306/db');
-    await expect(import('./env.js')).rejects.toThrow(/postgresql.*DATABASE_URL/);
+    await expect(import('./env.js')).rejects.toThrow(/file:.*DATABASE_URL/);
+  });
+
+  it('accepts file:// DATABASE_URL', async () => {
+    vi.stubEnv('APP_ENV', 'development');
+    vi.stubEnv('DATABASE_URL', 'file:./packages/database/prisma/dev.db');
+    const mod = await import('./env.js');
+    expect(mod.env.DATABASE_URL).toBe('file:./packages/database/prisma/dev.db');
   });
 });
