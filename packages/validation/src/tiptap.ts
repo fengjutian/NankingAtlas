@@ -358,7 +358,7 @@ function validateNodeAttrs(
   }
 
   if (node.type === 'heading') {
-    const level = attrs['level'];
+    const level = attrs.level;
     if (level !== undefined) {
       if (typeof level !== 'number' || !Number.isInteger(level) || level < 1 || level > 6) {
         issues.push({
@@ -370,7 +370,7 @@ function validateNodeAttrs(
   }
 
   if (node.type === 'image') {
-    const urlProblem = urlError(attrs['src'], IMAGE_URL_PROTOCOLS, 'image.attrs.src');
+    const urlProblem = urlError(attrs.src, IMAGE_URL_PROTOCOLS, 'image.attrs.src');
     if (urlProblem !== null) {
       issues.push({ path: [...path, 'attrs', 'src'], message: urlProblem });
     }
@@ -449,11 +449,11 @@ function validateMarks(
     }
 
     if (mark.type === 'link') {
-      const urlProblem = urlError(attrs?.['href'], ALLOWED_URL_PROTOCOLS, 'link.attrs.href');
+      const urlProblem = urlError(attrs?.href, ALLOWED_URL_PROTOCOLS, 'link.attrs.href');
       if (urlProblem !== null) {
         issues.push({ path: [...markPath, 'attrs', 'href'], message: urlProblem });
       }
-      const target = attrs?.['target'];
+      const target = attrs?.target;
       if (target !== undefined) {
         if (typeof target !== 'string' || !ALLOWED_LINK_TARGETS.includes(target)) {
           issues.push({
@@ -502,7 +502,7 @@ function measureTree(value: unknown): TreeMetrics {
     if (item === undefined) {
       break;
     }
-    if (!isRecord(item.value) || typeof item.value['type'] !== 'string') {
+    if (!isRecord(item.value) || typeof item.value.type !== 'string') {
       continue;
     }
     nodeCount += 1;
@@ -512,7 +512,7 @@ function measureTree(value: unknown): TreeMetrics {
     if (nodeCount > MAX_TIPTAP_NODE_COUNT) {
       return { depth, nodeCount };
     }
-    const content = item.value['content'];
+    const content = item.value.content;
     if (Array.isArray(content)) {
       for (const child of content) {
         stack.push({ value: child, depth: item.depth + 1 });
@@ -580,7 +580,12 @@ function decodeEntities(input: string): string {
   return current;
 }
 
-/** 控制字符、空白、零宽字符一律拒绝（`java\tscript:` 会被这条挡下）。 */
+/**
+ * 控制字符、空白、零宽字符一律拒绝（`java\tscript:` 会被这条挡下）。
+ * 这里必须显式匹配控制字符范围——安全校验规则本身就是"匹配危险字符"，
+ * 所以对 no-control-regex 做定点豁免，而不是删掉控制字符检测。
+ */
+// eslint-disable-next-line no-control-regex
 const UNSAFE_URL_CHARS = /[\u0000-\u0020\u007f-\u00a0\u200b-\u200f\u2028-\u202f\u2060\ufeff]/u;
 
 /** 引号与尖括号在属性上下文里没有合法用途，直接拒绝。 */
@@ -767,7 +772,7 @@ function renderMarks(node: TiptapNode): { open: string; close: string } {
         break;
       case 'link': {
         const result = decodeAndCheckUrl(
-          mark.attrs?.['href'],
+          mark.attrs?.href,
           ALLOWED_URL_PROTOCOLS,
           'link.attrs.href',
         );
@@ -776,7 +781,7 @@ function renderMarks(node: TiptapNode): { open: string; close: string } {
         }
         const href = escapeHtml(result.url);
         // rel 强制覆盖，不信任前端传入的值。
-        const target = mark.attrs?.['target'];
+        const target = mark.attrs?.target;
         const targetAttr = target === '_blank' ? ' target="_blank"' : '';
         open += `<a href="${href}" rel="${FORCED_LINK_REL}"${targetAttr}>`;
         close = `</a>${close}`;
@@ -830,7 +835,7 @@ function renderNode(node: TiptapNode): string {
 }
 
 function headingLevel(node: TiptapNode): number {
-  const level = node.attrs?.['level'];
+  const level = node.attrs?.level;
   if (typeof level === 'number' && Number.isInteger(level) && level >= 1 && level <= 6) {
     return level;
   }
@@ -839,7 +844,7 @@ function headingLevel(node: TiptapNode): number {
 
 function renderImage(node: TiptapNode): string {
   const result = decodeAndCheckUrl(
-    node.attrs?.['src'],
+    node.attrs?.src,
     IMAGE_URL_PROTOCOLS,
     'image.attrs.src',
   );
@@ -847,10 +852,10 @@ function renderImage(node: TiptapNode): string {
     throw new TiptapRenderError(result.error);
   }
 
-  const alt = typeof node.attrs?.['alt'] === 'string' ? (node.attrs['alt'] as string) : '';
-  const title = typeof node.attrs?.['title'] === 'string' ? node.attrs['title'] : undefined;
-  const width = positiveDimension(node.attrs?.['width']);
-  const height = positiveDimension(node.attrs?.['height']);
+  const alt = typeof node.attrs?.alt === 'string' ? (node.attrs.alt) : '';
+  const title = typeof node.attrs?.title === 'string' ? node.attrs.title : undefined;
+  const width = positiveDimension(node.attrs?.width);
+  const height = positiveDimension(node.attrs?.height);
 
   let html = `<img src="${escapeHtml(result.url)}" alt="${escapeHtml(alt)}"`;
   if (width !== undefined) {
@@ -878,8 +883,9 @@ function positiveDimension(value: unknown): number | undefined {
  * 返回值可以安全地作为 HTML 源码使用，调用方负责选择注入方式。
  */
 export function renderTiptapToSafeHtml(doc: TiptapDocument): string {
-  if (doc.type !== 'doc') {
-    throw new TiptapRenderError(`renderTiptapToSafeHtml 只接受 type="doc" 的文档，收到 "${doc.type}"`);
+  // 运行期防御：调用方可能绕过 parseTiptapDocument 直接塞入伪造对象。
+  if ((doc as { type: string }).type !== 'doc') {
+    throw new TiptapRenderError('renderTiptapToSafeHtml 只接受 type="doc" 的文档');
   }
   return renderNode(doc);
 }

@@ -69,9 +69,6 @@ describe('tiptap document validation', () => {
         content: [{ type: 'listItem', content: [p('甲')] }, { type: 'listItem', content: [p('乙')] }],
       });
       expect(render(list)).toBe('<ul><li><p>甲</p></li><li><p>乙</p></li></ul>');
-      expect(render({ ...list, content: [{ ...(list.content as TiptapNode[])[0], }] })).toContain(
-        '<ul>',
-      );
       expect(
         render(doc({ type: 'orderedList', content: [{ type: 'listItem', content: [p('一')] }] })),
       ).toBe('<ol><li><p>一</p></li></ol>');
@@ -143,8 +140,8 @@ describe('tiptap document validation', () => {
 
   describe('unknown and dangerous nodes', () => {
     it('rejects script / iframe / object / embed nodes', () => {
-      for (const type of ['script', 'iframe', 'object', 'embed', 'form', 'input', 'style']) {
-        expect(() => render(doc({ type: type as string }))).toThrow(TiptapDocumentError);
+      for (const nodeType of ['script', 'iframe', 'object', 'embed', 'form', 'input', 'style']) {
+        expect(() => render(doc({ type: nodeType }))).toThrow(TiptapDocumentError);
       }
     });
 

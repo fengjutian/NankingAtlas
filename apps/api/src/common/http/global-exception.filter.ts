@@ -9,8 +9,14 @@ import {
 import { type Request, type Response } from 'express';
 import { ZodError } from 'zod';
 
-import { UnauthorizedError } from './auth/auth.guard.js';
-import { ForbiddenError } from './roles.guard.js';
+import { UnauthorizedError } from '../auth/auth.guard.js';
+import { ForbiddenError } from '../auth/roles.guard.js';
+import {
+  ContentNotFoundError,
+  ContentVersionConflictError,
+  PublicationNotReadyError,
+} from '../../modules/contents/content.service.js';
+import { IfMatchRequiredError } from '../../modules/contents/content.controller.js';
 import { UserNotFoundError, InvalidRoleError } from '../../modules/users/users.service.js';
 import { AuthError } from '../../modules/auth/auth.service.js';
 

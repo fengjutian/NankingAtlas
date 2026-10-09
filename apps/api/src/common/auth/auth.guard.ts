@@ -4,10 +4,7 @@ import { type Request } from 'express';
 
 import { env } from '../../lib/env.js';
 import { verifyAccessToken } from '../../lib/token.js';
-import {
-  IS_PUBLIC_KEY,
-  ROLES_METADATA_KEY,
-} from './roles.decorator.js';
+import { IS_PUBLIC_KEY } from './roles.decorator.js';
 
 /**
  * 认证守卫：校验 access token，把身份挂到 request 上。
