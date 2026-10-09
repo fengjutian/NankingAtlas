@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { beforeEach, describe, expect, it } from 'vitest';
+
 import { AppController } from './app.controller';
 
 describe('AppController (P0 smoke)', () => {

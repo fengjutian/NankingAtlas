@@ -24,11 +24,11 @@ const schema = z.object({
 });
 
 const parsed = schema.safeParse({
-  APP_ENV: process.env['APP_ENV'],
-  NODE_ENV: process.env['NODE_ENV'],
-  API_PORT: process.env['API_PORT'],
-  WEB_ORIGIN: process.env['WEB_ORIGIN'],
-  ADMIN_ORIGIN: process.env['ADMIN_ORIGIN'],
+  APP_ENV: process.env.APP_ENV,
+  NODE_ENV: process.env.NODE_ENV,
+  API_PORT: process.env.API_PORT,
+  WEB_ORIGIN: process.env.WEB_ORIGIN,
+  ADMIN_ORIGIN: process.env.ADMIN_ORIGIN,
 });
 
 if (!parsed.success) {

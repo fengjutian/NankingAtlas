@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+
 import { env } from '@/lib/env';
+
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -17,7 +19,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   // env 在模块导入时已经完成校验，这里只是展示如何避免在边缘运行器中再次读取
-  void env.NEXT_PUBLIC_APP_ENV;
+  void env.APP_ENV;
   return (
     <html lang="zh-CN">
       <body>{children}</body>

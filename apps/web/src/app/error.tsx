@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect } from 'react';
 import Link from 'next/link';
+import { useEffect } from 'react';
 
 export default function GlobalError({
   error,
@@ -35,7 +35,8 @@ export default function GlobalError({
           }}
         >
           重试
-        </button>{' '}
+        </button>
+        {' '}
         <Link href="/">返回首页</Link>
       </p>
     </main>

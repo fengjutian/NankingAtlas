@@ -1,9 +1,12 @@
 import 'reflect-metadata';
-import { NestFactory } from '@nestjs/core';
-import type { NestExpressApplication } from '@nestjs/platform-express';
+
 import { Logger } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+
 import { AppModule } from './app.module';
 import { env } from './lib/env';
+
+import type { NestExpressApplication } from '@nestjs/platform-express';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
@@ -35,7 +38,6 @@ async function bootstrap(): Promise<void> {
 
 bootstrap().catch((error: unknown) => {
   // 启动期失败：直接退出，避免半运行态
-  // eslint-disable-next-line no-console
   console.error('[api] bootstrap failed', error);
   process.exit(1);
 });

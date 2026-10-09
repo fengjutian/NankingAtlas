@@ -4,7 +4,9 @@ import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
  * Vitest (jsdom) 在测试中把 import.meta.env 暴露为可写对象。
  * 通过 Object.defineProperty 给 import.meta.env 注入受控值。
  */
-type MetaLike = { env: Record<string, string | undefined> };
+interface MetaLike {
+  env: Record<string, string | undefined>;
+}
 
 function setImportMetaEnv(values: Record<string, string | undefined>): void {
   const meta = import.meta as unknown as MetaLike;

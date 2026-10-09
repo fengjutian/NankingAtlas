@@ -18,8 +18,8 @@ const schema = z.object({
 const rawEnv = import.meta.env as unknown as Record<string, string | undefined>;
 
 const parsed = schema.safeParse({
-  VITE_APP_ENV: rawEnv['VITE_APP_ENV'],
-  VITE_API_BASE_URL: rawEnv['VITE_API_BASE_URL'],
+  VITE_APP_ENV: rawEnv.VITE_APP_ENV,
+  VITE_API_BASE_URL: rawEnv.VITE_API_BASE_URL,
 });
 
 if (!parsed.success) {
