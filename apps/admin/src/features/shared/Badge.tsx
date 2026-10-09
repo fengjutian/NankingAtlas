@@ -1,7 +1,6 @@
 import { statusLabel } from './workflow';
 
 import type { ContentStatus } from '@/api/types';
-
 import type { CSSProperties, ReactNode } from 'react';
 
 export type BadgeTone = 'neutral' | 'draft' | 'review' | 'approved' | 'published' | 'archived' | 'danger';

@@ -136,7 +136,7 @@ export function createAutosaveController(options: AutosaveControllerOptions): Au
 /** 保存失败原因：优先用服务端 message，其次用错误自身文案。 */
 export function describeSaveError(error: unknown): string {
   if (typeof error === 'object' && error !== null && 'message' in error) {
-    const message = (error as { message: unknown }).message;
+    const message = (error).message;
     if (typeof message === 'string' && message !== '') {
       return message;
     }
@@ -243,14 +243,13 @@ export function useAutosaveController(options: {
   onErrorRef.current = options.onError;
 
   const controllerRef = useRef<AutosaveController | null>(null);
-  if (controllerRef.current === null) {
-    controllerRef.current = createAutosaveController({
-      save: (signal) => saveRef.current(signal),
-      onStateChange: setState,
-      onError: (error) => onErrorRef.current?.(error),
-      ...(options.delayMs === undefined ? {} : { delayMs: options.delayMs }),
-    });
-  }
+  // `??=`：只在还没创建过控制器时惰性创建一次。
+  controllerRef.current ??= createAutosaveController({
+    save: (signal) => saveRef.current(signal),
+    onStateChange: setState,
+    onError: (error) => onErrorRef.current?.(error),
+    ...(options.delayMs === undefined ? {} : { delayMs: options.delayMs }),
+  });
   const controller = controllerRef.current;
 
   // 卸载时取消计时与在途请求（beforeunload 提示由 useUnsavedChangesWarning 负责）。

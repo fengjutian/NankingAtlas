@@ -13,9 +13,9 @@ export interface ButtonProps {
   busy?: boolean;
   disabled?: boolean;
   /** 说明按钮为何不可用（禁用时给 screen reader 读的补充信息）。 */
-  title?: string;
+  title?: string | undefined;
   /** 切换型按钮的选中状态（会渲染成 aria-pressed）。 */
-  ariaPressed?: boolean;
+  ariaPressed?: boolean | undefined;
 }
 
 function variantStyle(variant: ButtonVariant): CSSProperties {

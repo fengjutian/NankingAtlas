@@ -1,7 +1,30 @@
 import { useMemo, useState } from 'react';
 
-import { Button, ButtonRow } from '@/features/shared/Button';
+import type {
+  ContentRelationDto,
+  ContentSourceLink,
+  ContentType,
+  Language,
+  MediaRightsStatus,
+  RelationType,
+  SourceKind,
+  TagDto,
+  TypeExtension,
+} from '@/api/types';
+import type { CSSProperties, ReactNode } from 'react';
+
+import {
+  CONTENT_TYPES,
+  EVENT_DATE_PRECISIONS,
+  LANGUAGES,
+  MEDIA_RIGHTS_STATUSES,
+  PLACE_ACCURACIES,
+  RELATION_TYPES,
+  SOURCE_KINDS,
+  VERIFICATION_STATUSES,
+} from '@/api/types';
 import { Badge } from '@/features/shared/Badge';
+import { Button, ButtonRow } from '@/features/shared/Button';
 import { Field } from '@/features/shared/Field';
 import { EmptyState } from '@/features/shared/States';
 import {
@@ -15,29 +38,6 @@ import {
 } from '@/features/shared/styles';
 import { SUMMARY_MAX, TITLE_MAX, isValidSlug, summaryLengthHint, titleLengthHint } from '@/features/shared/workflow';
 
-import {
-  CONTENT_TYPES,
-  EVENT_DATE_PRECISIONS,
-  LANGUAGES,
-  MEDIA_RIGHTS_STATUSES,
-  PLACE_ACCURACIES,
-  RELATION_TYPES,
-  SOURCE_KINDS,
-  VERIFICATION_STATUSES,
-} from '@/api/types';
-
-import type {
-  ContentRelationDto,
-  ContentSourceLink,
-  ContentType,
-  Language,
-  MediaRightsStatus,
-  RelationType,
-  SourceKind,
-  TagDto,
-  TypeExtension,
-} from '@/api/types';
-import type { CSSProperties, ReactNode } from 'react';
 
 /**
  * 编辑器八区（P1-10）。
@@ -189,11 +189,11 @@ export function buildExtension(
 ): TypeExtension | null {
   switch (type) {
     case 'PLACE': {
-      const address = textOrNull(values['address']);
-      const lon = numberOrNull(values['lon']);
-      const lat = numberOrNull(values['lat']);
-      const accuracy = values['accuracy'] ?? '';
-      const verificationStatus = values['verificationStatus'] ?? '';
+      const address = textOrNull(values.address);
+      const lon = numberOrNull(values.lon);
+      const lat = numberOrNull(values.lat);
+      const accuracy = values.accuracy ?? '';
+      const verificationStatus = values.verificationStatus ?? '';
       return {
         kind: 'PLACE',
         ...(address === null ? {} : { address }),
@@ -206,9 +206,9 @@ export function buildExtension(
       };
     }
     case 'PERSON': {
-      const birthText = textOrNull(values['birthText']);
-      const deathText = textOrNull(values['deathText']);
-      const biographyNote = textOrNull(values['biographyNote']);
+      const birthText = textOrNull(values.birthText);
+      const deathText = textOrNull(values.deathText);
+      const biographyNote = textOrNull(values.biographyNote);
       return {
         kind: 'PERSON',
         ...(birthText === null ? {} : { birthText }),
@@ -217,10 +217,10 @@ export function buildExtension(
       };
     }
     case 'EVENT': {
-      const startDate = textOrNull(values['startDate']);
-      const endDate = textOrNull(values['endDate']);
-      const datePrecision = values['datePrecision'] ?? '';
-      const dateNote = textOrNull(values['dateNote']);
+      const startDate = textOrNull(values.startDate);
+      const endDate = textOrNull(values.endDate);
+      const datePrecision = values.datePrecision ?? '';
+      const dateNote = textOrNull(values.dateNote);
       return {
         kind: 'EVENT',
         ...(startDate === null ? {} : { startDate }),
@@ -232,9 +232,9 @@ export function buildExtension(
       };
     }
     case 'ARCHITECTURE': {
-      const builtPeriod = textOrNull(values['builtPeriod']);
-      const currentCondition = textOrNull(values['currentCondition']);
-      const heritageLevel = textOrNull(values['heritageLevel']);
+      const builtPeriod = textOrNull(values.builtPeriod);
+      const currentCondition = textOrNull(values.currentCondition);
+      const heritageLevel = textOrNull(values.heritageLevel);
       return {
         kind: 'ARCHITECTURE',
         ...(builtPeriod === null ? {} : { builtPeriod }),
@@ -243,11 +243,11 @@ export function buildExtension(
       };
     }
     case 'TRADITION': {
-      const traditionType = textOrNull(values['traditionType']);
+      const traditionType = textOrNull(values.traditionType);
       if (traditionType === null) {
         return null;
       }
-      const transmissionMethod = textOrNull(values['transmissionMethod']);
+      const transmissionMethod = textOrNull(values.transmissionMethod);
       return {
         kind: 'TRADITION',
         traditionType,
@@ -255,12 +255,12 @@ export function buildExtension(
       };
     }
     case 'TOPIC': {
-      const curatorNote = textOrNull(values['curatorNote']);
+      const curatorNote = textOrNull(values.curatorNote);
       return { kind: 'TOPIC', ...(curatorNote === null ? {} : { curatorNote }) };
     }
     case 'ROUTE': {
-      const durationMinutes = numberOrNull(values['durationMinutes']);
-      const distanceMeters = numberOrNull(values['distanceMeters']);
+      const durationMinutes = numberOrNull(values.durationMinutes);
+      const distanceMeters = numberOrNull(values.distanceMeters);
       return {
         kind: 'ROUTE',
         ...(durationMinutes === null ? {} : { durationMinutes }),
@@ -556,7 +556,7 @@ export function TypeExtensionSection({
   disabled: boolean;
 }) {
   const fields = visibleExtensionFields(type);
-  const accuracy = values['accuracy'];
+  const accuracy = values.accuracy;
   return (
     <SectionShell
       index={3}

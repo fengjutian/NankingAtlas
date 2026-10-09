@@ -1,39 +1,117 @@
+import { useCallback, useEffect, useState } from 'react';
+
+import { authApi, clearAccessToken, getAccessToken } from './api/client';
 import { AdminShell } from './components/AdminShell';
+import { LoginPage } from './features/auth/LoginPage';
+import { ContentListPage } from './features/content/ContentListPage';
+import { EditorPage } from './features/content/EditorPage';
+import { navigate, useRoute } from './features/shared/router';
+import { clearSessionUser, readSessionUser } from './features/shared/session';
+import { EmptyState, Loading } from './features/shared/States';
+
+import type { SessionUser } from './features/shared/session';
+
+/**
+ * 应用外壳与路由（P1-10）。
+ *
+ * - `/login` 登录页（未登录时的唯一入口）
+ * - `/contents` 内容列表
+ * - `/contents/:id` 编辑器（`/contents/new` 为新建草稿）
+ *
+ * 登录态判定：sessionStorage 里的 token + 非敏感用户缓存。
+ * 有 token 但缓存缺失时用 `GET /auth/me` 复核（顺带验证 refresh cookie 是否还有效）。
+ */
+
+type AuthPhase = 'checking' | 'anonymous' | 'authenticated';
 
 export function App() {
+  const route = useRoute();
+  const [phase, setPhase] = useState<AuthPhase>('checking');
+  const [user, setUser] = useState<SessionUser | null>(null);
+
+  const signOut = useCallback(() => {
+    clearAccessToken();
+    clearSessionUser();
+    setUser(null);
+    setPhase('anonymous');
+    navigate('/login');
+  }, []);
+
+  const bootstrap = useCallback(async () => {
+    if (getAccessToken() === null) {
+      setPhase('anonymous');
+      setUser(null);
+      return;
+    }
+    const cached = readSessionUser();
+    if (cached !== null) {
+      setUser(cached);
+      setPhase('authenticated');
+      return;
+    }
+    try {
+      const me = await authApi.me();
+      // `/auth/me` 只返回 id 与 roles；展示名留空，登录后刷新即可补齐。
+      setUser({ id: me.id, email: '', displayName: '', roles: me.roles });
+      setPhase('authenticated');
+    } catch {
+      clearAccessToken();
+      clearSessionUser();
+      setUser(null);
+      setPhase('anonymous');
+    }
+  }, []);
+
+  useEffect(() => {
+    void bootstrap();
+  }, [bootstrap]);
+
+  if (phase === 'checking') {
+    return (
+      <AdminShell>
+        <Loading label="正在校验登录状态…" />
+      </AdminShell>
+    );
+  }
+
+  if (phase === 'anonymous') {
+    return (
+      <AdminShell>
+        <LoginPage
+          onLoggedIn={(loggedIn) => {
+            setUser(loggedIn);
+            setPhase('authenticated');
+            navigate('/contents');
+          }}
+        />
+      </AdminShell>
+    );
+  }
+
+  if (user === null) {
+    return (
+      <AdminShell>
+        <EmptyState
+          title="会话异常"
+          description="登录状态无法确定，请重新登录。"
+          action={
+            <button type="button" onClick={signOut}>
+              重新登录
+            </button>
+          }
+        />
+      </AdminShell>
+    );
+  }
+
   return (
     <AdminShell>
-      <header>
-        <h1 id="dashboard-title" style={{ fontSize: '1.5rem', margin: 0 }}>
-          仪表盘
-        </h1>
-        <p className="muted" style={{ marginTop: 'var(--app-space-xs)' }}>
-          Nanking Atlas Admin · 当前环境：等待 P1 接入真实数据
-        </p>
-      </header>
-
-      <section className="banner" role="status" aria-label="在建状态提示">
-        <strong>示例 / 待核验</strong> · 当前为 P0
-        工程骨架占位页。登录、内容编辑、审核、媒体上传等功能将在 P1 阶段交付。
-      </section>
-
-      <section style={{ marginTop: 'var(--app-space-lg)' }}>
-        <h2 style={{ fontSize: '1.15rem' }}>已构建的能力</h2>
-        <ul>
-          <li>Vite + React 18 应用可独立 dev / build / preview / test</li>
-          <li>管理后台 shell：顶栏 + 侧边导航（响应式，移动端汉堡折叠）</li>
-          <li>共享 design tokens（颜色、字体、间距）跨 web/admin 一致</li>
-          <li>启服端环境变量校验（缺关键变量立即失败）</li>
-          <li>strict TypeScript、共享 ESLint 规则、跨包依赖边界</li>
-        </ul>
-
-        <h2 style={{ fontSize: '1.15rem', marginTop: 'var(--app-space-lg)' }}>尚不可用</h2>
-        <ul>
-          <li>登录、用户、角色管理（API P1）</li>
-          <li>内容/来源/媒体编辑器与审核界面（API P1）</li>
-          <li>OpenAPI 生成客户端（API P1）</li>
-        </ul>
-      </section>
+      {route.name === 'contents' ? (
+        <ContentListPage user={user} onUnauthorized={signOut} />
+      ) : null}
+      {route.name === 'editor' ? (
+        <EditorPage key={route.contentId} contentId={route.contentId} user={user} onUnauthorized={signOut} />
+      ) : null}
     </AdminShell>
   );
 }

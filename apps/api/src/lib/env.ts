@@ -95,6 +95,17 @@ const authRefreshTtlSeconds = z.preprocess(
   z.coerce.number().int().min(300).max(60 * 60 * 24 * 30).default(60 * 60 * 24 * 14),
 );
 
+/**
+ * 登录端点限流（次 / 分钟 / IP）。
+ *
+ * 生产默认 5。做成 env 是因为集成测试里所有登录用例共享 127.0.0.1，
+ * 固定 5 次会被前面的用例吃光配额；测试配置可覆盖而不放松生产值。
+ */
+const authLoginRateLimit = z.preprocess(
+  blankToUndefined,
+  z.coerce.number().int().min(0).max(1000).default(5),
+);
+
 const schema = z
   .object({
     APP_ENV,
@@ -109,6 +120,7 @@ const schema = z
     AUTH_REFRESH_SECRET: authRefreshSecret,
     AUTH_ACCESS_TTL_SECONDS: authAccessTtlSeconds,
     AUTH_REFRESH_TTL_SECONDS: authRefreshTtlSeconds,
+    AUTH_LOGIN_RATE_LIMIT: authLoginRateLimit,
   })
   .superRefine((data, ctx) => {
     if (data.APP_ENV !== 'test' && !data.DATABASE_URL) {
@@ -153,6 +165,7 @@ const parsed = schema.safeParse({
   AUTH_REFRESH_SECRET: process.env.AUTH_REFRESH_SECRET,
   AUTH_ACCESS_TTL_SECONDS: process.env.AUTH_ACCESS_TTL_SECONDS,
   AUTH_REFRESH_TTL_SECONDS: process.env.AUTH_REFRESH_TTL_SECONDS,
+  AUTH_LOGIN_RATE_LIMIT: process.env.AUTH_LOGIN_RATE_LIMIT,
 });
 
 if (!parsed.success) {
@@ -175,6 +188,7 @@ export const env = Object.freeze({
   AUTH_REFRESH_SECRET: parsed.data.AUTH_REFRESH_SECRET,
   AUTH_ACCESS_TTL_SECONDS: parsed.data.AUTH_ACCESS_TTL_SECONDS,
   AUTH_REFRESH_TTL_SECONDS: parsed.data.AUTH_REFRESH_TTL_SECONDS,
+  AUTH_LOGIN_RATE_LIMIT: parsed.data.AUTH_LOGIN_RATE_LIMIT,
 });
 
 export type ApiEnv = typeof env;

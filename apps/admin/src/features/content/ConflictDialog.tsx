@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 
+import type { AdminContentDto } from '@/api/types';
+
 import { Button, ButtonRow } from '@/features/shared/Button';
 import { dangerBanner, dialogBackdrop, mutedText, stack, tableStyle } from '@/features/shared/styles';
 
-import type { AdminContentDto } from '@/api/types';
 
 /**
  * 版本冲突对话框（P1-10）。
@@ -38,8 +39,8 @@ export function readConflictVersions(
   details: Record<string, unknown> | undefined,
   fallbackLocalVersion: number,
 ): ConflictVersionInfo {
-  const current = details?.['currentVersion'];
-  const expected = details?.['expectedVersion'];
+  const current = details?.currentVersion;
+  const expected = details?.expectedVersion;
   return {
     localVersion: typeof expected === 'number' ? expected : fallbackLocalVersion,
     serverVersion: typeof current === 'number' ? current : null,

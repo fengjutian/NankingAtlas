@@ -5,6 +5,7 @@ import { z } from 'zod';
 
 import { AuthService, AuthError, type RequestContext } from './auth.service.js';
 import { REFRESH_COOKIE } from './refresh-cookie.js';
+import { env } from '../../lib/env.js';
 import { requireUser } from '../../common/auth/auth.guard.js';
 import { Public, RequireRoles } from '../../common/auth/roles.decorator.js';
 
@@ -69,6 +70,22 @@ function buildContext(req: Request): RequestContext {
   };
 }
 
+/**
+ * 登录限流：默认 5 次 / 分钟 / IP（可由 `AUTH_LOGIN_RATE_LIMIT` 覆盖）。
+ *
+ * 为什么做成 env 而不是硬编码：集成测试里所有登录用例共享同一个 IP
+ * （supertest 走 127.0.0.1），固定 5 次/分钟会被前面的用例吃光配额。
+ * 做成 env 后测试可以放宽而不放松生产值 —— 生产默认仍是 5。
+ *
+ * `env` 对象在模块加载期冻结（`Object.freeze`），所以阈值也只在加载期读取。
+ * 测试要验证"限流真的拦得住"，见 `auth.integration.spec.ts` 里用独立
+ * `AppModule` 副本 + 独立 env 的做法，而不是改这里的常量。
+ */
+const LOGIN_THROTTLE = { default: { limit: env.AUTH_LOGIN_RATE_LIMIT, ttl: 60_000 } };
+const REFRESH_THROTTLE = {
+  default: { limit: env.AUTH_LOGIN_RATE_LIMIT * 6, ttl: 60_000 },
+};
+
 @Controller('auth')
 export class AuthController {
   /**
@@ -90,7 +107,7 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  @Throttle(LOGIN_THROTTLE)
   async login(
     @Body() rawBody: unknown,
     @Req() req: Request,
@@ -117,7 +134,7 @@ export class AuthController {
   @Public()
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Throttle(REFRESH_THROTTLE)
   async refresh(
     @Body() rawBody: unknown,
     @Req() req: Request,
@@ -148,7 +165,7 @@ export class AuthController {
   @Public()
   @Post('logout')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @Throttle(REFRESH_THROTTLE)
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<void> {
     const cookieToken = readRefreshCookie(req);
     if (cookieToken !== null) {
@@ -194,10 +211,32 @@ function clearRefreshCookie(res: Response): void {
   });
 }
 
+/**
+ * 从 `Cookie` 头解析 refresh token。
+ *
+ * 不用 `req.cookies`：那需要 `cookie-parser` 中间件，而 Nest 默认不带。
+ * 为一个 cookie 引入新依赖不值（AGENTS.md §6.5「能用现有依赖解决时不新增」），
+ * 这里手动解析 —— Cookie 头格式简单（`k=v; k2=v2`），没有嵌套场景。
+ */
 function readRefreshCookie(req: Request): string | null {
-  const raw = (req.cookies as Record<string, string | undefined> | undefined)?.[REFRESH_COOKIE];
-  if (raw === undefined || raw === '') {
-    return null;
+  // 优先用中间件已解析的结果（若将来引入了 cookie-parser）。
+  const parsed = (req.cookies as Record<string, string | undefined> | undefined)?.[REFRESH_COOKIE];
+  if (parsed !== undefined && parsed !== '') {
+    return parsed;
   }
-  return raw;
+
+  const header = req.headers.cookie;
+  const raw = (Array.isArray(header) ? header[0] : header) ?? '';
+  for (const part of raw.split(';')) {
+    const eq = part.indexOf('=');
+    if (eq <= 0) {
+      continue;
+    }
+    const name = part.slice(0, eq).trim();
+    if (name === REFRESH_COOKIE) {
+      const value = part.slice(eq + 1).trim();
+      return value === '' ? null : decodeURIComponent(value);
+    }
+  }
+  return null;
 }

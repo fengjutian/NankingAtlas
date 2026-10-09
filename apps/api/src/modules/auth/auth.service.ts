@@ -189,6 +189,8 @@ export class AuthService {
     };
 
     // 旋转：撤销旧 + 发新，在同一事务内。
+    // 传 token 的**主键 id**（不是 hash）：Prisma 的 update 需要唯一键，
+    // tokenHash 虽然也是 unique，但这里用 id 更直观且索引更短。
     const next = await this.rotateRefreshToken(row.id, user, ctx);
     await this.writeAudit({
       actorId: user.id,
@@ -245,11 +247,11 @@ export class AuthService {
   /**
    * 旋转 refresh token。
    *
-   * `revokeTokenHash` 为 null 表示首次签发；否则撤销指定 token 后发新的。
+   * `revokeTokenId` 为 null 表示首次签发；否则撤销指定 token 的**主键 id** 后发新的。
    * 整个过程在一个事务里，避免"旧 token 已撤销但新 token 没发出去"。
    */
   private async rotateRefreshToken(
-    revokeTokenHash: string | null,
+    revokeTokenId: string | null,
     user: UserWithRoles,
     ctx: RequestContext,
   ): Promise<AuthSession> {
@@ -258,9 +260,9 @@ export class AuthService {
     const expiresAt = new Date(Date.now() + env.AUTH_REFRESH_TTL_SECONDS * 1000);
 
     await prisma.$transaction(async (tx) => {
-      if (revokeTokenHash !== null) {
+      if (revokeTokenId !== null) {
         await tx.refreshToken.update({
-          where: { tokenHash: revokeTokenHash },
+          where: { id: revokeTokenId },
           data: { revokedAt: new Date() },
         });
       }

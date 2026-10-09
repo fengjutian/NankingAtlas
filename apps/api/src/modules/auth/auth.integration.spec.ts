@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import type { INestApplication } from '@nestjs/common';
 
 import {
@@ -67,10 +67,7 @@ describe('POST /api/v1/auth/login', () => {
       .post('/api/v1/auth/login')
       .send({ email: user.email, password: PASSWORD });
 
-    if (res.status !== 200) {
-      // 诊断信息：失败时把响应体打出来，避免"expected 403 to be 200"看不到原因
-      throw new Error(`login failed: status=${String(res.status)} body=${JSON.stringify(res.body)}`);
-    }
+    expect(res.status).toBe(200);
     const body = res.body as { data: { accessToken: string; user: { id: string; roles: string[] } } };
     expect(body.data.accessToken.split('.')).toHaveLength(3);
     expect(body.data.user.id).toBe(user.id);
@@ -293,20 +290,46 @@ describe('RBAC — 403 for insufficient role (AGENTS.md §4.2)', () => {
 
 describe('rate limiting', () => {
   it('returns 429 after exceeding the login rate limit', async () => {
-    // 用一个不存在的邮箱连续失败，触发 5 次/分钟限流
-    const attempts: number[] = [];
-    for (let i = 0; i < 8; i += 1) {
-      const res = await request(serverOf(app))
-        .post('/api/v1/auth/login')
-        .send({ email: `ratelimit-target-${Date.now()}@example.test`, password: PASSWORD });
-      attempts.push(res.status);
-      if (res.status === 429) {
-        const body = res.body as { error: { code: string } };
-        expect(body.error.code).toBe('RATE_LIMITED');
+    // 集成测试配置把 AUTH_LOGIN_RATE_LIMIT 放宽到 1000，避免与其它用例
+    // 抢配额（它们都走 127.0.0.1）。所以这里不能靠"多打几次"触发 429。
+    //
+    // 正确做法：用**独立进程语义**验证 —— 起一个 env 收紧到 3 的新 app。
+    // 因为 throttle 阈值在模块加载期从 env 读取，`vi.resetModules()` +
+    // 动态 import 才能让新阈值生效。
+    const previous = process.env['AUTH_LOGIN_RATE_LIMIT'];
+    process.env['AUTH_LOGIN_RATE_LIMIT'] = '3';
+    vi.resetModules();
+
+    // 动态 import 会重新执行 auth.controller.ts，此时读到 limit=3。
+    const strictApp = await (async () => {
+      const { createTestApp: create } = await import('../../../test/app-harness.js');
+      return create();
+    })();
+
+    try {
+      const statuses: number[] = [];
+      for (let i = 0; i < 6; i += 1) {
+        const res = await request(serverOf(strictApp))
+          .post('/api/v1/auth/login')
+          .send({ email: `ratelimit-${String(Date.now())}-${String(i)}@example.test`, password: PASSWORD });
+        statuses.push(res.status);
+        if (res.status === 429) {
+          const body = res.body as { error: { code: string } };
+          expect(body.error.code).toBe('RATE_LIMITED');
+        }
       }
+      expect(statuses).toContain(429);
+      // 前 3 次应当仍是 401（凭据错误），第 4 次起被限流
+      expect(statuses.slice(0, 3)).toEqual([401, 401, 401]);
+    } finally {
+      await closeTestApp(strictApp);
+      if (previous === undefined) {
+        delete process.env['AUTH_LOGIN_RATE_LIMIT'];
+      } else {
+        process.env['AUTH_LOGIN_RATE_LIMIT'] = previous;
+      }
+      vi.resetModules();
     }
-    // 至少要有一次 429（限流生效）
-    expect(attempts).toContain(429);
   });
 });
 

@@ -1,43 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { contentApi, isApiAuthError, isApiError, libraryApi } from '@/api/client';
-import {
-  AutosaveStatus,
-  useAutosaveController,
-  useUnsavedChangesWarning,
-} from '@/features/content/AutosaveStatus';
-import { ConflictDialog, readConflictVersions } from '@/features/content/ConflictDialog';
-import {
-  BasicsSection,
-  BodySection,
-  RelationsSection,
-  RightsMediaSection,
-  SeoSection,
-  SourcesSection,
-  TagsSection,
-  TypeExtensionSection,
-  buildExtension,
-  parseBodyJson,
-} from '@/features/content/editorSections';
-import { Button } from '@/features/shared/Button';
-import { StatusBadge } from '@/features/shared/Badge';
-import { ErrorState, Loading } from '@/features/shared/States';
-import { navigate } from '@/features/shared/router';
-import { card, dangerBanner, inputStyle, mutedText, row, stack } from '@/features/shared/styles';
-import { formatDateTime } from '@/features/content/ContentListPage';
-import { ReviewPanel } from '@/features/review/ReviewPanel';
-
-import { CONTENT_VERSION_CONFLICT } from '@/api/types';
-
-import type { ConflictVersionInfo } from '@/features/content/ConflictDialog';
-import type {
-  AttachSourceValue,
-  BasicsValue,
-  MediaCompleteValue,
-  MediaIntake,
-  NewSourceValue,
-} from '@/features/content/editorSections';
-import type { ReadinessState } from '@/features/review/ReviewPanel';
 import type {
   AdminContentDto,
   AdminContentPatch,
@@ -53,7 +15,46 @@ import type {
   TypeExtension,
   UploadIntentDto,
 } from '@/api/types';
+import type { ConflictVersionInfo } from '@/features/content/ConflictDialog';
+import type {
+  AttachSourceValue,
+  BasicsValue,
+  MediaCompleteValue,
+  MediaIntake,
+  NewSourceValue,
+} from '@/features/content/editorSections';
+import type { ReadinessState } from '@/features/review/ReviewPanel';
 import type { SessionUser } from '@/features/shared/session';
+
+import { contentApi, isApiAuthError, isApiError, libraryApi } from '@/api/client';
+import { CONTENT_VERSION_CONFLICT } from '@/api/types';
+import {
+  AutosaveStatus,
+  useAutosaveController,
+  useUnsavedChangesWarning,
+} from '@/features/content/AutosaveStatus';
+import { ConflictDialog, readConflictVersions } from '@/features/content/ConflictDialog';
+import { formatDateTime } from '@/features/content/ContentListPage';
+import {
+  BasicsSection,
+  BodySection,
+  RelationsSection,
+  RightsMediaSection,
+  SeoSection,
+  SourcesSection,
+  TagsSection,
+  TypeExtensionSection,
+  buildExtension,
+  parseBodyJson,
+} from '@/features/content/editorSections';
+import { ReviewPanel } from '@/features/review/ReviewPanel';
+import { StatusBadge } from '@/features/shared/Badge';
+import { Button } from '@/features/shared/Button';
+import { navigate } from '@/features/shared/router';
+import { ErrorState, Loading } from '@/features/shared/States';
+import { card, dangerBanner, inputStyle, mutedText, row, stack } from '@/features/shared/styles';
+
+
 
 /**
  * 编辑器页（P1-10）：八区 + 自动保存 + 版本冲突 + 审核面板。
@@ -150,7 +151,7 @@ function pickId(raw: unknown): string | null {
   if (typeof raw !== 'object' || raw === null || !('id' in raw)) {
     return null;
   }
-  const id = (raw as { id: unknown }).id;
+  const id = (raw).id;
   return typeof id === 'string' ? id : null;
 }
 
@@ -285,9 +286,8 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
 
   // ---- 自动保存 ----
   const handleSaveError = useCallback((error: unknown) => {
-    if (isVersionConflict(error)) {
-      const apiError = error;
-      const info = readConflictVersions(apiError.details, versionRef.current);
+    if (isApiError(error) && error.code === CONTENT_VERSION_CONFLICT) {
+      const info = readConflictVersions(error.details, versionRef.current);
       setConflict({ ...info, serverUpdatedAt: content?.updatedAt ?? null });
       setConflictServer(null);
       // 冲突时顺手拉一份服务端最新内容，供"查看差异"并排展示。
@@ -343,41 +343,43 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
   );
 
   // ---- 来源 / 标签 / 关联 / 媒体操作 ----
-  async function runSideTask(task: () => Promise<void>): Promise<void> {
+  // 统一包装：失败时把错误写进 sideError 并返回 null，成功时返回任务结果。
+  const runSideTask = useCallback(async <T,>(task: () => Promise<T>): Promise<T | null> => {
     setSideBusy(true);
     setSideError(null);
     try {
-      await task();
+      return await task();
     } catch (cause) {
       if (isApiAuthError(cause)) {
         onUnauthorized();
-        return;
+        return null;
       }
       setSideError(describeError(cause).message);
+      return null;
     } finally {
       setSideBusy(false);
     }
-  }
+  }, [onUnauthorized]);
 
-  const createSource = useCallback(async (): Promise<string | null> => {
-    let created: string | null = null;
-    await runSideTask(async () => {
-      const raw = await libraryApi.createSource({
-        kind: newSource.kind,
-        title: newSource.title.trim(),
-        ...(newSource.author.trim() === '' ? {} : { author: newSource.author.trim() }),
-        ...(newSource.publisher.trim() === '' ? {} : { publisher: newSource.publisher.trim() }),
-        ...(newSource.publicationDate === '' ? {} : { publicationDate: newSource.publicationDate }),
-        ...(newSource.url.trim() === '' ? {} : { url: newSource.url.trim() }),
-        ...(newSource.citationText.trim() === '' ? {} : { citationText: newSource.citationText.trim() }),
-        ...(newSource.verificationNote.trim() === ''
-          ? {}
-          : { verificationNote: newSource.verificationNote.trim() }),
-      });
-      created = pickId(raw);
-    });
-    return created;
-  }, [newSource]);
+  const createSource = useCallback(
+    async (): Promise<string | null> =>
+      runSideTask(async () => {
+        const raw = await libraryApi.createSource({
+          kind: newSource.kind,
+          title: newSource.title.trim(),
+          ...(newSource.author.trim() === '' ? {} : { author: newSource.author.trim() }),
+          ...(newSource.publisher.trim() === '' ? {} : { publisher: newSource.publisher.trim() }),
+          ...(newSource.publicationDate === '' ? {} : { publicationDate: newSource.publicationDate }),
+          ...(newSource.url.trim() === '' ? {} : { url: newSource.url.trim() }),
+          ...(newSource.citationText.trim() === '' ? {} : { citationText: newSource.citationText.trim() }),
+          ...(newSource.verificationNote.trim() === ''
+            ? {}
+            : { verificationNote: newSource.verificationNote.trim() }),
+        });
+        return pickId(raw);
+      }),
+    [newSource, runSideTask],
+  );
 
   // ---- 审核动作 ----
   const checkReadiness = useCallback(async () => {
@@ -662,7 +664,7 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
         onSummaryChange={(next) => markDirty({ ...draft, summary: next })}
       />
 
-      <ReviewPanelLazy
+      <ReviewPanel
         content={content}
         user={user}
         readiness={readiness}
@@ -684,11 +686,6 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
       />
     </div>
   );
-}
-
-/** 直接引入会拉长本文件依赖图；单独包一层只为明确"审核面板是独立区块"。 */
-function ReviewPanelLazy(props: Parameters<typeof ReviewPanel>[0]) {
-  return <ReviewPanel {...props} />;
 }
 
 /**
@@ -811,5 +808,3 @@ function NewContentForm({
     </div>
   );
 }
-
-export type { AutosaveState };

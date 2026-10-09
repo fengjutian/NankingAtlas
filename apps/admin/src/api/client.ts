@@ -1,5 +1,3 @@
-import { env } from '@/lib/env';
-
 import type {
   AdminContentDto,
   AdminContentPatch,
@@ -24,6 +22,9 @@ import type {
   UploadIntentDto,
   UpsertTagInput,
 } from './types';
+
+import { env } from '@/lib/env';
+
 
 /**
  * 管理后台 HTTP 客户端（P1-10）。
@@ -93,7 +94,12 @@ export class ApiNetworkError extends Error {
 }
 
 /** 请求被取消（自动保存 abort 掉上一次请求时）。继承 ApiNetworkError 以便统一兜底。 */
-export class ApiAbortError extends ApiNetworkError {}
+export class ApiAbortError extends ApiNetworkError {
+  constructor(message: string, cause?: unknown) {
+    super(message, cause);
+    this.name = 'ApiAbortError';
+  }
+}
 
 export function isApiError(value: unknown): value is ApiError {
   return value instanceof ApiError;
@@ -222,7 +228,7 @@ function isApiErrorPayload(raw: unknown): raw is ApiErrorPayload {
   if (typeof raw !== 'object' || raw === null || !('error' in raw)) {
     return false;
   }
-  const error = (raw as { error: unknown }).error;
+  const error = (raw).error;
   if (typeof error !== 'object' || error === null) {
     return false;
   }
@@ -292,7 +298,7 @@ function isSessionPayload(raw: unknown): raw is ApiEnvelope<AuthSession> {
   if (typeof raw !== 'object' || raw === null || !('data' in raw)) {
     return false;
   }
-  const data = (raw as { data: unknown }).data;
+  const data = (raw).data;
   if (typeof data !== 'object' || data === null) {
     return false;
   }
@@ -307,7 +313,7 @@ async function execute<T>(path: string, options: RequestOptions, allowRefresh: b
 
   const token = options.auth === false ? null : getAccessToken();
   if (token !== null) {
-    headers['Authorization'] = `Bearer ${token}`;
+    headers.Authorization = `Bearer ${token}`;
   }
   if (options.ifMatch !== undefined) {
     headers['If-Match'] = formatIfMatch(options.ifMatch);

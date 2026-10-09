@@ -57,6 +57,9 @@ export default defineConfig({
       DATABASE_URL: integrationDatabaseUrl,
       AUTH_ACCESS_SECRET: 'test-access-secret-value-long-enough-over-32b',
       AUTH_REFRESH_SECRET: 'test-refresh-secret-value-long-enough-over-32b',
+      // 集成测试里所有登录用例共享 127.0.0.1，固定 5 次/分钟会被前面的
+      // 用例吃光配额。测试放宽到 1000；生产默认仍是 5（见 .env.example）。
+      AUTH_LOGIN_RATE_LIMIT: '1000',
     },
   },
 });
