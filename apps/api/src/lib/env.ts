@@ -24,7 +24,7 @@ const optionalUrl = z.preprocess(blankToUndefined, z.string().url().optional());
 
 const apiPort = z.preprocess(
   blankToUndefined,
-  z.number().int().positive().max(65535).default(4000),
+  z.coerce.number().int().positive().max(65535).default(4000),
 );
 
 const logLevel = z.preprocess(

@@ -13,7 +13,10 @@
  * 格式契约的权威来源。P0 阶段 `validation` 与 `api-contract` 都依赖 zod；后续
  * P1-11 把 OpenAPI 生成物补全后，本包可改为只导出从 OpenAPI 派生的类型。
  */
-export { requestIdSchema, type RequestId } from '@nanking-atlas/validation';
+import { requestIdSchema, type RequestId } from '@nanking-atlas/validation';
+
+export { requestIdSchema };
+export type { RequestId };
 
 /**
  * API 错误码。所有接口的 error.code 必须取自这里（区分大小写）。

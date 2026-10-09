@@ -19,27 +19,18 @@ import { env } from './lib/env.js';
                 options: {
                   singleLine: true,
                   translateTime: 'SYS:HH:MM:ss.l',
-                  ignore: 'pid,hostname,req.headers,res.headers',
+                  ignore: 'pid,hostname',
                 },
               },
-        // 请求生命周期：到达 → 完成（success / error）
         customLogLevel: (_req, res, err) => {
           if (err || res.statusCode >= 500) return 'error';
           if (res.statusCode >= 400) return 'warn';
           return 'info';
         },
-        // 字段重命名 + 透传 requestId
-        customProps: (req) => ({ requestId: (req as { requestId?: string }).requestId }),
-        // 不在生产日志里打印完整 req/res（可能含 token / cookie）
-        redact: {
-          paths: [
-            'req.headers.authorization',
-            'req.headers.cookie',
-            'req.headers["x-forwarded-for"]',
-            'res.headers["set-cookie"]',
-          ],
-          censor: '[REDACTED]',
-        },
+        // 在每行日志带 requestId；res.locals.requestId 由 RequestIdMiddleware 写入
+        customProps: (_req, res) => ({
+          requestId: (res as { locals?: { requestId?: string } }).locals?.requestId,
+        }),
       },
     }),
   ],

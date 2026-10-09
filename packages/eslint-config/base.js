@@ -42,6 +42,9 @@ export default [
           groups: ['builtin', 'external', 'internal', ['parent', 'sibling', 'index'], 'type'],
           'newlines-between': 'always',
           alphabetize: { order: 'asc', caseInsensitive: true },
+          // 把 @nanking-atlas/* workspace 包归入 internal 组，与外部依赖分层
+          pathGroups: [{ pattern: '@nanking-atlas/**', group: 'internal' }],
+          pathGroupsExcludedImportTypes: ['builtin'],
         },
       ],
       '@typescript-eslint/consistent-type-imports': [

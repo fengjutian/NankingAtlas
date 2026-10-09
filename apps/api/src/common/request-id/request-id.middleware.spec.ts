@@ -1,7 +1,8 @@
-import type { NextFunction, Request, Response } from 'express';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import { REQUEST_ID_KEY, RequestIdMiddleware } from './request-id.middleware.js';
+
+import type { NextFunction, Request, Response } from 'express';
 
 function makeReq(headerValue: string | undefined, headerName = 'x-request-id'): Request {
   const headers: Record<string, string> = {};
@@ -10,6 +11,7 @@ function makeReq(headerValue: string | undefined, headerName = 'x-request-id'): 
     header(name: string): string | undefined {
       return headers[name.toLowerCase()];
     },
+    locals: {} as Record<string, unknown>,
   } as unknown as Request;
 }
 
@@ -19,6 +21,7 @@ function makeRes(): { res: Response; setHeaders: Record<string, string> } {
     setHeader(name: string, value: string): void {
       setHeaders[name.toLowerCase()] = value;
     },
+    locals: {} as Record<string, unknown>,
   } as unknown as Response;
   return { res, setHeaders };
 }
@@ -37,7 +40,9 @@ describe('RequestIdMiddleware', () => {
 
     middleware.use(req, res, next);
 
-    expect(req[REQUEST_ID_KEY]).toBe('req_abc123_-XYZ');
+    expect((req as unknown as { locals: Record<string, unknown> }).locals[REQUEST_ID_KEY]).toBe(
+      'req_abc123_-XYZ',
+    );
     expect(setHeaders['x-request-id']).toBe('req_abc123_-XYZ');
   });
 
@@ -48,7 +53,9 @@ describe('RequestIdMiddleware', () => {
 
     middleware.use(req, res, () => undefined);
 
-    const generated = req[REQUEST_ID_KEY];
+    const generated = (req as unknown as { locals: Record<string, unknown> }).locals[
+      REQUEST_ID_KEY
+    ];
     expect(generated).toMatch(/^[A-Za-z0-9_-]{16,}$/);
     expect(setHeaders['x-request-id']).toBe(generated);
   });
@@ -60,8 +67,9 @@ describe('RequestIdMiddleware', () => {
 
     middleware.use(req, res, () => undefined);
 
-    expect(req[REQUEST_ID_KEY]).not.toBe('has space and !@#');
-    expect(req[REQUEST_ID_KEY]).toMatch(/^[A-Za-z0-9_-]+$/);
-    expect(setHeaders['x-request-id']).toBe(req[REQUEST_ID_KEY]);
+    const locals = (req as unknown as { locals: Record<string, unknown> }).locals;
+    expect(locals[REQUEST_ID_KEY]).not.toBe('has space and !@#');
+    expect(locals[REQUEST_ID_KEY]).toMatch(/^[A-Za-z0-9_-]+$/);
+    expect(setHeaders['x-request-id']).toBe(locals[REQUEST_ID_KEY]);
   });
 });
