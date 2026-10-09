@@ -1,11 +1,24 @@
+/* 共享 design tokens（事实来源：packages/ui/src/tokens.ts） */
+@import '@nanking-atlas/ui/styles.css';
+
+/* 管理后台应用层变量 */
 :root {
-  --color-bg: #1f1d18;
-  --color-fg: #f5f1e8;
-  --color-muted: #b3ad9f;
-  --color-accent: #c8912a;
-  --color-border: #3b362d;
-  --max-content: 80rem;
-  --font-body: 'PingFang SC', 'Hiragino Sans GB', system-ui, sans-serif;
+  --app-bg: var(--nla-color-admin-bg);
+  --app-fg: var(--nla-color-admin-fg);
+  --app-muted: var(--nla-color-admin-muted);
+  --app-accent: var(--nla-color-admin-accent);
+  --app-border: var(--nla-color-admin-border);
+  --app-warning-fg: var(--nla-color-admin-warning-fg);
+  --app-warning-bg: var(--nla-color-admin-warning-bg);
+  --app-warning-border: var(--nla-color-admin-warning-border);
+  --app-font-sans: var(--nla-font-sans);
+  --app-space-xs: var(--nla-space-xs);
+  --app-space-sm: var(--nla-space-sm);
+  --app-space-md: var(--nla-space-md);
+  --app-space-lg: var(--nla-space-lg);
+  --app-space-xl: var(--nla-space-xl);
+  --app-space-xxl: var(--nla-space-xxl);
+  --app-max-content: var(--nla-max-content-admin);
 }
 
 * {
@@ -16,38 +29,193 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: var(--color-bg);
-  color: var(--color-fg);
-  font-family: var(--font-body);
+  background: var(--app-bg);
+  color: var(--app-fg);
+  font-family: var(--app-font-sans);
   font-size: 15px;
   line-height: 1.6;
 }
 
-.shell {
-  max-width: var(--max-content);
-  margin: 0 auto;
-  padding: 1.5rem;
-}
-
 .muted {
-  color: var(--color-muted);
+  color: var(--app-muted);
 }
 
 .banner {
-  background: #3a2e16;
-  border: 1px solid #6f541d;
-  color: #fbe5b6;
-  padding: 0.75rem 1rem;
+  background: var(--app-warning-bg);
+  border: 1px solid var(--app-warning-border);
+  color: var(--app-warning-fg);
+  padding: var(--app-space-sm) var(--app-space-md);
   border-radius: 0.25rem;
-  margin-top: 1rem;
+  margin-top: var(--app-space-md);
 }
 
 a {
-  color: var(--color-accent);
+  color: var(--app-accent);
 }
 
 button:focus-visible,
 a:focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--app-accent);
   outline-offset: 2px;
+}
+
+.skip-link {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  background: var(--app-fg);
+  color: var(--app-bg);
+  padding: var(--app-space-sm) var(--app-space-md);
+  z-index: 100;
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  left: 0;
+}
+
+/* ---- AdminShell ---- */
+.admin-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-shell__topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-md);
+  padding: var(--app-space-sm) var(--app-space-lg);
+  border-bottom: 1px solid var(--app-border);
+  background: var(--app-bg);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.admin-shell__brand {
+  font-weight: 600;
+  font-size: 1rem;
+  flex: 1;
+}
+
+.admin-shell__env {
+  font-size: 0.8rem;
+  color: var(--app-muted);
+}
+
+.admin-shell__env code {
+  background: var(--app-warning-bg);
+  color: var(--app-warning-fg);
+  padding: 0 var(--app-space-xs);
+  border-radius: 0.25rem;
+}
+
+.admin-shell__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--app-border);
+  border-radius: 0.25rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: var(--app-fg);
+}
+
+.admin-shell__body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+
+.admin-shell__sidebar {
+  background: var(--app-bg);
+  border-right: 1px solid var(--app-border);
+  padding: var(--app-space-md);
+  width: 16rem;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+
+.admin-shell__sidebar h2 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--app-muted);
+  margin: 0 0 var(--app-space-xs);
+}
+
+.admin-shell__sidebar section + section {
+  margin-top: var(--app-space-md);
+}
+
+.admin-shell__sidebar ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-shell__sidebar li {
+  margin: 0;
+}
+
+.admin-shell__link {
+  display: flex;
+  align-items: center;
+  gap: var(--app-space-xs);
+  padding: var(--app-space-xs) var(--app-space-sm);
+  color: var(--app-fg);
+  text-decoration: none;
+  border-radius: 0.25rem;
+}
+
+.admin-shell__link:hover {
+  background: var(--app-warning-bg);
+}
+
+.admin-shell__link.is-disabled {
+  color: var(--app-muted);
+  cursor: not-allowed;
+}
+
+.admin-shell__badge {
+  margin-left: auto;
+  font-size: 0.7rem;
+  padding: 0 var(--app-space-xs);
+  border: 1px solid var(--app-warning-border);
+  border-radius: 0.25rem;
+  color: var(--app-warning-fg);
+}
+
+.admin-shell__main {
+  flex: 1;
+  padding: var(--app-space-lg);
+  min-width: 0;
+  outline: none;
+}
+
+@media (max-width: 768px) {
+  .admin-shell__toggle {
+    display: inline-flex;
+  }
+  .admin-shell__sidebar {
+    display: none;
+    position: fixed;
+    inset: 3rem 0 0 0;
+    z-index: 5;
+    width: 100%;
+    height: calc(100vh - 3rem);
+  }
+  .admin-shell__sidebar.is-open {
+    display: block;
+  }
+}
+
+@media (min-width: 769px) {
+  .admin-shell__toggle {
+    display: none;
+  }
 }

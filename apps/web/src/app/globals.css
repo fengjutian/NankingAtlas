@@ -1,12 +1,26 @@
+/* 共享 design tokens（事实来源：packages/ui/src/tokens.ts） */
+@import '@nanking-atlas/ui/styles.css';
+
+/* 公开站应用层变量：把 CSS 变量绑定到本应用所需的具体 token。
+   这是允许的"应用层"覆盖；不要在 globals.css 里写死颜色值。 */
 :root {
-  --color-bg: #f8f5ef;
-  --color-fg: #1f1d18;
-  --color-muted: #6b665d;
-  --color-accent: #8b1e1e;
-  --color-border: #d9d4c7;
-  --max-content: 72rem;
-  --font-display: 'Songti SC', 'STSong', 'Source Han Serif', serif;
-  --font-body: 'PingFang SC', 'Hiragino Sans GB', system-ui, sans-serif;
+  --app-bg: var(--nla-color-web-bg);
+  --app-fg: var(--nla-color-web-fg);
+  --app-muted: var(--nla-color-web-muted);
+  --app-accent: var(--nla-color-web-accent);
+  --app-border: var(--nla-color-web-border);
+  --app-warning-fg: var(--nla-color-web-warning-fg);
+  --app-warning-bg: var(--nla-color-web-warning-bg);
+  --app-warning-border: var(--nla-color-web-warning-border);
+  --app-font-serif: var(--nla-font-serif);
+  --app-font-sans: var(--nla-font-sans);
+  --app-space-xs: var(--nla-space-xs);
+  --app-space-sm: var(--nla-space-sm);
+  --app-space-md: var(--nla-space-md);
+  --app-space-lg: var(--nla-space-lg);
+  --app-space-xl: var(--nla-space-xl);
+  --app-space-xxl: var(--nla-space-xxl);
+  --app-max-content: var(--nla-max-content-web);
 }
 
 * {
@@ -17,9 +31,9 @@ html,
 body {
   margin: 0;
   padding: 0;
-  background: var(--color-bg);
-  color: var(--color-fg);
-  font-family: var(--font-body);
+  background: var(--app-bg);
+  color: var(--app-fg);
+  font-family: var(--app-font-sans);
   font-size: 16px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
@@ -27,28 +41,196 @@ body {
 }
 
 a {
-  color: var(--color-accent);
+  color: var(--app-accent);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
-a:focus-visible,
-button:focus-visible {
-  outline: 2px solid var(--color-accent);
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--app-accent);
   outline-offset: 2px;
 }
 
+.skip-link {
+  position: absolute;
+  left: -10000px;
+  top: 0;
+  background: var(--app-fg);
+  color: var(--app-bg);
+  padding: var(--app-space-sm) var(--app-space-md);
+  z-index: 100;
+  text-decoration: none;
+}
+
+.skip-link:focus {
+  left: 0;
+}
+
 .shell {
-  max-width: var(--max-content);
+  max-width: var(--app-max-content);
   margin: 0 auto;
-  padding: 2rem 1.5rem;
+  padding: var(--app-space-xl) var(--app-space-lg);
 }
 
 .banner {
-  background: #fdf3d0;
-  border: 1px solid #e6cf7d;
-  color: #5a4a14;
-  padding: 0.75rem 1rem;
+  background: var(--app-warning-bg);
+  border: 1px solid var(--app-warning-border);
+  color: var(--app-warning-fg);
+  padding: var(--app-space-sm) var(--app-space-md);
   border-radius: 0.25rem;
   font-size: 0.9rem;
+}
+
+.muted {
+  color: var(--app-muted);
+}
+
+/* ---- 顶部导航 ---- */
+.site-header {
+  border-bottom: 1px solid var(--app-border);
+  background: var(--app-bg);
+}
+
+.site-header__inner {
+  max-width: var(--app-max-content);
+  margin: 0 auto;
+  padding: var(--app-space-md) var(--app-space-lg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--app-space-md);
+  position: relative;
+}
+
+.site-header__brand {
+  color: var(--app-fg);
+  text-decoration: none;
+  font-family: var(--app-font-serif);
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.site-header__brand:focus-visible {
+  outline-offset: 4px;
+}
+
+.site-header__toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--app-border);
+  border-radius: 0.25rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  font-size: 1.25rem;
+  cursor: pointer;
+  color: var(--app-fg);
+}
+
+.site-header__nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  gap: var(--app-space-md);
+}
+
+.site-header__nav a {
+  color: var(--app-fg);
+  text-decoration: none;
+  padding: var(--app-space-xs) var(--app-space-sm);
+  border-radius: 0.25rem;
+}
+
+.site-header__nav a:hover {
+  background: var(--app-warning-bg);
+}
+
+@media (max-width: 640px) {
+  .site-header__toggle {
+    display: inline-flex;
+  }
+  .site-header__nav {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--app-bg);
+    border-bottom: 1px solid var(--app-border);
+    padding: var(--app-space-md) var(--app-space-lg);
+  }
+  .site-header__nav.is-open {
+    display: block;
+  }
+  .site-header__nav ul {
+    flex-direction: column;
+    gap: var(--app-space-sm);
+  }
+}
+
+@media (min-width: 641px) {
+  .site-header__toggle {
+    display: none;
+  }
+}
+
+/* ---- 底部 ---- */
+.site-footer {
+  border-top: 1px solid var(--app-border);
+  background: var(--app-bg);
+  margin-top: var(--app-space-xxl);
+}
+
+.site-footer__inner {
+  max-width: var(--app-max-content);
+  margin: 0 auto;
+  padding: var(--app-space-xl) var(--app-space-lg);
+}
+
+.site-footer__cols {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--app-space-lg);
+}
+
+@media (min-width: 641px) {
+  .site-footer__cols {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.site-footer h2 {
+  font-size: 0.95rem;
+  font-family: var(--app-font-sans);
+  margin: 0 0 var(--app-space-sm);
+  color: var(--app-fg);
+}
+
+.site-footer ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.site-footer li {
+  margin: 0 0 var(--app-space-xs);
+}
+
+.site-footer__notice {
+  margin-top: var(--app-space-lg);
+  padding: var(--app-space-sm) var(--app-space-md);
+  background: var(--app-warning-bg);
+  border: 1px solid var(--app-warning-border);
+  color: var(--app-warning-fg);
+  border-radius: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.site-footer__copyright {
+  margin-top: var(--app-space-md);
+  font-size: 0.8rem;
+  color: var(--app-muted);
 }

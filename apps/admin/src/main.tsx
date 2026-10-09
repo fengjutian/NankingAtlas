@@ -12,6 +12,9 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
   <StrictMode>
+    <a href="#main" className="skip-link">
+      跳到主要内容
+    </a>
     <App />
   </StrictMode>,
 );
