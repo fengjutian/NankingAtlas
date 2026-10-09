@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import type { INestApplication } from '@nestjs/common';
 
 import {
   closeTestApp,
@@ -9,6 +8,8 @@ import {
   serverOf,
 } from '../../../test/app-harness.js';
 import { hashPassword } from '../../lib/password.js';
+
+import type { INestApplication } from '@nestjs/common';
 
 /**
  * 认证集成测试（P1-02 / P1-03）。
@@ -31,6 +32,20 @@ interface TestUser {
 }
 
 let app: INestApplication | undefined;
+
+/**
+ * 取已初始化的 app。
+ *
+ * `app` 声明为 `INestApplication | undefined`（beforeAll 可能失败），
+ * 但测试体里用 `serverOf(liveApp())` 会被 TS 拒。把"必须已初始化"这件事
+ * 集中在这里断言一次，比在每个用例里写 `app!` 更安全。
+ */
+function liveApp(): INestApplication {
+  if (app === undefined) {
+    throw new Error('app not initialised — beforeAll likely failed');
+  }
+  return app;
+}
 
 async function createUser(email: string, roles: string[], disabled = false): Promise<TestUser> {
   const passwordHash = await hashPassword(PASSWORD);
@@ -63,20 +78,22 @@ describe('POST /api/v1/auth/login', () => {
   it('issues an access token for valid credentials', async () => {
     const user = await createUser('editor-ok@example.test', ['EDITOR']);
 
-    const res = await request(serverOf(app))
+    const res = await request(serverOf(liveApp()))
       .post('/api/v1/auth/login')
       .send({ email: user.email, password: PASSWORD });
 
     expect(res.status).toBe(200);
-    const body = res.body as { data: { accessToken: string; user: { id: string; roles: string[] } } };
+    const body = res.body as {
+      data: { accessToken: string; user: { id: string; roles: string[] } };
+    };
     expect(body.data.accessToken.split('.')).toHaveLength(3);
     expect(body.data.user.id).toBe(user.id);
     expect(body.data.user.roles).toEqual(['EDITOR']);
   });
 
   it('is case-insensitive on email', async () => {
-    const user = await createUser('case-test@example.test', ['EDITOR']);
-    const res = await request(serverOf(app))
+    await createUser('case-test@example.test', ['EDITOR']);
+    const res = await request(serverOf(liveApp()))
       .post('/api/v1/auth/login')
       .send({ email: 'CASE-TEST@EXAMPLE.TEST', password: PASSWORD });
     expect(res.status).toBe(200);
@@ -84,7 +101,7 @@ describe('POST /api/v1/auth/login', () => {
 
   it('returns 401 with a generic message for a wrong password (no account enumeration)', async () => {
     const user = await createUser('wrong-pw@example.test', ['EDITOR']);
-    const res = await request(serverOf(app))
+    const res = await request(serverOf(liveApp()))
       .post('/api/v1/auth/login')
       .send({ email: user.email, password: 'definitely-the-wrong-password' });
 
@@ -96,7 +113,7 @@ describe('POST /api/v1/auth/login', () => {
   });
 
   it('returns the SAME message for a non-existent account', async () => {
-    const res = await request(serverOf(app))
+    const res = await request(serverOf(liveApp()))
       .post('/api/v1/auth/login')
       .send({ email: 'nobody-at-all@example.test', password: PASSWORD });
 
@@ -107,7 +124,7 @@ describe('POST /api/v1/auth/login', () => {
 
   it('rejects a disabled account with the same generic message', async () => {
     const user = await createUser('disabled@example.test', ['EDITOR'], true);
-    const res = await request(serverOf(app))
+    const res = await request(serverOf(liveApp()))
       .post('/api/v1/auth/login')
       .send({ email: user.email, password: PASSWORD });
 
@@ -117,7 +134,7 @@ describe('POST /api/v1/auth/login', () => {
   });
 
   it('rejects a non-object body (DTO whitelist)', async () => {
-    const res = await request(serverOf(app))
+    const res = await request(serverOf(liveApp()))
       .post('/api/v1/auth/login')
       .send({ email: 'a@b.test', password: PASSWORD, isAdmin: true });
     expect(res.status).toBe(400);
@@ -126,7 +143,7 @@ describe('POST /api/v1/auth/login', () => {
   });
 
   it('rejects a malformed email', async () => {
-    const res = await request(serverOf(app))
+    const res = await request(serverOf(liveApp()))
       .post('/api/v1/auth/login')
       .send({ email: 'not-an-email', password: PASSWORD });
     expect(res.status).toBe(400);
@@ -137,37 +154,36 @@ describe('POST /api/v1/auth/refresh', () => {
   it('rotates the refresh token (old one becomes invalid)', async () => {
     const user = await createUser('rotate@example.test', ['EDITOR']);
 
-    const login = await request(serverOf(app))
+    const login = await request(serverOf(liveApp()))
       .post('/api/v1/auth/login')
       .send({ email: user.email, password: PASSWORD });
     expect(login.status).toBe(200);
 
-    const firstCookie = extractCookie(login);
-    expect(firstCookie).toBeTruthy();
+    const firstCookie = requireCookie(login);
 
-    const firstRefresh = await request(serverOf(app))
+    const firstRefresh = await request(serverOf(liveApp()))
       .post('/api/v1/auth/refresh')
-      .set('Cookie', firstCookie!);
+      .set('Cookie', firstCookie);
     expect(firstRefresh.status).toBe(200);
 
     // 重放旧 token → 应被识别为 reuse 并拒绝
-    const replay = await request(serverOf(app))
+    const replay = await request(serverOf(liveApp()))
       .post('/api/v1/auth/refresh')
-      .set('Cookie', firstCookie!);
+      .set('Cookie', firstCookie);
     expect(replay.status).toBe(401);
     const body = replay.body as { error: { code: string } };
     expect(body.error.code).toBe('TOKEN_REVOKED');
   });
 
   it('rejects a refresh with no cookie', async () => {
-    const res = await request(serverOf(app)).post('/api/v1/auth/refresh').send({});
+    const res = await request(serverOf(liveApp())).post('/api/v1/auth/refresh').send({});
     expect(res.status).toBe(401);
     const body = res.body as { error: { code: string } };
     expect(body.error.code).toBe('TOKEN_REVOKED');
   });
 
   it('rejects a forged refresh cookie', async () => {
-    const res = await request(serverOf(app))
+    const res = await request(serverOf(liveApp()))
       .post('/api/v1/auth/refresh')
       .set('Cookie', 'nla_rt=forged-token-that-never-existed-000000');
     expect(res.status).toBe(401);
@@ -177,30 +193,33 @@ describe('POST /api/v1/auth/refresh', () => {
 describe('POST /api/v1/auth/logout', () => {
   it('revokes the session and is idempotent', async () => {
     const user = await createUser('logout@example.test', ['EDITOR']);
-    const login = await request(serverOf(app))
+    const login = await request(serverOf(liveApp()))
       .post('/api/v1/auth/login')
       .send({ email: user.email, password: PASSWORD });
-    const cookie = extractCookie(login);
-    expect(cookie).toBeTruthy();
+    const cookie = requireCookie(login);
 
-    const first = await request(serverOf(app)).post('/api/v1/auth/logout').set('Cookie', cookie!);
+    const first = await request(serverOf(liveApp()))
+      .post('/api/v1/auth/logout')
+      .set('Cookie', cookie);
     expect(first.status).toBe(204);
 
     // 幂等：第二次仍 204
-    const second = await request(serverOf(app)).post('/api/v1/auth/logout').set('Cookie', cookie!);
+    const second = await request(serverOf(liveApp()))
+      .post('/api/v1/auth/logout')
+      .set('Cookie', cookie);
     expect(second.status).toBe(204);
 
     // token 已撤销，refresh 失败
-    const refresh = await request(serverOf(app))
+    const refresh = await request(serverOf(liveApp()))
       .post('/api/v1/auth/refresh')
-      .set('Cookie', cookie!);
+      .set('Cookie', cookie);
     expect(refresh.status).toBe(401);
   });
 });
 
 describe('GET /api/v1/auth/me — 401 / 403', () => {
   it('returns 401 without a token', async () => {
-    const res = await request(serverOf(app)).get('/api/v1/auth/me');
+    const res = await request(serverOf(liveApp())).get('/api/v1/auth/me');
     expect(res.status).toBe(401);
     const body = res.body as { error: { code: string; requestId: string } };
     expect(body.error.code).toBe('UNAUTHORIZED');
@@ -208,7 +227,7 @@ describe('GET /api/v1/auth/me — 401 / 403', () => {
   });
 
   it('returns 401 for a malformed bearer token', async () => {
-    const res = await request(serverOf(app))
+    const res = await request(serverOf(liveApp()))
       .get('/api/v1/auth/me')
       .set('Authorization', 'Bearer not-a-jwt');
     expect(res.status).toBe(401);
@@ -216,7 +235,7 @@ describe('GET /api/v1/auth/me — 401 / 403', () => {
 
   it('returns 401 for a token signed with a different secret', async () => {
     // 结构合法但签名不对
-    const res = await request(serverOf(app))
+    const res = await request(serverOf(liveApp()))
       .get('/api/v1/auth/me')
       .set('Authorization', 'Bearer aGVhZGVy.cGF5bG9hZA.bm90LWEtc2lnbmF0dXJl');
     expect(res.status).toBe(401);
@@ -224,12 +243,12 @@ describe('GET /api/v1/auth/me — 401 / 403', () => {
 
   it('returns 200 with a valid token', async () => {
     const user = await createUser('me-ok@example.test', ['EDITOR']);
-    const login = await request(serverOf(app))
+    const login = await request(serverOf(liveApp()))
       .post('/api/v1/auth/login')
       .send({ email: user.email, password: PASSWORD });
     const accessToken = (login.body as { data: { accessToken: string } }).data.accessToken;
 
-    const res = await request(serverOf(app))
+    const res = await request(serverOf(liveApp()))
       .get('/api/v1/auth/me')
       .set('Authorization', `Bearer ${accessToken}`);
     expect(res.status).toBe(200);
@@ -241,12 +260,12 @@ describe('GET /api/v1/auth/me — 401 / 403', () => {
 describe('RBAC — 403 for insufficient role (AGENTS.md §4.2)', () => {
   it('rejects EDITOR from admin-only user management', async () => {
     const editor = await createUser('rbac-editor@example.test', ['EDITOR']);
-    const login = await request(serverOf(app))
+    const login = await request(serverOf(liveApp()))
       .post('/api/v1/auth/login')
       .send({ email: editor.email, password: PASSWORD });
     const accessToken = (login.body as { data: { accessToken: string } }).data.accessToken;
 
-    const res = await request(serverOf(app))
+    const res = await request(serverOf(liveApp()))
       .get('/api/v1/admin/users')
       .set('Authorization', `Bearer ${accessToken}`);
     expect(res.status).toBe(403);
@@ -256,12 +275,12 @@ describe('RBAC — 403 for insufficient role (AGENTS.md §4.2)', () => {
 
   it('allows ADMIN into admin-only endpoints', async () => {
     const admin = await createUser('rbac-admin@example.test', ['ADMIN']);
-    const login = await request(serverOf(app))
+    const login = await request(serverOf(liveApp()))
       .post('/api/v1/auth/login')
       .send({ email: admin.email, password: PASSWORD });
     const accessToken = (login.body as { data: { accessToken: string } }).data.accessToken;
 
-    const res = await request(serverOf(app))
+    const res = await request(serverOf(liveApp()))
       .get('/api/v1/admin/users')
       .set('Authorization', `Bearer ${accessToken}`);
     expect(res.status).toBe(200);
@@ -269,19 +288,19 @@ describe('RBAC — 403 for insufficient role (AGENTS.md §4.2)', () => {
 
   it('returns 401 (not 403) when unauthenticated on an admin endpoint', async () => {
     // 守卫顺序：Auth 先跑，所以未认证是 401 而不是 403
-    const res = await request(serverOf(app)).get('/api/v1/admin/users');
+    const res = await request(serverOf(liveApp())).get('/api/v1/admin/users');
     expect(res.status).toBe(401);
   });
 
   it('allows any authenticated role into /auth/me', async () => {
     const editor = await createUser('me-editor@example.test', ['EDITOR']);
-    const login = await request(serverOf(app))
+    const login = await request(serverOf(liveApp()))
       .post('/api/v1/auth/login')
       .send({ email: editor.email, password: PASSWORD });
     expect(login.status).toBe(200);
     const accessToken = (login.body as { data: { accessToken: string } }).data.accessToken;
 
-    const res = await request(serverOf(app))
+    const res = await request(serverOf(liveApp()))
       .get('/api/v1/auth/me')
       .set('Authorization', `Bearer ${accessToken}`);
     expect(res.status).toBe(200);
@@ -296,8 +315,8 @@ describe('rate limiting', () => {
     // 正确做法：用**独立进程语义**验证 —— 起一个 env 收紧到 3 的新 app。
     // 因为 throttle 阈值在模块加载期从 env 读取，`vi.resetModules()` +
     // 动态 import 才能让新阈值生效。
-    const previous = process.env['AUTH_LOGIN_RATE_LIMIT'];
-    process.env['AUTH_LOGIN_RATE_LIMIT'] = '3';
+    const previous = process.env.AUTH_LOGIN_RATE_LIMIT;
+    process.env.AUTH_LOGIN_RATE_LIMIT = '3';
     vi.resetModules();
 
     // 动态 import 会重新执行 auth.controller.ts，此时读到 limit=3。
@@ -311,7 +330,10 @@ describe('rate limiting', () => {
       for (let i = 0; i < 6; i += 1) {
         const res = await request(serverOf(strictApp))
           .post('/api/v1/auth/login')
-          .send({ email: `ratelimit-${String(Date.now())}-${String(i)}@example.test`, password: PASSWORD });
+          .send({
+            email: `ratelimit-${String(Date.now())}-${String(i)}@example.test`,
+            password: PASSWORD,
+          });
         statuses.push(res.status);
         if (res.status === 429) {
           const body = res.body as { error: { code: string } };
@@ -324,9 +346,9 @@ describe('rate limiting', () => {
     } finally {
       await closeTestApp(strictApp);
       if (previous === undefined) {
-        delete process.env['AUTH_LOGIN_RATE_LIMIT'];
+        delete process.env.AUTH_LOGIN_RATE_LIMIT;
       } else {
-        process.env['AUTH_LOGIN_RATE_LIMIT'] = previous;
+        process.env.AUTH_LOGIN_RATE_LIMIT = previous;
       }
       vi.resetModules();
     }
@@ -336,7 +358,7 @@ describe('rate limiting', () => {
 describe('audit trail (P1-07 — append-only)', () => {
   it('writes an audit record for login success', async () => {
     const user = await createUser('audit-login@example.test', ['EDITOR']);
-    await request(serverOf(app))
+    await request(serverOf(liveApp()))
       .post('/api/v1/auth/login')
       .send({ email: user.email, password: PASSWORD });
 
@@ -347,7 +369,7 @@ describe('audit trail (P1-07 — append-only)', () => {
   });
 
   it('writes an audit record for login failure with actorId=null', async () => {
-    await request(serverOf(app))
+    await request(serverOf(liveApp()))
       .post('/api/v1/auth/login')
       .send({ email: 'audit-fail@example.test', password: 'wrong-password-entirely' });
 
@@ -361,11 +383,11 @@ describe('audit trail (P1-07 — append-only)', () => {
 
   it('never stores the plaintext refresh token in the DB', async () => {
     const user = await createUser('audit-secret@example.test', ['EDITOR']);
-    const login = await request(serverOf(app))
+    const login = await request(serverOf(liveApp()))
       .post('/api/v1/auth/login')
       .send({ email: user.email, password: PASSWORD });
-    const cookie = extractCookie(login);
-    const plain = /nla_rt=([^;]+)/.exec(cookie ?? '')?.[1];
+    const cookie = requireCookie(login);
+    const plain = /nla_rt=([^;]+)/.exec(cookie)?.[1];
 
     expect(plain).toBeTruthy();
     const rows = await prisma.refreshToken.findMany({ where: { userId: user.id } });
@@ -386,4 +408,18 @@ function extractCookie(res: { headers: Record<string, unknown> }): string | null
     }
   }
   return null;
+}
+
+/**
+ * 同上，但在"必须有 cookie"的场景直接抛错。
+ *
+ * 避免用 `cookie!` 非空断言 —— eslint 明令禁止，且断言失败时错误信息
+ * 会指向 `.set('Cookie', ...)` 而不是真正缺失 cookie 的登录步骤。
+ */
+function requireCookie(res: { headers: Record<string, unknown> }): string {
+  const cookie = extractCookie(res);
+  if (cookie === null) {
+    throw new Error('expected a nla_rt cookie in set-cookie, got none');
+  }
+  return cookie;
 }

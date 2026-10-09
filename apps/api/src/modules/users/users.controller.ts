@@ -4,7 +4,12 @@ import { z } from 'zod';
 
 import { USER_ROLES } from '@nanking-atlas/database';
 
-import { UsersService, InvalidRoleError, UserNotFoundError, normalizeRoles } from './users.service.js';
+import {
+  UsersService,
+  InvalidRoleError,
+  UserNotFoundError,
+  normalizeRoles,
+} from './users.service.js';
 import { requireUser } from '../../common/auth/auth.guard.js';
 import { RequireRoles } from '../../common/auth/roles.decorator.js';
 import { hashPassword } from '../../lib/password.js';
@@ -162,8 +167,14 @@ export class UsersController {
         action: 'admin.user.update',
         entityType: 'user',
         entityId: id,
-        beforeJson: JSON.stringify({ roles: target.roles, disabledAt: target.disabledAt?.toISOString() ?? null }),
-        afterJson: JSON.stringify({ roles: body.roles ?? target.roles, disabled: body.disabled ?? null }),
+        beforeJson: JSON.stringify({
+          roles: target.roles,
+          disabledAt: target.disabledAt?.toISOString() ?? null,
+        }),
+        afterJson: JSON.stringify({
+          roles: body.roles ?? target.roles,
+          disabled: body.disabled ?? null,
+        }),
       },
     });
 

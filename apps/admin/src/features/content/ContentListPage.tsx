@@ -9,9 +9,16 @@ import { StatusBadge } from '@/features/shared/Badge';
 import { Button } from '@/features/shared/Button';
 import { navigate } from '@/features/shared/router';
 import { EmptyState, ErrorState, Loading } from '@/features/shared/States';
-import { card, inputStyle, mutedText, row, srOnly, stack, tableStyle } from '@/features/shared/styles';
+import {
+  card,
+  inputStyle,
+  mutedText,
+  row,
+  srOnly,
+  stack,
+  tableStyle,
+} from '@/features/shared/styles';
 import { ACTION_LABELS, availableActions, statusLabel } from '@/features/shared/workflow';
-
 
 /**
  * 内容列表（P1-10）。
@@ -55,9 +62,11 @@ export interface ContentListPageProps {
 export function ContentListPage({ user, onUnauthorized }: ContentListPageProps) {
   const [rows, setRows] = useState<AdminContentDto[]>([]);
   const [loadState, setLoadState] = useState<LoadState>('loading');
-  const [errorInfo, setErrorInfo] = useState<{ message: string; requestId: string; forbidden: boolean } | null>(
-    null,
-  );
+  const [errorInfo, setErrorInfo] = useState<{
+    message: string;
+    requestId: string;
+    forbidden: boolean;
+  } | null>(null);
   const [type, setType] = useState<'' | ContentType>('');
   const [status, setStatus] = useState<'' | ContentStatus>('');
   const [keyword, setKeyword] = useState('');
@@ -86,7 +95,11 @@ export function ContentListPage({ user, onUnauthorized }: ContentListPageProps) 
           forbidden: cause.status === 403,
         });
       } else {
-        setErrorInfo({ message: '无法连接服务器，请检查 API 是否已启动', requestId: '-', forbidden: false });
+        setErrorInfo({
+          message: '无法连接服务器，请检查 API 是否已启动',
+          requestId: '-',
+          forbidden: false,
+        });
       }
       setLoadState('error');
     }
@@ -125,7 +138,8 @@ export function ContentListPage({ user, onUnauthorized }: ContentListPageProps) 
         </Button>
       </div>
       <p style={mutedText}>
-        已登录：{user.displayName}（{user.roles.join(' / ')}）· 审核与发布按钮按服务端状态机与角色规则显示。
+        已登录：{user.displayName}（{user.roles.join(' / ')}）·
+        审核与发布按钮按服务端状态机与角色规则显示。
       </p>
 
       <section aria-label="筛选条件" style={card}>

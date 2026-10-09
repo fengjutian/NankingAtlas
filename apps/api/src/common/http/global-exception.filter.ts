@@ -9,6 +9,8 @@ import {
 import { type Request, type Response } from 'express';
 import { ZodError } from 'zod';
 
+import { TiptapDocumentError } from '@nanking-atlas/validation';
+
 import { AuthError } from '../../modules/auth/auth.service.js';
 import { IfMatchRequiredError } from '../../modules/contents/content.controller.js';
 import {
@@ -17,6 +19,7 @@ import {
   PublicationNotReadyError,
 } from '../../modules/contents/content.service.js';
 import { UserNotFoundError, InvalidRoleError } from '../../modules/users/users.service.js';
+import { PublicContentNotFoundError } from '../../modules/homepage/public-content.controller.js';
 import { UnauthorizedError } from '../auth/auth.guard.js';
 import { ForbiddenError } from '../auth/roles.guard.js';
 
@@ -65,16 +68,19 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     res.status(status).json(body);
   }
 
-  private toErrorBody(
-    exception: unknown,
-    requestId: string,
-  ): { status: number; body: ErrorBody } {
+  private toErrorBody(exception: unknown, requestId: string): { status: number; body: ErrorBody } {
     // ---- 认证 / 授权 ----
     if (exception instanceof UnauthorizedError) {
-      return { status: HttpStatus.UNAUTHORIZED, body: wrap('UNAUTHORIZED', exception.message, requestId) };
+      return {
+        status: HttpStatus.UNAUTHORIZED,
+        body: wrap('UNAUTHORIZED', exception.message, requestId),
+      };
     }
     if (exception instanceof ForbiddenError) {
-      return { status: HttpStatus.FORBIDDEN, body: wrap('FORBIDDEN', exception.message, requestId) };
+      return {
+        status: HttpStatus.FORBIDDEN,
+        body: wrap('FORBIDDEN', exception.message, requestId),
+      };
     }
     if (exception instanceof AuthError) {
       return this.mapAuthError(exception, requestId);
@@ -85,6 +91,11 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       return { status: HttpStatus.NOT_FOUND, body: wrap('NOT_FOUND', '用户不存在', requestId) };
     }
     if (exception instanceof ContentNotFoundError) {
+      return { status: HttpStatus.NOT_FOUND, body: wrap('NOT_FOUND', '内容不存在', requestId) };
+    }
+    // 公开读接口：未发布 / 已归档 / 不存在 → 统一 404。
+    // 区分它们会泄露"这个 slug 存在但没发布"，属于信息泄露。
+    if (exception instanceof PublicContentNotFoundError) {
       return { status: HttpStatus.NOT_FOUND, body: wrap('NOT_FOUND', '内容不存在', requestId) };
     }
     if (exception instanceof InvalidRoleError) {
@@ -134,6 +145,18 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       };
     }
 
+    // ---- Tiptap 文档白名单（P1-06）----
+    // 客户端提交了 script / javascript: 等被禁内容 —— 这是**用户的输入错误**
+    // 不是服务端故障，所以映射成 400 并回传具体路径，便于编辑器高亮问题节点。
+    if (exception instanceof TiptapDocumentError) {
+      return {
+        status: HttpStatus.BAD_REQUEST,
+        body: wrap('VALIDATION_FAILED', exception.message, requestId, {
+          issues: exception.issues,
+        }),
+      };
+    }
+
     // ---- Nest 内建 HTTP 异常 ----
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
@@ -143,7 +166,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       }
       const message =
         typeof raw === 'object' && raw !== null && 'message' in raw
-          ? String((raw).message)
+          ? String(raw.message)
           : exception.message;
       return { status, body: wrap(httpStatusToCode(status), message, requestId) };
     }
@@ -155,21 +178,33 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     };
   }
 
-  private mapAuthError(
-    error: AuthError,
-    requestId: string,
-  ): { status: number; body: ErrorBody } {
+  private mapAuthError(error: AuthError, requestId: string): { status: number; body: ErrorBody } {
     switch (error.code) {
       case 'INVALID_CREDENTIALS':
-        return { status: HttpStatus.UNAUTHORIZED, body: wrap('INVALID_CREDENTIALS', error.message, requestId) };
+        return {
+          status: HttpStatus.UNAUTHORIZED,
+          body: wrap('INVALID_CREDENTIALS', error.message, requestId),
+        };
       case 'TOKEN_EXPIRED':
-        return { status: HttpStatus.UNAUTHORIZED, body: wrap('TOKEN_EXPIRED', error.message, requestId) };
+        return {
+          status: HttpStatus.UNAUTHORIZED,
+          body: wrap('TOKEN_EXPIRED', error.message, requestId),
+        };
       case 'TOKEN_REVOKED':
-        return { status: HttpStatus.UNAUTHORIZED, body: wrap('TOKEN_REVOKED', error.message, requestId) };
+        return {
+          status: HttpStatus.UNAUTHORIZED,
+          body: wrap('TOKEN_REVOKED', error.message, requestId),
+        };
       case 'ACCOUNT_DISABLED':
-        return { status: HttpStatus.FORBIDDEN, body: wrap('ACCOUNT_DISABLED', error.message, requestId) };
+        return {
+          status: HttpStatus.FORBIDDEN,
+          body: wrap('ACCOUNT_DISABLED', error.message, requestId),
+        };
       default:
-        return { status: HttpStatus.UNAUTHORIZED, body: wrap('UNAUTHORIZED', error.message, requestId) };
+        return {
+          status: HttpStatus.UNAUTHORIZED,
+          body: wrap('UNAUTHORIZED', error.message, requestId),
+        };
     }
   }
 }

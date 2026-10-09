@@ -125,9 +125,7 @@ export function createApiError(
   details?: Record<string, unknown>,
 ): ApiErrorResponse {
   const error: ApiErrorResponse['error'] =
-    details === undefined
-      ? { code, message, requestId }
-      : { code, message, requestId, details };
+    details === undefined ? { code, message, requestId } : { code, message, requestId, details };
 
   return { error };
 }

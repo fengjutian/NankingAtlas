@@ -1,8 +1,4 @@
-import {
-  CONTENT_STATUSES,
-  RELATION_TYPES,
-  type ContentStatus,
-} from '@nanking-atlas/database';
+import { CONTENT_STATUSES, RELATION_TYPES, type ContentStatus } from '@nanking-atlas/database';
 
 import { ForbiddenError } from '../../common/auth/roles.guard.js';
 
@@ -30,13 +26,7 @@ import { ForbiddenError } from '../../common/auth/roles.guard.js';
  */
 
 export type ContentAction =
-  | 'EDIT'
-  | 'SUBMIT'
-  | 'APPROVE'
-  | 'REJECT'
-  | 'PUBLISH'
-  | 'ARCHIVE'
-  | 'RESTORE';
+  'EDIT' | 'SUBMIT' | 'APPROVE' | 'REJECT' | 'PUBLISH' | 'ARCHIVE' | 'RESTORE';
 
 /** 状态 → 允许的动作。fail-closed：不在表里即不允许。 */
 const ALLOWED_ACTIONS_BY_STATUS: Record<ContentStatus, readonly ContentAction[]> = {

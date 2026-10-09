@@ -117,6 +117,7 @@ model Content {
   relationsFrom ContentRelation[] @relation("RelationFrom")
   relationsTo   ContentRelation[] @relation("RelationTo")
   routeStops RouteStop[]
+  homepageSlots HomepageSlot[]
 
   @@index([type, status])
   @@index([status, publishedAt(sort: Desc)])
@@ -403,4 +404,31 @@ model AuditLog {
   @@index([actorId, createdAt(sort: Desc)])
   @@index([action, createdAt(sort: Desc)])
   @@map("audit_logs")
+}
+
+// ============================================================================
+// 首页槽位（P2-02）
+// ============================================================================
+
+/// 首页可配置槽位。
+///
+/// 技术方案 §4：「`homepage_slots` | slot_key、content_id、position、
+/// starts_at、ends_at；由后台配置」。
+///
+/// 时间窗语义：`startsAt` / `endsAt` 允许后台提前排期与自动下架；
+/// 两个都为 null 表示常驻。公开 API 只返回「当前时间落在窗口内」的槽位。
+model HomepageSlot {
+  id        String    @id @default(cuid())
+  slotKey   String    @unique @map("slot_key")
+  contentId String?   @map("content_id")
+  position  Int       @default(0)
+  startsAt  DateTime? @map("starts_at")
+  endsAt    DateTime? @map("ends_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  updatedBy String?   @map("updated_by")
+
+  content Content? @relation(fields: [contentId], references: [id], onDelete: Cascade)
+
+  @@index([slotKey, position])
+  @@map("homepage_slots")
 }

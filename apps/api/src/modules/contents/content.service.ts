@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 
 import {
   CONTENT_STATUSES,
@@ -17,6 +17,14 @@ import {
 } from './content-state-machine.js';
 import { ForbiddenError } from '../../common/auth/roles.guard.js';
 import { prisma } from '../../lib/prisma.js';
+import { revalidationPathsFor, triggerRevalidation } from '../content-revalidation/revalidation.js';
+
+/** 会改变公开可见性的动作 —— 只有这些需要触发 revalidation。 */
+const AFFECTS_PUBLIC_VISIBILITY: ReadonlySet<ContentAction> = new Set([
+  'PUBLISH',
+  'ARCHIVE',
+  'RESTORE',
+]);
 
 /**
  * 内容服务（P1-04 CRUD + P1-07 revisions/audit + P1-08 状态机接入）。
@@ -48,10 +56,33 @@ export interface ContentRecord {
 
 /** 类型扩展的联合；SQLite 无原生 enum，这里按 type 分派。 */
 export type TypeExtension =
-  | { kind: 'PLACE'; address?: string | null; lon?: number | null; lat?: number | null; accuracy?: string; verificationStatus?: string }
-  | { kind: 'PERSON'; birthText?: string | null; deathText?: string | null; biographyNote?: string | null }
-  | { kind: 'EVENT'; startDate?: string | null; endDate?: string | null; datePrecision?: string; dateNote?: string | null }
-  | { kind: 'ARCHITECTURE'; builtPeriod?: string | null; currentCondition?: string | null; heritageLevel?: string | null }
+  | {
+      kind: 'PLACE';
+      address?: string | null;
+      lon?: number | null;
+      lat?: number | null;
+      accuracy?: string;
+      verificationStatus?: string;
+    }
+  | {
+      kind: 'PERSON';
+      birthText?: string | null;
+      deathText?: string | null;
+      biographyNote?: string | null;
+    }
+  | {
+      kind: 'EVENT';
+      startDate?: string | null;
+      endDate?: string | null;
+      datePrecision?: string;
+      dateNote?: string | null;
+    }
+  | {
+      kind: 'ARCHITECTURE';
+      builtPeriod?: string | null;
+      currentCondition?: string | null;
+      heritageLevel?: string | null;
+    }
   | { kind: 'TRADITION'; traditionType: string; transmissionMethod?: string | null }
   | { kind: 'TOPIC'; curatorNote?: string | null }
   | { kind: 'ROUTE'; durationMinutes?: number | null; distanceMeters?: number | null };
@@ -96,6 +127,9 @@ export function assertCoordinateRange(lon: number | null, lat: number | null): v
 
 @Injectable()
 export class ContentService {
+  /** revalidation 失败只记日志，不影响发布（技术方案 §9.1）。 */
+  private readonly logger = new Logger(ContentService.name);
+
   /**
    * 创建内容。
    *
@@ -218,7 +252,16 @@ export class ContentService {
       // 事务内再查一次 version，防止 TOCTOU。
       const current = await tx.content.findUniqueOrThrow({
         where: { id: input.id },
-        select: { version: true, status: true, createdById: true, bodyJson: true, title: true, summary: true, subtitle: true, slug: true },
+        select: {
+          version: true,
+          status: true,
+          createdById: true,
+          bodyJson: true,
+          title: true,
+          summary: true,
+          subtitle: true,
+          slug: true,
+        },
       });
 
       if (current.version !== input.expectedVersion) {
@@ -310,44 +353,67 @@ export class ContentService {
       }
     }
 
-    return prisma.$transaction(async (tx) => {
-      const updated = await tx.content.update({
-        where: { id: input.id },
-        data: {
-          status: decision.to,
-          version: { increment: 1 },
-          updatedById: input.actorId,
-          ...(decision.to === 'PUBLISHED' ? { publishedAt: new Date() } : {}),
-          ...(decision.to === 'ARCHIVED' ? { archivedAt: new Date() } : {}),
-          ...(decision.to === 'DRAFT' && existing.archivedAt !== null ? { archivedAt: null } : {}),
-        },
-      });
+    return prisma
+      .$transaction(async (tx) => {
+        const updated = await tx.content.update({
+          where: { id: input.id },
+          data: {
+            status: decision.to,
+            version: { increment: 1 },
+            updatedById: input.actorId,
+            ...(decision.to === 'PUBLISHED' ? { publishedAt: new Date() } : {}),
+            ...(decision.to === 'ARCHIVED' ? { archivedAt: new Date() } : {}),
+            ...(decision.to === 'DRAFT' && existing.archivedAt !== null
+              ? { archivedAt: null }
+              : {}),
+          },
+        });
 
-      await tx.reviewAction.create({
-        data: {
-          contentId: input.id,
-          action: decision.action,
-          fromStatus: decision.from,
-          toStatus: decision.to,
-          comment: input.reason ?? null,
-          actorId: input.actorId,
-        },
-      });
+        await tx.reviewAction.create({
+          data: {
+            contentId: input.id,
+            action: decision.action,
+            fromStatus: decision.from,
+            toStatus: decision.to,
+            comment: input.reason ?? null,
+            actorId: input.actorId,
+          },
+        });
 
-      await tx.auditLog.create({
-        data: {
-          actorId: input.actorId,
-          requestId: input.requestId,
-          action: `content.${decision.action.toLowerCase()}`,
-          entityType: 'content',
-          entityId: input.id,
-          beforeJson: JSON.stringify({ status: decision.from, version: existing.version }),
-          afterJson: JSON.stringify({ status: decision.to, version: existing.version + 1 }),
-        },
-      });
+        await tx.auditLog.create({
+          data: {
+            actorId: input.actorId,
+            requestId: input.requestId,
+            action: `content.${decision.action.toLowerCase()}`,
+            entityType: 'content',
+            entityId: input.id,
+            beforeJson: JSON.stringify({ status: decision.from, version: existing.version }),
+            afterJson: JSON.stringify({ status: decision.to, version: existing.version + 1 }),
+          },
+        });
 
-      return updated as ContentRecord;
-    });
+        return updated as ContentRecord;
+      })
+      .then(async (updated) => {
+        // 发布 / 撤回 / 归档成功后触发 revalidation（P2-07）。
+        //
+        // 关键：**在事务之外**做，且失败只记日志。技术方案 §9.1 明确
+        // 「数据库发布事务不依赖 Netlify 成功」—— 把网络请求放进事务里
+        // 会让站点故障拖住甚至回滚内容发布。
+        if (AFFECTS_PUBLIC_VISIBILITY.has(decision.action)) {
+          const result = await triggerRevalidation({
+            paths: revalidationPathsFor({ slug: existing.slug, type: existing.type }),
+            reason: `content.${decision.action.toLowerCase()}`,
+          });
+          if (!result.ok) {
+            // 失败进入重试由运维处理；这里不抛，避免影响发布结果
+            this.logger.warn(
+              `[${input.requestId}] revalidation 失败（内容已发布，站点将靠 TTL 收敛）: ${result.reason}`,
+            );
+          }
+        }
+        return updated;
+      });
   }
 
   /** 软删除：置 archivedAt，不物理删除（AGENTS.md §5.4）。 */
@@ -381,7 +447,9 @@ export class ContentService {
    *
    * 汇总：字段完整性 + 来源 + 媒体版权 + 坐标核实。
    */
-  async evaluateReadiness(content: ContentRecord): Promise<{ ready: boolean; issues: ReadinessIssue[] }> {
+  async evaluateReadiness(
+    content: ContentRecord,
+  ): Promise<{ ready: boolean; issues: ReadinessIssue[] }> {
     const [sourceCount, mediaRows, placeRow] = await Promise.all([
       prisma.contentSource.count({ where: { contentId: content.id } }),
       prisma.contentMedia.findMany({
@@ -466,7 +534,9 @@ export class ContentService {
           update: {
             ...(extension.birthText !== undefined ? { birthText: extension.birthText } : {}),
             ...(extension.deathText !== undefined ? { deathText: extension.deathText } : {}),
-            ...(extension.biographyNote !== undefined ? { biographyNote: extension.biographyNote } : {}),
+            ...(extension.biographyNote !== undefined
+              ? { biographyNote: extension.biographyNote }
+              : {}),
           },
         });
         return;
@@ -487,7 +557,9 @@ export class ContentService {
             ...(extension.endDate !== undefined
               ? { endDate: extension.endDate === null ? null : new Date(extension.endDate) }
               : {}),
-            ...(extension.datePrecision !== undefined ? { datePrecision: extension.datePrecision } : {}),
+            ...(extension.datePrecision !== undefined
+              ? { datePrecision: extension.datePrecision }
+              : {}),
             ...(extension.dateNote !== undefined ? { dateNote: extension.dateNote } : {}),
           },
         });
@@ -506,7 +578,9 @@ export class ContentService {
             ...(extension.currentCondition !== undefined
               ? { currentCondition: extension.currentCondition }
               : {}),
-            ...(extension.heritageLevel !== undefined ? { heritageLevel: extension.heritageLevel } : {}),
+            ...(extension.heritageLevel !== undefined
+              ? { heritageLevel: extension.heritageLevel }
+              : {}),
           },
         });
         return;
@@ -574,7 +648,9 @@ export class ContentVersionConflictError extends Error {
     public readonly currentVersion: number,
     public readonly expectedVersion: number,
   ) {
-    super(`content version conflict: expected ${String(expectedVersion)}, current ${String(currentVersion)}`);
+    super(
+      `content version conflict: expected ${String(expectedVersion)}, current ${String(currentVersion)}`,
+    );
     this.name = 'ContentVersionConflictError';
   }
 }

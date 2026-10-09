@@ -6,7 +6,12 @@ export const DEFAULT_PAGE_SIZE = 20;
 /** 单页上限；超过一律拒绝，不做静默截断。 */
 export const MAX_PAGE_SIZE = 100;
 
-export const pageSizeSchema = z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE);
+export const pageSizeSchema = z.coerce
+  .number()
+  .int()
+  .min(1)
+  .max(MAX_PAGE_SIZE)
+  .default(DEFAULT_PAGE_SIZE);
 
 export const cursorSchema = z.string().min(1).max(512).optional();
 
@@ -27,7 +32,8 @@ const cursorPayloadSchema = z.object({
  * 游标是客户端可控输入，解析失败必须能区分原因（base64 损坏 / JSON 损坏 /
  * 载荷字段不合法），否则无法给出可操作的错误提示。
  */
-export type CursorErrorCode = 'CURSOR_BASE64_INVALID' | 'CURSOR_JSON_INVALID' | 'CURSOR_PAYLOAD_INVALID';
+export type CursorErrorCode =
+  'CURSOR_BASE64_INVALID' | 'CURSOR_JSON_INVALID' | 'CURSOR_PAYLOAD_INVALID';
 
 export class CursorError extends Error {
   readonly code: CursorErrorCode;

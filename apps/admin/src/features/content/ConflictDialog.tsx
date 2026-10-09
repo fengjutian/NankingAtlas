@@ -3,8 +3,13 @@ import { useEffect, useRef, useState } from 'react';
 import type { AdminContentDto } from '@/api/types';
 
 import { Button, ButtonRow } from '@/features/shared/Button';
-import { dangerBanner, dialogBackdrop, mutedText, stack, tableStyle } from '@/features/shared/styles';
-
+import {
+  dangerBanner,
+  dialogBackdrop,
+  mutedText,
+  stack,
+  tableStyle,
+} from '@/features/shared/styles';
 
 /**
  * 版本冲突对话框（P1-10）。
@@ -63,7 +68,10 @@ export function diffContentFields(
   local: Pick<AdminContentDto, 'title' | 'subtitle' | 'summary' | 'slug' | 'body'>,
   server: Pick<AdminContentDto, 'title' | 'subtitle' | 'summary' | 'slug' | 'body'>,
 ): FieldDiff[] {
-  const fields: readonly { key: 'title' | 'subtitle' | 'summary' | 'slug' | 'body'; label: string }[] = [
+  const fields: readonly {
+    key: 'title' | 'subtitle' | 'summary' | 'slug' | 'body';
+    label: string;
+  }[] = [
     { key: 'title', label: '标题' },
     { key: 'subtitle', label: '副标题' },
     { key: 'summary', label: '摘要' },
@@ -160,14 +168,22 @@ export function ConflictDialog({
         aria-modal="true"
         aria-labelledby="conflict-dialog-title"
         aria-describedby="conflict-dialog-desc"
-        style={{ ...dangerBanner, background: 'var(--app-bg)', maxWidth: '48rem', width: '100%', maxHeight: '80vh', overflow: 'auto' }}
+        style={{
+          ...dangerBanner,
+          background: 'var(--app-bg)',
+          maxWidth: '48rem',
+          width: '100%',
+          maxHeight: '80vh',
+          overflow: 'auto',
+        }}
       >
         <div style={stack}>
           <h2 id="conflict-dialog-title" style={{ fontSize: '1.1rem', margin: 0 }}>
             保存冲突：内容已被他人修改
           </h2>
           <p id="conflict-dialog-desc" style={mutedText}>
-            服务端拒绝了这次保存（HTTP 409 CONTENT_VERSION_CONFLICT）。本地改动尚未丢失，请选择处理方式。
+            服务端拒绝了这次保存（HTTP 409
+            CONTENT_VERSION_CONFLICT）。本地改动尚未丢失，请选择处理方式。
           </p>
           <dl style={{ ...stack, margin: 0 }}>
             <div>
@@ -189,7 +205,7 @@ export function ConflictDialog({
             {info.serverUpdatedAt === null ? null : (
               <div>
                 <dt style={{ fontWeight: 600 }}>服务端最后更新</dt>
-                <dd style={{ margin: 0}}>{info.serverUpdatedAt}</dd>
+                <dd style={{ margin: 0 }}>{info.serverUpdatedAt}</dd>
               </div>
             )}
           </dl>

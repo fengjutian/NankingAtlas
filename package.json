@@ -15,6 +15,7 @@
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
+    "test:integration": "pnpm --filter @nanking-atlas/api test:integration",
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
     "clean": "turbo run clean && rimraf \"**/dist\" \"**/.turbo\" \"**/.next\" \"**/coverage\""

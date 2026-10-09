@@ -9,7 +9,6 @@ import { Field } from '@/features/shared/Field';
 import { writeSessionUser } from '@/features/shared/session';
 import { card, dangerBanner, inputStyle, mutedText, stack } from '@/features/shared/styles';
 
-
 /**
  * 登录页（P1-10）。
  *
@@ -59,7 +58,12 @@ export function LoginPage({ onLoggedIn }: LoginPageProps) {
         账号由管理员分配。登录后仅能执行角色允许的操作，服务端会再次校验权限。
       </p>
 
-      <form onSubmit={(event) => void handleSubmit(event)} aria-busy={busy} style={stack} noValidate>
+      <form
+        onSubmit={(event) => void handleSubmit(event)}
+        aria-busy={busy}
+        style={stack}
+        noValidate
+      >
         <Field label="邮箱" required>
           {({ id, describedBy }) => (
             <input
@@ -99,7 +103,12 @@ export function LoginPage({ onLoggedIn }: LoginPageProps) {
           </p>
         )}
 
-        <Button type="submit" variant="primary" busy={busy} disabled={email.trim() === '' || password === ''}>
+        <Button
+          type="submit"
+          variant="primary"
+          busy={busy}
+          disabled={email.trim() === '' || password === ''}
+        >
           {busy ? '正在登录…' : '登录'}
         </Button>
       </form>

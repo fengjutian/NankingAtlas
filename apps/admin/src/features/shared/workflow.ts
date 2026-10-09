@@ -153,5 +153,9 @@ export function titleLengthHint(title: string): LengthHint {
 }
 
 export function summaryLengthHint(summary: string): LengthHint {
-  return summary.length > SUMMARY_MAX ? 'error' : summary.length > SUMMARY_MAX * 0.8 ? 'warn' : 'ok';
+  return summary.length > SUMMARY_MAX
+    ? 'error'
+    : summary.length > SUMMARY_MAX * 0.8
+      ? 'warn'
+      : 'ok';
 }

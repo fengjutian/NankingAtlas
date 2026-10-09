@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  type CanActivate,
-  type ExecutionContext,
-} from '@nestjs/common';
+import { Injectable, type CanActivate, type ExecutionContext } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { type Request } from 'express';
 
@@ -71,10 +67,7 @@ export class ForbiddenError extends Error {
 }
 
 /** 供 service 层复用：断言 actor 拥有指定角色之一。 */
-export function assertAnyRole(
-  userRoles: readonly string[],
-  allowed: readonly string[],
-): void {
+export function assertAnyRole(userRoles: readonly string[], allowed: readonly string[]): void {
   const allowedSet = new Set(allowed.map((role) => role.toUpperCase()));
   const ok = userRoles.some((role) => allowedSet.has(role.toUpperCase()));
   if (!ok) {

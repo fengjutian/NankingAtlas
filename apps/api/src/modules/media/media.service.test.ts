@@ -49,7 +49,12 @@ describe('upload validation', () => {
     });
 
     it('rejects unsupported mime types', () => {
-      for (const mime of ['application/pdf', 'image/svg+xml', 'text/html', 'application/x-msdownload']) {
+      for (const mime of [
+        'application/pdf',
+        'image/svg+xml',
+        'text/html',
+        'application/x-msdownload',
+      ]) {
         expect(() => assertMagicBytes(mime, jpegHeader)).toThrow(/不支持的 MIME 类型/);
       }
     });

@@ -31,22 +31,46 @@ describe('content state machine', () => {
     });
 
     it('allows IN_REVIEW → APPROVED for a reviewer', () => {
-      const result = decideTransition({ ...base, status: 'IN_REVIEW', action: 'APPROVE', actorRoles: ['REVIEWER'], authorId: 'someone-else' });
+      const result = decideTransition({
+        ...base,
+        status: 'IN_REVIEW',
+        action: 'APPROVE',
+        actorRoles: ['REVIEWER'],
+        authorId: 'someone-else',
+      });
       expect(result.to).toBe('APPROVED');
     });
 
     it('allows APPROVED → PUBLISHED for a reviewer', () => {
-      const result = decideTransition({ ...base, status: 'APPROVED', action: 'PUBLISH', actorRoles: ['REVIEWER'], authorId: 'someone-else' });
+      const result = decideTransition({
+        ...base,
+        status: 'APPROVED',
+        action: 'PUBLISH',
+        actorRoles: ['REVIEWER'],
+        authorId: 'someone-else',
+      });
       expect(result.to).toBe('PUBLISHED');
     });
 
     it('allows PUBLISHED → ARCHIVED', () => {
-      const result = decideTransition({ ...base, status: 'PUBLISHED', action: 'ARCHIVE', actorRoles: ['REVIEWER'], authorId: 'x' });
+      const result = decideTransition({
+        ...base,
+        status: 'PUBLISHED',
+        action: 'ARCHIVE',
+        actorRoles: ['REVIEWER'],
+        authorId: 'x',
+      });
       expect(result.to).toBe('ARCHIVED');
     });
 
     it('allows ARCHIVED → DRAFT via RESTORE', () => {
-      const result = decideTransition({ ...base, status: 'ARCHIVED', action: 'RESTORE', actorRoles: ['ADMIN'], authorId: 'x' });
+      const result = decideTransition({
+        ...base,
+        status: 'ARCHIVED',
+        action: 'RESTORE',
+        actorRoles: ['ADMIN'],
+        authorId: 'x',
+      });
       expect(result.to).toBe('DRAFT');
     });
   });
@@ -70,7 +94,13 @@ describe('content state machine', () => {
 
     it('rejects unknown status-like action', () => {
       expect(() =>
-        decideTransition({ ...base, status: 'PUBLISHED', action: 'EDIT', actorRoles: ['ADMIN'], authorId: 'x' }),
+        decideTransition({
+          ...base,
+          status: 'PUBLISHED',
+          action: 'EDIT',
+          actorRoles: ['ADMIN'],
+          authorId: 'x',
+        }),
       ).toThrow(/不允许动作/);
     });
   });
@@ -78,19 +108,38 @@ describe('content state machine', () => {
   describe('RBAC (AGENTS.md §4.2: Editor 不得审核或发布)', () => {
     it('rejects EDITOR approving', () => {
       expect(() =>
-        decideTransition({ ...base, status: 'IN_REVIEW', action: 'APPROVE', actorRoles: ['EDITOR'], authorId: 'x' }),
+        decideTransition({
+          ...base,
+          status: 'IN_REVIEW',
+          action: 'APPROVE',
+          actorRoles: ['EDITOR'],
+          authorId: 'x',
+        }),
       ).toThrow(/无权执行/);
     });
 
     it('rejects EDITOR rejecting', () => {
       expect(() =>
-        decideTransition({ ...base, status: 'IN_REVIEW', action: 'REJECT', actorRoles: ['EDITOR'], authorId: 'x', reason: 'no' }),
+        decideTransition({
+          ...base,
+          status: 'IN_REVIEW',
+          action: 'REJECT',
+          actorRoles: ['EDITOR'],
+          authorId: 'x',
+          reason: 'no',
+        }),
       ).toThrow(/无权执行/);
     });
 
     it('rejects EDITOR publishing', () => {
       expect(() =>
-        decideTransition({ ...base, status: 'APPROVED', action: 'PUBLISH', actorRoles: ['EDITOR'], authorId: 'x' }),
+        decideTransition({
+          ...base,
+          status: 'APPROVED',
+          action: 'PUBLISH',
+          actorRoles: ['EDITOR'],
+          authorId: 'x',
+        }),
       ).toThrow(/无权执行/);
     });
 
@@ -264,7 +313,14 @@ describe('publication readiness (技术方案 §5.3)', () => {
 
 describe('relation type dictionary', () => {
   it('accepts known relation types', () => {
-    for (const type of ['RELATED_TO', 'PART_OF', 'INFLUENCED', 'CONTINUES', 'REFERENCES', 'LOCATED_AT']) {
+    for (const type of [
+      'RELATED_TO',
+      'PART_OF',
+      'INFLUENCED',
+      'CONTINUES',
+      'REFERENCES',
+      'LOCATED_AT',
+    ]) {
       expect(isRelationType(type)).toBe(true);
     }
   });

@@ -27,12 +27,7 @@ import { prisma } from '../../lib/prisma.js';
 // ---------------------------------------------------------------------------
 
 /** 允许的图片 MIME（AGENTS.md §4.5「上传必须校验内容与大小」）。 */
-export const ALLOWED_IMAGE_MIMES = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-  'image/gif',
-] as const;
+export const ALLOWED_IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const;
 
 /** 单文件上限 10 MiB —— 明确上限，避免超大文件打满内存。 */
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;

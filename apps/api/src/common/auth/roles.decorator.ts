@@ -11,8 +11,7 @@ import { SetMetadata } from '@nestjs/common';
 export const ROLES_METADATA_KEY = 'nla:required_roles' as const;
 
 /** 声明访问该端点所需的全部角色（任一满足即可）。 */
-export const RequireRoles = (...roles: readonly string[]) =>
-  SetMetadata(ROLES_METADATA_KEY, roles);
+export const RequireRoles = (...roles: readonly string[]) => SetMetadata(ROLES_METADATA_KEY, roles);
 
 /** 公开端点标记；`AuthGuard` 遇到它直接放行。 */
 export const IS_PUBLIC_KEY = 'nla:is_public' as const;

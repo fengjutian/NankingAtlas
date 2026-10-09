@@ -23,7 +23,12 @@ function isSessionUser(raw: unknown): raw is SessionUser {
   if (typeof raw !== 'object' || raw === null) {
     return false;
   }
-  const candidate = raw as { id?: unknown; email?: unknown; displayName?: unknown; roles?: unknown };
+  const candidate = raw as {
+    id?: unknown;
+    email?: unknown;
+    displayName?: unknown;
+    roles?: unknown;
+  };
   if (
     typeof candidate.id !== 'string' ||
     typeof candidate.email !== 'string' ||

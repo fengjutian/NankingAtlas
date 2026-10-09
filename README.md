@@ -12,9 +12,25 @@
 
 ## 当前状态
 
-P0-01 ~ P0-09 已交付：三应用骨架、共享 strict 配置与依赖边界、CI、品牌 tokens、响应式 shell、公开站静态首页、API request-id / 健康检查 / 结构化日志、本地启动文档。`pnpm format:check / lint / typecheck / test / build` 在本机全过。
+P0-01 ~ P0-09 已交付：三应用骨架、共享 strict 配置与依赖边界、CI、品牌 tokens、响应式 shell、公开站静态首页、API request-id / 健康检查 / 结构化日志、本地启动文档。
 
-P1-01.a 已落盘：Prisma schema（**SQLite 方案**，P1 全部 25 张表）、`@nanking-atlas/database` Prisma client 承载层、`apps/api` Prisma 单例与 `DATABASE_URL` 校验（`file:./...`）。**与 PostgreSQL 版本的差异**：无空间查询（P3 地图改 R*Tree）、无 pg_trgm 中文模糊搜索（改 LIKE）、所有 enum 改 String + 应用层字面量联合校验。**实跑迁移尚未在本机完成**（schema 已落盘但 SQLite 文件与表尚未生成）；下一项是 P1-02（users / roles / 登录 / 刷新 / 登出 / 限流）。
+**P1-01 ~ P1-10 已实现并通过验证**（SQLite 方案，见下方"数据层"章节的功能差异说明）：
+
+| 任务  | 内容                                                              | 验证                                   |
+| ----- | ----------------------------------------------------------------- | -------------------------------------- |
+| P1-01 | Prisma schema（25 表）+ 迁移 + seed                               | `migrate deploy` 在空库成功；seed 幂等 |
+| P1-02 | Argon2id 密码、登录/刷新/登出、refresh 旋转与重放检测、限流       | 23 条集成用例                          |
+| P1-03 | AuthGuard（401）+ RolesGuard（403，fail-closed）                  | 401/403 真实 HTTP 断言                 |
+| P1-04 | 内容 CRUD + 7 种类型扩展 + slug + 乐观锁（409）+ 软删除           | 并发更新 409 断言                      |
+| P1-05 | sources / relations / tags + 自关联与重复拒绝                     | 完整性约束断言                         |
+| P1-06 | Tiptap JSON 白名单 + 安全渲染（`@nanking-atlas/validation`）      | 59 条用例（XSS / `javascript:` 绕过）  |
+| P1-07 | revisions / review_actions / audit_logs 事务内只增                | 事务一致性断言                         |
+| P1-08 | 状态机 + 退回理由 + publication readiness（422 结构化）           | 非法流转 403；缺来源 422               |
+| P1-09 | upload intent + 对象确认 + MIME 魔数 / 版权校验                   | 21 条校验用例                          |
+| P1-10 | 后台列表、编辑器八区、自动保存（debounce + 并发保护）、冲突对话框 | 67 条用例                              |
+| P1-11 | OpenAPI 生成与 breaking-change 检查                               | 见 CI                                  |
+
+**P1-11（OpenAPI）尚在进行中。** 下一阶段为 P2（公开站真实数据接入、SEO、revalidation）。
 
 ## 仓库结构
 
@@ -125,13 +141,30 @@ P1-01.b 起会生成：
 DATABASE_URL='file:./test.db' pnpm --filter @nanking-atlas/database prisma:migrate:deploy
 ```
 
-**Seed 占位**（P1-01.b）：当前不插入任何示例数据；入口稳定，命令：
+P1-02 起 seed 填充演示数据。全部标注「示例 / 待核验」，状态一律 `DRAFT`（**未发布**），坐标留空、来源标 `未核验`：
 
 ```bash
 pnpm --filter @nanking-atlas/database seed
 ```
 
-P1-02 users/roles 落地后，seed 将按"幂等 + 显式标记示例/待核验"原则写入演示账号与最小内容。
+演示账号（仅本地与 CI，生产禁止执行 seed）：
+
+| 邮箱                  | 角色     | 密码                      |
+| --------------------- | -------- | ------------------------- |
+| `admin@demo.local`    | ADMIN    | `nanking-atlas-demo-2026` |
+| `reviewer@demo.local` | REVIEWER | `nanking-atlas-demo-2026` |
+| `editor@demo.local`   | EDITOR   | `nanking-atlas-demo-2026` |
+
+seed 是幂等的：`seed-auth.integration.spec.ts` 通过子进程跑真实 seed 命令验证，并校验 seed 与 API 的 Argon2id 参数一致 —— 不一致则登录失败。
+
+### 测试
+
+```bash
+pnpm test                # 单元测试
+pnpm test:integration    # API 集成测试（真实 SQLite 库 + 全局守卫 + 异常过滤器）
+```
+
+集成测试由 `apps/api/test/global-setup.ts` 在**空库上执行真实迁移 SQL** 建库，验证「迁移可在全新数据库执行」（AGENTS.md §7.5）。
 
 应用层 enum：因 SQLite 没有原生 ENUM，所有 enum 列实际存为 String。
 应用层通过 `@nanking-atlas/database` 的字面量联合 + zod 校验保证取值范围

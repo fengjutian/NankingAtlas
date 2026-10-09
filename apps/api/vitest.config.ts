@@ -15,7 +15,12 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
+    // 刻意不匹配 `*.integration.spec.ts` —— 集成测试需要 globalSetup 建库，
+    // 由 vitest.integration.config.ts 单独跑（`pnpm test:integration`）。
+    // 这里若用宽泛的 `*.{test,spec}.ts` 会把集成测试吸进单测 run，
+    // 导致它们在没有迁移过的库上全部失败。
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: ['src/**/*.integration.spec.ts', 'node_modules/**', 'dist/**'],
     // 默认注入一组最小可用的环境变量，避免 env 校验模块在测试加载时抛错
     env: {
       APP_ENV: 'test',

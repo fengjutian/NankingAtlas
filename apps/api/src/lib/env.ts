@@ -92,7 +92,12 @@ const authAccessTtlSeconds = z.preprocess(
 
 const authRefreshTtlSeconds = z.preprocess(
   blankToUndefined,
-  z.coerce.number().int().min(300).max(60 * 60 * 24 * 30).default(60 * 60 * 24 * 14),
+  z.coerce
+    .number()
+    .int()
+    .min(300)
+    .max(60 * 60 * 24 * 30)
+    .default(60 * 60 * 24 * 14),
 );
 
 /**
@@ -104,6 +109,38 @@ const authRefreshTtlSeconds = z.preprocess(
 const authLoginRateLimit = z.preprocess(
   blankToUndefined,
   z.coerce.number().int().min(0).max(1000).default(5),
+);
+
+/**
+ * revalidation 签名密钥（P2-07）。
+ *
+ * web 端的 `POST /api/revalidate` 用同一密钥校验。生产必须注入真实值；
+ * 本地缺省给固定 dev 值，且 `APP_ENV=production` 时会 fail-fast
+ * （与 AUTH_* secret 同等对待）。
+ */
+const revalidationSecret = z.preprocess(
+  blankToUndefined,
+  z
+    .string()
+    .min(32, 'REVALIDATION_SECRET 至少 32 字符')
+    .default('dev-only-insecure-revalidation-secret-override'),
+);
+
+/**
+ * web 端 revalidation 接收地址。
+ *
+ * 未配置时发布流程**跳过** revalidation 而不是失败 ——
+ * 技术方案 §9.1 明确「数据库发布事务不依赖 Netlify 成功」。
+ */
+const revalidationUrl = z.preprocess(
+  blankToUndefined,
+  z
+    .string()
+    .url()
+    .refine((value) => value.startsWith('https://') || /^http:\/\/localhost/iu.test(value), {
+      message: 'REVALIDATION_URL 必须是 https，或本地开发的 http://localhost',
+    })
+    .optional(),
 );
 
 const schema = z
@@ -121,6 +158,8 @@ const schema = z
     AUTH_ACCESS_TTL_SECONDS: authAccessTtlSeconds,
     AUTH_REFRESH_TTL_SECONDS: authRefreshTtlSeconds,
     AUTH_LOGIN_RATE_LIMIT: authLoginRateLimit,
+    REVALIDATION_SECRET: revalidationSecret,
+    REVALIDATION_URL: revalidationUrl,
   })
   .superRefine((data, ctx) => {
     if (data.APP_ENV !== 'test' && !data.DATABASE_URL) {
@@ -149,6 +188,22 @@ const schema = z
           message: '生产环境必须注入真实 AUTH_REFRESH_SECRET',
         });
       }
+      const devRevalidation = 'dev-only-insecure-revalidation-secret-override';
+      if (data.REVALIDATION_SECRET === devRevalidation) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['REVALIDATION_SECRET'],
+          message: '生产环境必须注入真实 REVALIDATION_SECRET',
+        });
+      }
+      // 生产必须有 revalidation 接收地址，否则发布后站点无法收敛
+      if (data.REVALIDATION_URL === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['REVALIDATION_URL'],
+          message: '生产环境必须配置 REVALIDATION_URL（web 端 revalidate 端点）',
+        });
+      }
     }
   });
 
@@ -166,6 +221,8 @@ const parsed = schema.safeParse({
   AUTH_ACCESS_TTL_SECONDS: process.env.AUTH_ACCESS_TTL_SECONDS,
   AUTH_REFRESH_TTL_SECONDS: process.env.AUTH_REFRESH_TTL_SECONDS,
   AUTH_LOGIN_RATE_LIMIT: process.env.AUTH_LOGIN_RATE_LIMIT,
+  REVALIDATION_SECRET: process.env.REVALIDATION_SECRET,
+  REVALIDATION_URL: process.env.REVALIDATION_URL,
 });
 
 if (!parsed.success) {
@@ -189,6 +246,8 @@ export const env = Object.freeze({
   AUTH_ACCESS_TTL_SECONDS: parsed.data.AUTH_ACCESS_TTL_SECONDS,
   AUTH_REFRESH_TTL_SECONDS: parsed.data.AUTH_REFRESH_TTL_SECONDS,
   AUTH_LOGIN_RATE_LIMIT: parsed.data.AUTH_LOGIN_RATE_LIMIT,
+  REVALIDATION_SECRET: parsed.data.REVALIDATION_SECRET,
+  REVALIDATION_URL: parsed.data.REVALIDATION_URL ?? null,
 });
 
 export type ApiEnv = typeof env;

@@ -16,7 +16,6 @@ import {
   validateTransition,
 } from '@/features/shared/workflow';
 
-
 /**
  * 审核操作面板（P1-10）。
  *
@@ -98,18 +97,28 @@ export function ReviewPanel({
 
       <ButtonRow>
         {actions.map((action) => {
-          const disabledReason = explainUnavailableAction(content.status, user.roles, action, context);
+          const disabledReason = explainUnavailableAction(
+            content.status,
+            user.roles,
+            action,
+            context,
+          );
           const reasonMissing = action === 'REJECT' && reasonError !== null;
           const publishNotReady = action === 'PUBLISH' && (needsReadinessCheck || publishBlocked);
           return (
             <Button
               key={action}
-              variant={action === 'PUBLISH' || action === 'APPROVE' ? 'primary' : action === 'REJECT' ? 'danger' : 'default'}
+              variant={
+                action === 'PUBLISH' || action === 'APPROVE'
+                  ? 'primary'
+                  : action === 'REJECT'
+                    ? 'danger'
+                    : 'default'
+              }
               busy={busyAction === action}
               disabled={disabledReason !== null || reasonMissing || publishNotReady}
               title={
-                disabledReason ??
-                (publishNotReady ? '发布前必须先通过 readiness 校验' : undefined)
+                disabledReason ?? (publishNotReady ? '发布前必须先通过 readiness 校验' : undefined)
               }
               onClick={() => {
                 if (action === 'REJECT') {
@@ -149,7 +158,9 @@ export function ReviewPanel({
         ) : null}
         {readiness !== null ? (
           readiness.issues.length === 0 ? (
-            <p style={mutedText}>校验通过：{readiness.ready ? '满足发布条件' : '服务端判定为未就绪'}。</p>
+            <p style={mutedText}>
+              校验通过：{readiness.ready ? '满足发布条件' : '服务端判定为未就绪'}。
+            </p>
           ) : (
             <ul style={{ ...stack, listStyle: 'none', padding: 0, margin: 0 }}>
               {readiness.issues.map((issue) => (
@@ -173,7 +184,9 @@ export function ReviewPanel({
         这里不做假数据；待后端补 `GET /admin/contents/:id/revisions` 后接入。
         TODO(P2): 渲染 revision 列表（版本号、操作人、动作、时间、reason）。
       */}
-      <p style={mutedText}>版本历史：后端尚未提供 revisions 读取端点，暂不展示（不填充占位数据）。</p>
+      <p style={mutedText}>
+        版本历史：后端尚未提供 revisions 读取端点，暂不展示（不填充占位数据）。
+      </p>
     </section>
   );
 }

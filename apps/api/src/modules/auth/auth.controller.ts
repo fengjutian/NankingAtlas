@@ -1,13 +1,23 @@
-import { Controller, Get, Post, Req, Res, Body, HttpCode, HttpStatus, Inject } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Req,
+  Res,
+  Body,
+  HttpCode,
+  HttpStatus,
+  Inject,
+} from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { type Request, type Response } from 'express';
 import { z } from 'zod';
 
 import { AuthService, AuthError, type RequestContext } from './auth.service.js';
 import { REFRESH_COOKIE } from './refresh-cookie.js';
-import { env } from '../../lib/env.js';
 import { requireUser } from '../../common/auth/auth.guard.js';
 import { Public, RequireRoles } from '../../common/auth/roles.decorator.js';
+import { env } from '../../lib/env.js';
 
 /**
  * 认证控制器。
@@ -175,11 +185,11 @@ export class AuthController {
   }
 
   /**
- * GET /auth/me —— 需要认证 + 任一后台角色。
- *
- * 显式声明 `@RequireRoles` 是必要的：RolesGuard 对未声明角色的端点
- * fail-closed（默认 403），`/auth/me` 属于"登录即可访问"，必须显式说明。
- */
+   * GET /auth/me —— 需要认证 + 任一后台角色。
+   *
+   * 显式声明 `@RequireRoles` 是必要的：RolesGuard 对未声明角色的端点
+   * fail-closed（默认 403），`/auth/me` 属于"登录即可访问"，必须显式说明。
+   */
   @Get('me')
   @RequireRoles('ADMIN', 'EDITOR', 'REVIEWER', 'VIEWER')
   me(@Req() req: Request): { data: unknown } {
@@ -225,8 +235,7 @@ function readRefreshCookie(req: Request): string | null {
     return parsed;
   }
 
-  const header = req.headers.cookie;
-  const raw = (Array.isArray(header) ? header[0] : header) ?? '';
+  const raw = firstHeaderValue(req.headers.cookie) ?? '';
   for (const part of raw.split(';')) {
     const eq = part.indexOf('=');
     if (eq <= 0) {

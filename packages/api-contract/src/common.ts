@@ -9,7 +9,11 @@ import { requestIdSchema, type RequestId } from '@nanking-atlas/validation';
  * 返回首次的结果而不是重复执行。字符集刻意保守（ASCII 字母数字与 `._:-`），
  * 避免日志 / 存储里的转义歧义。
  */
-export const idempotencyKeySchema = z.string().min(8).max(255).regex(/^[A-Za-z0-9._:-]+$/u);
+export const idempotencyKeySchema = z
+  .string()
+  .min(8)
+  .max(255)
+  .regex(/^[A-Za-z0-9._:-]+$/u);
 
 /** 弱 ETag，仅接受 `W/"<version>"` 形式。 */
 export const ifMatchSchema = z.string().regex(/^W\/"[^"]{1,64}"$/u);

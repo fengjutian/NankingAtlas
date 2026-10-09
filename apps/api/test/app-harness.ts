@@ -1,11 +1,12 @@
-import { INestApplication } from '@nestjs/common';
+import { type INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
-import type { Server } from 'node:http';
 
 import { AppModule } from '../src/app.module.js';
 import { GlobalExceptionFilter } from '../src/common/http/global-exception.filter.js';
 import { prisma } from '../src/lib/prisma.js';
+
+import type { Server } from 'node:http';
 
 /**
  * 集成测试的 Nest app 引导。

@@ -95,13 +95,7 @@ export const ALLOWED_TIPTAP_NODES: readonly string[] = [
 ];
 
 /** 允许的 mark type。`script` / `style` / `iframe` 等不存在于白名单。 */
-export const ALLOWED_TIPTAP_MARKS: readonly string[] = [
-  'bold',
-  'italic',
-  'strike',
-  'code',
-  'link',
-];
+export const ALLOWED_TIPTAP_MARKS: readonly string[] = ['bold', 'italic', 'strike', 'code', 'link'];
 
 /** 允许的 URL 协议；`javascript:` / `data:` / `vbscript:` / `file:` 均不在其中。 */
 export const ALLOWED_URL_PROTOCOLS: readonly string[] = ['http', 'https', 'mailto', 'tel'];
@@ -286,7 +280,11 @@ function visitNode(
   // 父节点层级约束（根节点无父级，跳过）
   if (parentType !== null) {
     const parentAllowed = ALLOWED_CHILDREN[parentType];
-    if (parentAllowed !== undefined && parentAllowed !== null && !parentAllowed.includes(node.type)) {
+    if (
+      parentAllowed !== undefined &&
+      parentAllowed !== null &&
+      !parentAllowed.includes(node.type)
+    ) {
       issues.push({
         path: [...path, 'type'],
         message: `node type "${node.type}" 不能出现在 "${parentType}" 内`,
@@ -333,11 +331,7 @@ function visitNode(
   });
 }
 
-function validateNodeAttrs(
-  node: TiptapNode,
-  path: (string | number)[],
-  issues: RuleIssue[],
-): void {
+function validateNodeAttrs(node: TiptapNode, path: (string | number)[], issues: RuleIssue[]): void {
   const attrs = node.attrs;
   const allowedKeys = NODE_ATTR_KEYS[node.type] ?? [];
 
@@ -387,10 +381,7 @@ function validateNodeAttrs(
       const value = attrs[key];
       if (value !== undefined) {
         const valid =
-          typeof value === 'number' &&
-          Number.isInteger(value) &&
-          value > 0 &&
-          value <= 10000;
+          typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= 10000;
         if (!valid) {
           issues.push({
             path: [...path, 'attrs', key],
@@ -402,11 +393,7 @@ function validateNodeAttrs(
   }
 }
 
-function validateMarks(
-  node: TiptapNode,
-  path: (string | number)[],
-  issues: RuleIssue[],
-): void {
+function validateMarks(node: TiptapNode, path: (string | number)[], issues: RuleIssue[]): void {
   const marks = node.marks;
   if (marks === undefined) {
     return;
@@ -671,7 +658,11 @@ export function parseTiptapDocument(input: unknown): TiptapDocument {
   }
   if (preIssues.length > 0) {
     throw new TiptapDocumentError(
-      preIssues.map((issue) => ({ code: 'too_large', path: pathString(issue.path), message: issue.message })),
+      preIssues.map((issue) => ({
+        code: 'too_large',
+        path: pathString(issue.path),
+        message: issue.message,
+      })),
     );
   }
 
@@ -723,7 +714,10 @@ export function extractPlainText(doc: TiptapDocument): string {
     .map((block) => (block.includes('\n') ? block : collapseSpaces(block)))
     .filter((block) => block.trim().length > 0);
 
-  return blocks.join('\n').replace(/\n{3,}/gu, '\n\n').trim();
+  return blocks
+    .join('\n')
+    .replace(/\n{3,}/gu, '\n\n')
+    .trim();
 }
 
 function collapseSpaces(value: string): string {
@@ -843,16 +837,12 @@ function headingLevel(node: TiptapNode): number {
 }
 
 function renderImage(node: TiptapNode): string {
-  const result = decodeAndCheckUrl(
-    node.attrs?.src,
-    IMAGE_URL_PROTOCOLS,
-    'image.attrs.src',
-  );
+  const result = decodeAndCheckUrl(node.attrs?.src, IMAGE_URL_PROTOCOLS, 'image.attrs.src');
   if ('error' in result) {
     throw new TiptapRenderError(result.error);
   }
 
-  const alt = typeof node.attrs?.alt === 'string' ? (node.attrs.alt) : '';
+  const alt = typeof node.attrs?.alt === 'string' ? node.attrs.alt : '';
   const title = typeof node.attrs?.title === 'string' ? node.attrs.title : undefined;
   const width = positiveDimension(node.attrs?.width);
   const height = positiveDimension(node.attrs?.height);

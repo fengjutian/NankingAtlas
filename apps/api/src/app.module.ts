@@ -8,6 +8,7 @@ import { GlobalExceptionFilter } from './common/http/global-exception.filter.js'
 import { RequestIdMiddleware } from './common/request-id/request-id.middleware.js';
 import { env } from './lib/env.js';
 import { ContentModule } from './modules/contents/content.module.js';
+import { HomepageModule } from './modules/homepage/homepage.module.js';
 import { MediaModule } from './modules/media/media.module.js';
 import { UsersAuthModule } from './modules/users/users-auth.module.js';
 
@@ -70,6 +71,7 @@ const throttlerModuleOptions = {
     ThrottlerModule.forRoot(throttlerModuleOptions),
     UsersAuthModule,
     ContentModule,
+    HomepageModule,
     MediaModule,
   ],
   controllers: [HealthController],

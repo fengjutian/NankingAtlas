@@ -62,7 +62,10 @@ export function Button({
       aria-busy={busy ? true : undefined}
       {...(ariaPressed === undefined ? {} : { 'aria-pressed': ariaPressed })}
       title={title}
-      style={{ ...variantStyle(variant), ...(isDisabled ? { opacity: 0.6, cursor: 'not-allowed' } : {}) }}
+      style={{
+        ...variantStyle(variant),
+        ...(isDisabled ? { opacity: 0.6, cursor: 'not-allowed' } : {}),
+      }}
     >
       {children}
     </button>

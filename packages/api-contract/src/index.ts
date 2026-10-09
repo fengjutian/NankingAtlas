@@ -55,3 +55,15 @@ export {
   type SuccessResponse,
   type VersionHeaders,
 } from './common.js';
+
+// ---------------------------------------------------------------------------
+// P1-11：OpenAPI 生成契约
+//
+// `generated/api-client.ts` 由 `apps/api/scripts/generate-openapi.ts` 从
+// `apps/api/src/openapi.ts` 推导产出，禁止手工编辑。
+//
+// 追加而非替换：上面所有手写导出保持不变，向后兼容；web/admin 应优先从本包
+// 导入 DTO 类型（AGENTS.md §6.3「跨应用类型来自 OpenAPI 生成契约」）。
+// ---------------------------------------------------------------------------
+
+export * from './generated/api-client.js';

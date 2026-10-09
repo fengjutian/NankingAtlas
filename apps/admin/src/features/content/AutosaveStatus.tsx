@@ -136,7 +136,7 @@ export function createAutosaveController(options: AutosaveControllerOptions): Au
 /** 保存失败原因：优先用服务端 message，其次用错误自身文案。 */
 export function describeSaveError(error: unknown): string {
   if (typeof error === 'object' && error !== null && 'message' in error) {
-    const message = (error).message;
+    const message = error.message;
     if (typeof message === 'string' && message !== '') {
       return message;
     }
@@ -204,15 +204,12 @@ export function AutosaveStatus({ state, onRetry, busy = false }: AutosaveStatusP
  * 返回值给调用方：是否处于"有未保存改动"状态（也用于列表页离开确认）。
  */
 export function useUnsavedChangesWarning(hasUnsavedChanges: boolean): void {
-  const handler = useCallback(
-    (event: BeforeUnloadEvent): string => {
-      event.preventDefault();
-      // 部分浏览器需要设置 returnValue 才会弹出确认框。
-      event.returnValue = '';
-      return '';
-    },
-    [],
-  );
+  const handler = useCallback((event: BeforeUnloadEvent): string => {
+    event.preventDefault();
+    // 部分浏览器需要设置 returnValue 才会弹出确认框。
+    event.returnValue = '';
+    return '';
+  }, []);
   useEffect(() => {
     if (!hasUnsavedChanges) {
       return undefined;

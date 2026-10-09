@@ -77,9 +77,9 @@ export class RelationsService {
     });
   }
 
-  async listForContent(contentId: string): Promise<
-    { targetContentId: string; relationType: string; directionNote: string | null }[]
-  > {
+  async listForContent(
+    contentId: string,
+  ): Promise<{ targetContentId: string; relationType: string; directionNote: string | null }[]> {
     const rows = await prisma.contentRelation.findMany({
       where: { OR: [{ sourceContentId: contentId }, { targetContentId: contentId }] },
     });

@@ -25,7 +25,6 @@ import type {
 
 import { env } from '@/lib/env';
 
-
 /**
  * 管理后台 HTTP 客户端（P1-10）。
  *
@@ -170,7 +169,8 @@ function formatIfMatch(version: number | string): string {
 }
 
 function newRequestId(): string {
-  const cryptoRef: Crypto | undefined = typeof globalThis.crypto === 'undefined' ? undefined : globalThis.crypto;
+  const cryptoRef: Crypto | undefined =
+    typeof globalThis.crypto === 'undefined' ? undefined : globalThis.crypto;
   if (cryptoRef !== undefined && typeof cryptoRef.randomUUID === 'function') {
     return cryptoRef.randomUUID();
   }
@@ -181,6 +181,15 @@ function isAbortLike(cause: unknown): boolean {
   return cause instanceof Error && cause.name === 'AbortError';
 }
 
+/**
+ * 读响应体。
+ *
+ * 非 JSON 的 body **不抛错**，而是原样返回字符串：
+ * 错误响应（4xx/5xx）经常来自网关 / 代理，返回 HTML 或纯文本。
+ * 那时应该由 `toApiError` 用状态码兜底出 FORBIDDEN / 503，
+ * 而不是让 "不是合法 JSON" 掩盖真正的错误码。
+ * 只有在**成功路径**上拿到非 JSON 才算协议错误（见 `execute`）。
+ */
 async function readBody(response: Response): Promise<unknown> {
   if (response.status === 204) {
     return undefined;
@@ -200,7 +209,7 @@ async function readBody(response: Response): Promise<unknown> {
   try {
     return JSON.parse(text) as unknown;
   } catch {
-    throw new ApiNetworkError('服务端响应不是合法 JSON');
+    return text;
   }
 }
 
@@ -228,7 +237,7 @@ function isApiErrorPayload(raw: unknown): raw is ApiErrorPayload {
   if (typeof raw !== 'object' || raw === null || !('error' in raw)) {
     return false;
   }
-  const error = (raw).error;
+  const error = raw.error;
   if (typeof error !== 'object' || error === null) {
     return false;
   }
@@ -298,14 +307,18 @@ function isSessionPayload(raw: unknown): raw is ApiEnvelope<AuthSession> {
   if (typeof raw !== 'object' || raw === null || !('data' in raw)) {
     return false;
   }
-  const data = (raw).data;
+  const data = raw.data;
   if (typeof data !== 'object' || data === null) {
     return false;
   }
   return typeof (data as { accessToken?: unknown }).accessToken === 'string';
 }
 
-async function execute<T>(path: string, options: RequestOptions, allowRefresh: boolean): Promise<T> {
+async function execute<T>(
+  path: string,
+  options: RequestOptions,
+  allowRefresh: boolean,
+): Promise<T> {
   const headers: Record<string, string> = {
     Accept: 'application/json',
     'X-Request-Id': newRequestId(),
@@ -343,7 +356,7 @@ async function execute<T>(path: string, options: RequestOptions, allowRefresh: b
     if (isAbortLike(cause)) {
       throw new ApiAbortError('请求已取消', cause);
     }
-    throw new ApiNetworkError('无法连接到服务器，请检查网络或 API 地址', cause);
+    throw new ApiNetworkError('无法连接服务器，请检查网络或 API 地址', cause);
   }
 
   const isAuthed = options.auth !== false;
@@ -360,6 +373,15 @@ async function execute<T>(path: string, options: RequestOptions, allowRefresh: b
 
   if (!response.ok) {
     throw toApiError(raw, response.status, newRequestId());
+  }
+  // 204 / 空响应体没有 data（logout 就是 204）。直接返回 undefined，
+  // 不能当成"服务端响应格式错误"——否则 `requestVoid` 永远拿不到成功。
+  if (response.status === 204 || raw === undefined) {
+    return undefined as T;
+  }
+  // 成功路径上的非 JSON body 才是协议错误（错误路径已在 toApiError 兜底）。
+  if (typeof raw === 'string') {
+    throw new ApiNetworkError('服务端响应不是合法 JSON');
   }
   if (typeof raw !== 'object' || raw === null || !('data' in raw)) {
     throw new ApiNetworkError('服务端响应缺少 data 字段');
@@ -418,16 +440,27 @@ export const contentApi = {
     }
     search.set('limit', String(query.limit ?? 50));
     const suffix = search.toString();
-    return request<AdminContentDto[]>(`/admin/contents?${suffix}`, signal === undefined ? {} : { signal });
+    return request<AdminContentDto[]>(
+      `/admin/contents?${suffix}`,
+      signal === undefined ? {} : { signal },
+    );
   },
   get(id: string, signal?: AbortSignal): Promise<AdminContentDto> {
-    return request<AdminContentDto>(`/admin/contents/${id}`, signal === undefined ? {} : { signal });
+    return request<AdminContentDto>(
+      `/admin/contents/${id}`,
+      signal === undefined ? {} : { signal },
+    );
   },
   create(input: CreateContentInput): Promise<AdminContentDto> {
     return request<AdminContentDto>('/admin/contents', { method: 'POST', body: input });
   },
   /** 必须带 If-Match；版本不一致服务端返回 409 CONTENT_VERSION_CONFLICT。 */
-  update(id: string, patch: AdminContentPatch, version: number, signal?: AbortSignal): Promise<AdminContentDto> {
+  update(
+    id: string,
+    patch: AdminContentPatch,
+    version: number,
+    signal?: AbortSignal,
+  ): Promise<AdminContentDto> {
     const options: RequestOptions = { method: 'PATCH', body: patch, ifMatch: version };
     if (signal !== undefined) {
       options.signal = signal;
@@ -439,10 +472,16 @@ export const contentApi = {
     return request<AdminContentDto>(`/admin/contents/${id}/transition`, { method: 'POST', body });
   },
   readiness(id: string, signal?: AbortSignal): Promise<ReadinessResult> {
-    return request<ReadinessResult>(`/admin/contents/${id}/readiness`, signal === undefined ? {} : { signal });
+    return request<ReadinessResult>(
+      `/admin/contents/${id}/readiness`,
+      signal === undefined ? {} : { signal },
+    );
   },
   listSources(id: string, signal?: AbortSignal): Promise<ContentSourceLink[]> {
-    return request<ContentSourceLink[]>(`/admin/contents/${id}/sources`, signal === undefined ? {} : { signal });
+    return request<ContentSourceLink[]>(
+      `/admin/contents/${id}/sources`,
+      signal === undefined ? {} : { signal },
+    );
   },
   listTags(id: string, signal?: AbortSignal): Promise<TagDto[]> {
     return request<TagDto[]>(`/admin/contents/${id}/tags`, signal === undefined ? {} : { signal });
@@ -494,7 +533,11 @@ export const libraryApi = {
     }
     return request<UploadIntentDto>('/admin/media/upload-intents', options);
   },
-  completeMedia(mediaId: string, input: CompleteMediaInput, idempotencyKey?: string): Promise<MediaCompleteDto> {
+  completeMedia(
+    mediaId: string,
+    input: CompleteMediaInput,
+    idempotencyKey?: string,
+  ): Promise<MediaCompleteDto> {
     const options: RequestOptions = { method: 'POST', body: input };
     if (idempotencyKey !== undefined) {
       options.idempotencyKey = idempotencyKey;

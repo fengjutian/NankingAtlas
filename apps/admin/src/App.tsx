@@ -106,11 +106,14 @@ export function App() {
 
   return (
     <AdminShell>
-      {route.name === 'contents' ? (
-        <ContentListPage user={user} onUnauthorized={signOut} />
-      ) : null}
+      {route.name === 'contents' ? <ContentListPage user={user} onUnauthorized={signOut} /> : null}
       {route.name === 'editor' ? (
-        <EditorPage key={route.contentId} contentId={route.contentId} user={user} onUnauthorized={signOut} />
+        <EditorPage
+          key={route.contentId}
+          contentId={route.contentId}
+          user={user}
+          onUnauthorized={signOut}
+        />
       ) : null}
     </AdminShell>
   );

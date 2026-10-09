@@ -3,7 +3,8 @@ import { statusLabel } from './workflow';
 import type { ContentStatus } from '@/api/types';
 import type { CSSProperties, ReactNode } from 'react';
 
-export type BadgeTone = 'neutral' | 'draft' | 'review' | 'approved' | 'published' | 'archived' | 'danger';
+export type BadgeTone =
+  'neutral' | 'draft' | 'review' | 'approved' | 'published' | 'archived' | 'danger';
 
 export function Badge({ tone = 'neutral', children }: { tone?: BadgeTone; children: ReactNode }) {
   return <span style={badgeStyle(tone)}>{children}</span>;

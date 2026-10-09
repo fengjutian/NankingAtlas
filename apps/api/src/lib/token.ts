@@ -75,10 +75,7 @@ export type VerifyAccessTokenResult =
  * 顺序刻意是：先结构 → 再签名（timingSafeEqual）→ 最后过期。
  * 签名不过就直接失败，不做任何 claims 解释。
  */
-export function verifyAccessToken(
-  token: string,
-  now: Date = new Date(),
-): VerifyAccessTokenResult {
+export function verifyAccessToken(token: string, now: Date = new Date()): VerifyAccessTokenResult {
   const parts = token.split('.');
   if (parts.length !== 3) {
     return { ok: false, reason: 'malformed' };
@@ -186,9 +183,5 @@ export function constantTimeEqualHex(a: string, b: string): boolean {
  * 审计只需"同一 IP 是否相同"的等价性，不需要可逆。
  */
 export function hashIp(ip: string): string {
-  return createHash('sha256')
-    .update(env.AUTH_ACCESS_SECRET)
-    .update('ip:')
-    .update(ip)
-    .digest('hex');
+  return createHash('sha256').update(env.AUTH_ACCESS_SECRET).update('ip:').update(ip).digest('hex');
 }

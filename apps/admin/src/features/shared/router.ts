@@ -11,9 +11,7 @@ import { useSyncExternalStore } from 'react';
  */
 
 export type Route =
-  | { name: 'login' }
-  | { name: 'contents' }
-  | { name: 'editor'; contentId: string };
+  { name: 'login' } | { name: 'contents' } | { name: 'editor'; contentId: string };
 
 const listeners = new Set<() => void>();
 

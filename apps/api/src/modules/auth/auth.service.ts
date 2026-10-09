@@ -4,12 +4,12 @@ import { env } from '../../lib/env.js';
 import { hashPassword, verifyPassword } from '../../lib/password.js';
 import { prisma } from '../../lib/prisma.js';
 import { hashIp } from '../../lib/token.js';
+import { generateRefreshToken, hashRefreshToken, issueAccessToken } from '../../lib/token.js';
 import {
-  generateRefreshToken,
-  hashRefreshToken,
-  issueAccessToken,
-} from '../../lib/token.js';
-import { getPasswordHashByEmail, UsersService, type UserWithRoles } from '../users/users.service.js';
+  getPasswordHashByEmail,
+  UsersService,
+  type UserWithRoles,
+} from '../users/users.service.js';
 
 /**
  * 认证业务。
@@ -237,10 +237,7 @@ export class AuthService {
   }
 
   /** 签发 access + refresh 并落库。 */
-  private async issueSession(
-    user: UserWithRoles,
-    ctx: RequestContext,
-  ): Promise<AuthSession> {
+  private async issueSession(user: UserWithRoles, ctx: RequestContext): Promise<AuthSession> {
     return this.rotateRefreshToken(null, user, ctx);
   }
 

@@ -99,7 +99,9 @@ export class SourcesService {
           ...(input.patch.author !== undefined ? { author: input.patch.author } : {}),
           ...(input.patch.publisher !== undefined ? { publisher: input.patch.publisher } : {}),
           ...(input.patch.url !== undefined ? { url: input.patch.url } : {}),
-          ...(input.patch.citationText !== undefined ? { citationText: input.patch.citationText } : {}),
+          ...(input.patch.citationText !== undefined
+            ? { citationText: input.patch.citationText }
+            : {}),
           ...(input.patch.verificationNote !== undefined
             ? { verificationNote: input.patch.verificationNote }
             : {}),
@@ -164,7 +166,9 @@ export class SourcesService {
     });
   }
 
-  async listForContent(contentId: string): Promise<
+  async listForContent(
+    contentId: string,
+  ): Promise<
     { claimScope: string; pageReference: string | null; isPrimary: boolean; source: SourceRecord }[]
   > {
     const rows = await prisma.contentSource.findMany({

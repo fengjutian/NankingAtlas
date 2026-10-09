@@ -45,8 +45,27 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-function errorResponse(status: number, code: string, message: string, details?: Record<string, unknown>): Response {
-  return jsonResponse({ error: { code, message, requestId: 'req-1', ...(details === undefined ? {} : { details }) } }, status);
+/**
+ * 让 fetch 每次调用都返回**新的** Response。
+ *
+ * `mockResolvedValue` 复用同一个 Response 实例，而 body 是只能读一次的流；
+ * 第二个请求再读就抛 `读取响应体失败`。凡是同一用例里连发两次请求的
+ * 都必须用这个辅助函数。
+ */
+function mockJson(body: unknown, status = 200): void {
+  vi.mocked(fetch).mockImplementation(() => Promise.resolve(jsonResponse(body, status)));
+}
+
+function errorResponse(
+  status: number,
+  code: string,
+  message: string,
+  details?: Record<string, unknown>,
+): Response {
+  return jsonResponse(
+    { error: { code, message, requestId: 'req-1', ...(details === undefined ? {} : { details }) } },
+    status,
+  );
 }
 
 function headerOf(init: RequestInit | undefined, name: string): string | null {
@@ -116,7 +135,11 @@ describe('api client: request headers', () => {
     client.setAccessToken('token-abc');
     vi.mocked(fetch).mockResolvedValue(jsonResponse({ data: { id: 'c1' } }));
 
-    await client.request('/admin/contents/c1', { method: 'PATCH', body: { title: 'x' }, ifMatch: 7 });
+    await client.request('/admin/contents/c1', {
+      method: 'PATCH',
+      body: { title: 'x' },
+      ifMatch: 7,
+    });
 
     const [, init] = vi.mocked(fetch).mock.calls[0] ?? [];
     expect(headerOf(init, 'If-Match')).toBe('W/"7"');
@@ -126,14 +149,18 @@ describe('api client: request headers', () => {
     client.setAccessToken('token-abc');
     vi.mocked(fetch).mockResolvedValue(jsonResponse({ data: { id: 'c1' } }));
 
-    await client.request('/admin/contents/c1', { method: 'PATCH', body: { title: 'x' }, ifMatch: 'W/"9"' });
+    await client.request('/admin/contents/c1', {
+      method: 'PATCH',
+      body: { title: 'x' },
+      ifMatch: 'W/"9"',
+    });
 
     const [, init] = vi.mocked(fetch).mock.calls[0] ?? [];
     expect(headerOf(init, 'If-Match')).toBe('W/"9"');
   });
 
   it('sets Content-Type only when a body is present', async () => {
-    vi.mocked(fetch).mockResolvedValue(jsonResponse({ data: null }));
+    mockJson({ data: null });
 
     await client.request('/auth/me');
     await client.request('/admin/contents', { method: 'POST', body: { title: 'x' } });
@@ -178,7 +205,9 @@ describe('api client: error mapping', () => {
       }),
     );
 
-    const error = await client.request('/admin/contents/c1', { method: 'PATCH' }).catch((cause: unknown) => cause);
+    const error = await client
+      .request('/admin/contents/c1', { method: 'PATCH' })
+      .catch((cause: unknown) => cause);
 
     expect(client.isApiError(error)).toBe(true);
     const apiError = error as ApiError;
@@ -235,7 +264,9 @@ describe('api client: 401 refresh and replay', () => {
     vi.mocked(fetch)
       .mockResolvedValueOnce(errorResponse(401, 'UNAUTHORIZED', '登录已过期'))
       .mockResolvedValueOnce(
-        jsonResponse({ data: { accessToken: 'fresh-token', accessTokenExpiresAt: 'later', user: {} } }),
+        jsonResponse({
+          data: { accessToken: 'fresh-token', accessTokenExpiresAt: 'later', user: {} },
+        }),
       )
       .mockResolvedValueOnce(jsonResponse({ data: [{ id: 'c1' }] }));
 
@@ -264,7 +295,9 @@ describe('api client: 401 refresh and replay', () => {
   });
 
   it('does not attempt refresh for anonymous login requests', async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(errorResponse(401, 'INVALID_CREDENTIALS', '邮箱或密码不正确'));
+    vi.mocked(fetch).mockResolvedValueOnce(
+      errorResponse(401, 'INVALID_CREDENTIALS', '邮箱或密码不正确'),
+    );
 
     const error = await client.authApi.login('a@b.c', 'wrong').catch((cause: unknown) => cause);
 

@@ -24,7 +24,13 @@ export interface ErrorStateProps {
   onRetry?: () => void;
 }
 
-export function ErrorState({ title, message, requestId, forbidden = false, onRetry }: ErrorStateProps) {
+export function ErrorState({
+  title,
+  message,
+  requestId,
+  forbidden = false,
+  onRetry,
+}: ErrorStateProps) {
   return (
     <div role="alert" style={{ ...card, ...dangerBanner }}>
       <div style={stack}>

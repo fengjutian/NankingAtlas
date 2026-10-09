@@ -28,7 +28,9 @@ export function Field({ label, hint, error, required = false, children }: FieldP
   const id = useId();
   const hintId = hint === undefined ? undefined : `${id}-hint`;
   const errorId = error === undefined || error === null || error === '' ? undefined : `${id}-error`;
-  const describedBy = [hintId, errorId].filter((value): value is string => value !== undefined).join(' ');
+  const describedBy = [hintId, errorId]
+    .filter((value): value is string => value !== undefined)
+    .join(' ');
   const invalid = errorId !== undefined;
 
   return (
@@ -50,7 +52,11 @@ export function Field({ label, hint, error, required = false, children }: FieldP
       )}
       {children({ id, describedBy: describedBy === '' ? undefined : describedBy, invalid })}
       {invalid ? (
-        <p id={errorId} role="alert" style={{ color: 'var(--app-warning-fg)', fontSize: '0.85rem', margin: 0 }}>
+        <p
+          id={errorId}
+          role="alert"
+          style={{ color: 'var(--app-warning-fg)', fontSize: '0.85rem', margin: 0 }}
+        >
           {error}
         </p>
       ) : null}

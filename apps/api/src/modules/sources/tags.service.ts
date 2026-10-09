@@ -38,10 +38,18 @@ export class TagsService {
   }
 
   /** 给内容打标签；已存在则跳过（幂等）。 */
-  async attach(contentId: string, tagSlug: string, actorId: string, requestId: string): Promise<void> {
+  async attach(
+    contentId: string,
+    tagSlug: string,
+    actorId: string,
+    requestId: string,
+  ): Promise<void> {
     const slug = slugSchema.parse(tagSlug);
     await prisma.$transaction(async (tx) => {
-      const content = await tx.content.findUnique({ where: { id: contentId }, select: { id: true } });
+      const content = await tx.content.findUnique({
+        where: { id: contentId },
+        select: { id: true },
+      });
       if (content === null) {
         throw new ForbiddenError('内容不存在');
       }

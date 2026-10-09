@@ -1,10 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';
 
-import {
-  assertPasswordAcceptable,
-  hashPassword,
-  verifyPassword,
-} from './password.js';
+import { assertPasswordAcceptable, hashPassword, verifyPassword } from './password.js';
 
 /**
  * Argon2id 单测。

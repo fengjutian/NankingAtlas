@@ -36,8 +36,13 @@ import {
   stack,
   tableStyle,
 } from '@/features/shared/styles';
-import { SUMMARY_MAX, TITLE_MAX, isValidSlug, summaryLengthHint, titleLengthHint } from '@/features/shared/workflow';
-
+import {
+  SUMMARY_MAX,
+  TITLE_MAX,
+  isValidSlug,
+  summaryLengthHint,
+  titleLengthHint,
+} from '@/features/shared/workflow';
 
 /**
  * 编辑器八区（P1-10）。
@@ -124,10 +129,20 @@ export const EXTENSION_FIELDS: Record<ContentType, readonly ExtensionFieldMeta[]
     },
     { key: 'lon', label: '经度', kind: 'number' },
     { key: 'lat', label: '纬度', kind: 'number' },
-    { key: 'verificationStatus', label: '核验状态', kind: 'select', options: VERIFICATION_STATUSES },
+    {
+      key: 'verificationStatus',
+      label: '核验状态',
+      kind: 'select',
+      options: VERIFICATION_STATUSES,
+    },
   ],
   PERSON: [
-    { key: 'birthText', label: '生年（文本）', kind: 'text', hint: '史料原文优先，不确定时保留原文表述' },
+    {
+      key: 'birthText',
+      label: '生年（文本）',
+      kind: 'text',
+      hint: '史料原文优先，不确定时保留原文表述',
+    },
     { key: 'deathText', label: '卒年（文本）', kind: 'text' },
     { key: 'biographyNote', label: '生平说明', kind: 'textarea' },
   ],
@@ -135,7 +150,12 @@ export const EXTENSION_FIELDS: Record<ContentType, readonly ExtensionFieldMeta[]
     { key: 'startDate', label: '开始日期', kind: 'date' },
     { key: 'endDate', label: '结束日期', kind: 'date' },
     { key: 'datePrecision', label: '日期精度', kind: 'select', options: EVENT_DATE_PRECISIONS },
-    { key: 'dateNote', label: '日期说明', kind: 'text', hint: '如「据《XX志》卷三，约清光绪年间」' },
+    {
+      key: 'dateNote',
+      label: '日期说明',
+      kind: 'text',
+      hint: '如「据《XX志》卷三，约清光绪年间」',
+    },
   ],
   ARCHITECTURE: [
     { key: 'builtPeriod', label: '营建年代', kind: 'text' },
@@ -183,10 +203,7 @@ function numberOrNull(value: string | undefined): number | null {
  * 空字符串一律不下发（服务端 `.nullish()` 接受缺省）。
  * 返回 null 表示该 type 的必填项没填（TRADITION.traditionType）。
  */
-export function buildExtension(
-  type: ContentType,
-  values: ExtensionValues,
-): TypeExtension | null {
+export function buildExtension(type: ContentType, values: ExtensionValues): TypeExtension | null {
   switch (type) {
     case 'PLACE': {
       const address = textOrNull(values.address);
@@ -407,7 +424,15 @@ export function BasicsSection({ value, onChange, typeLocked, disabled }: BasicsS
       title="基础信息"
       description="标题、slug 与类型决定公开页地址与索引方式；发布后 slug 变更需谨慎。"
     >
-      <Field label="标题" required error={titleLengthHint(value.title) === 'error' && value.title.trim() === '' ? '标题不能为空' : null}>
+      <Field
+        label="标题"
+        required
+        error={
+          titleLengthHint(value.title) === 'error' && value.title.trim() === ''
+            ? '标题不能为空'
+            : null
+        }
+      >
         {({ id, describedBy, invalid }) => (
           <input
             id={id}
@@ -452,7 +477,10 @@ export function BasicsSection({ value, onChange, typeLocked, disabled }: BasicsS
           />
         )}
       </Field>
-      <Field label="类型" hint={typeLocked ? '该内容已进入审核流程，类型已锁定' : '类型决定第三区显示哪些扩展字段'}>
+      <Field
+        label="类型"
+        hint={typeLocked ? '该内容已进入审核流程，类型已锁定' : '类型决定第三区显示哪些扩展字段'}
+      >
         {({ id, describedBy }) => (
           <Select
             id={id}
@@ -760,7 +788,11 @@ export function SourcesSection({
             />
           )}
         </Field>
-        <Field label="来源标题" required error={newSource.title.trim() === '' ? '来源标题不能为空' : null}>
+        <Field
+          label="来源标题"
+          required
+          error={newSource.title.trim() === '' ? '来源标题不能为空' : null}
+        >
           {({ id, describedBy, invalid }) => (
             <input
               id={id}
@@ -780,7 +812,9 @@ export function SourcesSection({
                 id={id}
                 disabled={busy}
                 value={newSource.author}
-                onChange={(event) => onNewSourceChange({ ...newSource, author: event.target.value })}
+                onChange={(event) =>
+                  onNewSourceChange({ ...newSource, author: event.target.value })
+                }
                 style={inputStyle}
               />
             )}
@@ -791,7 +825,9 @@ export function SourcesSection({
                 id={id}
                 disabled={busy}
                 value={newSource.publisher}
-                onChange={(event) => onNewSourceChange({ ...newSource, publisher: event.target.value })}
+                onChange={(event) =>
+                  onNewSourceChange({ ...newSource, publisher: event.target.value })
+                }
                 style={inputStyle}
               />
             )}
@@ -806,7 +842,9 @@ export function SourcesSection({
                 disabled={busy}
                 type="date"
                 value={newSource.publicationDate}
-                onChange={(event) => onNewSourceChange({ ...newSource, publicationDate: event.target.value })}
+                onChange={(event) =>
+                  onNewSourceChange({ ...newSource, publicationDate: event.target.value })
+                }
                 style={inputStyle}
               />
             )}
@@ -831,7 +869,9 @@ export function SourcesSection({
               disabled={busy}
               rows={3}
               value={newSource.citationText}
-              onChange={(event) => onNewSourceChange({ ...newSource, citationText: event.target.value })}
+              onChange={(event) =>
+                onNewSourceChange({ ...newSource, citationText: event.target.value })
+              }
               style={inputStyle}
             />
           )}
@@ -915,7 +955,9 @@ export function SourcesSection({
                 id={id}
                 disabled={busy}
                 value={attach.pageReference}
-                onChange={(event) => onAttachChange({ ...attach, pageReference: event.target.value })}
+                onChange={(event) =>
+                  onAttachChange({ ...attach, pageReference: event.target.value })
+                }
                 style={inputStyle}
               />
             )}
@@ -1037,7 +1079,11 @@ export function RightsMediaSection({
             )}
           </Field>
         </div>
-        <Field label="大小（字节）" required error={intake.sizeBytes === '' ? null : sizeValid ? null : '必须是正整数'}>
+        <Field
+          label="大小（字节）"
+          required
+          error={intake.sizeBytes === '' ? null : sizeValid ? null : '必须是正整数'}
+        >
           {({ id, describedBy, invalid }) => (
             <input
               id={id}
@@ -1082,7 +1128,13 @@ export function RightsMediaSection({
         <Field
           label="Checksum（sha256，64 位小写十六进制）"
           required
-          error={complete.checksum.trim() === '' ? null : checksumValid ? null : '必须是 64 位小写十六进制'}
+          error={
+            complete.checksum.trim() === ''
+              ? null
+              : checksumValid
+                ? null
+                : '必须是 64 位小写十六进制'
+          }
         >
           {({ id, describedBy, invalid }) => (
             <input
@@ -1096,7 +1148,11 @@ export function RightsMediaSection({
             />
           )}
         </Field>
-        <Field label="替代文本（altText）" required error={complete.altText.trim() === '' ? '替代文本不能为空' : null}>
+        <Field
+          label="替代文本（altText）"
+          required
+          error={complete.altText.trim() === '' ? '替代文本不能为空' : null}
+        >
           {({ id, describedBy, invalid }) => (
             <input
               id={id}
@@ -1140,7 +1196,9 @@ export function RightsMediaSection({
                 id={id}
                 disabled={busy}
                 value={complete.creditLine}
-                onChange={(event) => onCompleteChange({ ...complete, creditLine: event.target.value })}
+                onChange={(event) =>
+                  onCompleteChange({ ...complete, creditLine: event.target.value })
+                }
                 style={inputStyle}
               />
             )}
@@ -1180,7 +1238,9 @@ export function RightsMediaSection({
                   type="number"
                   min={1}
                   value={complete.height}
-                  onChange={(event) => onCompleteChange({ ...complete, height: event.target.value })}
+                  onChange={(event) =>
+                    onCompleteChange({ ...complete, height: event.target.value })
+                  }
                   style={inputStyle}
                 />
               )}
@@ -1239,7 +1299,11 @@ export function TagsSection({
   error: string | null;
 }) {
   return (
-    <SectionShell index={6} title="标签" description="标签用于聚合检索；slug 全局唯一，重复添加等同于复用已有标签。">
+    <SectionShell
+      index={6}
+      title="标签"
+      description="标签用于聚合检索；slug 全局唯一，重复添加等同于复用已有标签。"
+    >
       {tags.length === 0 ? (
         <EmptyState title="还没有标签" description="添加标签便于在列表与前台按主题聚合内容。" />
       ) : (
@@ -1268,7 +1332,11 @@ export function TagsSection({
               />
             )}
           </Field>
-          <Field label="显示名" required error={displayName.trim() === '' ? '显示名不能为空' : null}>
+          <Field
+            label="显示名"
+            required
+            error={displayName.trim() === '' ? '显示名不能为空' : null}
+          >
             {({ id, describedBy, invalid }) => (
               <input
                 id={id}
@@ -1320,7 +1388,11 @@ export function RelationsSection({
   targetContentId: string;
   relationType: RelationType;
   directionNote: string;
-  onChange: (next: { targetContentId: string; relationType: RelationType; directionNote: string }) => void;
+  onChange: (next: {
+    targetContentId: string;
+    relationType: RelationType;
+    directionNote: string;
+  }) => void;
   onCreate: () => void;
   busy: boolean;
   error: string | null;
@@ -1332,12 +1404,18 @@ export function RelationsSection({
       description="关联关系由受控字典约束；方向说明用于避免把有向关系读成双向。"
     >
       {relations.length === 0 ? (
-        <EmptyState title="还没有关联内容" description="把人物与地点、事件与地点等关系连起来，便于前台串联阅读。" />
+        <EmptyState
+          title="还没有关联内容"
+          description="把人物与地点、事件与地点等关系连起来，便于前台串联阅读。"
+        />
       ) : (
         <ul style={{ ...stack, listStyle: 'none', padding: 0, margin: 0 }}>
           {relations.map((relation) => (
             <li key={`${relation.targetContentId}-${relation.relationType}`} style={row}>
-              <Badge>{RELATION_TYPE_LABELS[relation.relationType as RelationType] ?? relation.relationType}</Badge>
+              <Badge>
+                {RELATION_TYPE_LABELS[relation.relationType as RelationType] ??
+                  relation.relationType}
+              </Badge>
               <code>{relation.targetContentId}</code>
               <span style={mutedText}>{relation.directionNote ?? ''}</span>
             </li>
@@ -1345,7 +1423,11 @@ export function RelationsSection({
         </ul>
       )}
       <div style={stack}>
-        <Field label="目标内容 ID" required error={targetContentId.trim() === '' ? '目标内容 ID 不能为空' : null}>
+        <Field
+          label="目标内容 ID"
+          required
+          error={targetContentId.trim() === '' ? '目标内容 ID 不能为空' : null}
+        >
           {({ id, describedBy, invalid }) => (
             <input
               id={id}
@@ -1353,7 +1435,9 @@ export function RelationsSection({
               aria-invalid={invalid}
               disabled={busy}
               value={targetContentId}
-              onChange={(event) => onChange({ targetContentId: event.target.value, relationType, directionNote })}
+              onChange={(event) =>
+                onChange({ targetContentId: event.target.value, relationType, directionNote })
+              }
               style={inputStyle}
             />
           )}
@@ -1417,7 +1501,11 @@ export function SeoSection({
   const titleHint = titleLengthHint(title);
   const summaryHint = summaryLengthHint(summary);
   return (
-    <SectionShell index={8} title="SEO 与可分享" description="公开页路径由 slug 决定；标题与摘要同时用于分享卡片。">
+    <SectionShell
+      index={8}
+      title="SEO 与可分享"
+      description="公开页路径由 slug 决定；标题与摘要同时用于分享卡片。"
+    >
       <Field label="摘要（summary）" hint={`用于列表摘要与分享卡片，最多 ${SUMMARY_MAX} 字`}>
         {({ id, describedBy }) => (
           <textarea
@@ -1440,7 +1528,9 @@ export function SeoSection({
         <div style={row}>
           <dt style={{ fontWeight: 600 }}>标题长度</dt>
           <dd style={{ margin: 0 }}>
-            <Badge tone={titleHint === 'ok' ? 'published' : titleHint === 'warn' ? 'review' : 'danger'}>
+            <Badge
+              tone={titleHint === 'ok' ? 'published' : titleHint === 'warn' ? 'review' : 'danger'}
+            >
               {title.length} / {TITLE_MAX}
             </Badge>
           </dd>
@@ -1448,7 +1538,11 @@ export function SeoSection({
         <div style={row}>
           <dt style={{ fontWeight: 600 }}>摘要长度</dt>
           <dd style={{ margin: 0 }}>
-            <Badge tone={summaryHint === 'ok' ? 'published' : summaryHint === 'warn' ? 'review' : 'danger'}>
+            <Badge
+              tone={
+                summaryHint === 'ok' ? 'published' : summaryHint === 'warn' ? 'review' : 'danger'
+              }
+            >
               {summary.length} / {SUMMARY_MAX}
             </Badge>
           </dd>

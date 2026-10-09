@@ -140,8 +140,12 @@ describe('buildCursorPage', () => {
   });
 
   it('rejects an out-of-range limit', () => {
-    expect(() => buildCursorPage({ items: makeItems(1), limit: 0, toCursorItem })).toThrow(RangeError);
-    expect(() => buildCursorPage({ items: makeItems(1), limit: 101, toCursorItem })).toThrow(RangeError);
+    expect(() => buildCursorPage({ items: makeItems(1), limit: 0, toCursorItem })).toThrow(
+      RangeError,
+    );
+    expect(() => buildCursorPage({ items: makeItems(1), limit: 101, toCursorItem })).toThrow(
+      RangeError,
+    );
   });
 
   it('does not alias the caller array', () => {

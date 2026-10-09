@@ -54,8 +54,6 @@ import { navigate } from '@/features/shared/router';
 import { ErrorState, Loading } from '@/features/shared/States';
 import { card, dangerBanner, inputStyle, mutedText, row, stack } from '@/features/shared/styles';
 
-
-
 /**
  * 编辑器页（P1-10）：八区 + 自动保存 + 版本冲突 + 审核面板。
  *
@@ -151,7 +149,7 @@ function pickId(raw: unknown): string | null {
   if (typeof raw !== 'object' || raw === null || !('id' in raw)) {
     return null;
   }
-  const id = (raw).id;
+  const id = raw.id;
   return typeof id === 'string' ? id : null;
 }
 
@@ -166,10 +164,14 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
   const [content, setContent] = useState<AdminContentDto | null>(null);
   const [draft, setDraft] = useState<DraftState | null>(null);
   const [version, setVersion] = useState(0);
-  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>(isNew ? 'ready' : 'loading');
-  const [pageError, setPageError] = useState<{ message: string; requestId: string; forbidden: boolean } | null>(
-    null,
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'error'>(
+    isNew ? 'ready' : 'loading',
   );
+  const [pageError, setPageError] = useState<{
+    message: string;
+    requestId: string;
+    forbidden: boolean;
+  } | null>(null);
 
   // ---- 来源 / 标签 / 关联 / 媒体 ----
   const [links, setLinks] = useState<ContentSourceLink[]>([]);
@@ -203,7 +205,11 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
     relationType: 'RELATED_TO',
     directionNote: '',
   });
-  const [intake, setIntake] = useState<MediaIntake>({ fileName: '', mimeType: 'image/jpeg', sizeBytes: '' });
+  const [intake, setIntake] = useState<MediaIntake>({
+    fileName: '',
+    mimeType: 'image/jpeg',
+    sizeBytes: '',
+  });
   const [intent, setIntent] = useState<UploadIntentDto | null>(null);
   const [mediaResult, setMediaResult] = useState<MediaCompleteDto | null>(null);
   const [mediaForm, setMediaForm] = useState<MediaCompleteValue>({
@@ -225,7 +231,9 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
 
   // ---- 冲突 ----
   const [conflict, setConflict] = useState<ConflictVersionInfo | null>(null);
-  const [conflictServer, setConflictServer] = useState<ReturnType<typeof toDiffSource> | null>(null);
+  const [conflictServer, setConflictServer] = useState<ReturnType<typeof toDiffSource> | null>(
+    null,
+  );
   const [conflictBusy, setConflictBusy] = useState(false);
 
   const draftRef = useRef<DraftState | null>(null);
@@ -285,26 +293,31 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
   }, [contentId, isNew, loadContent]);
 
   // ---- 自动保存 ----
-  const handleSaveError = useCallback((error: unknown) => {
-    if (isApiError(error) && error.code === CONTENT_VERSION_CONFLICT) {
-      const info = readConflictVersions(error.details, versionRef.current);
-      setConflict({ ...info, serverUpdatedAt: content?.updatedAt ?? null });
-      setConflictServer(null);
-      // 冲突时顺手拉一份服务端最新内容，供"查看差异"并排展示。
-      void contentApi
-        .get(contentId)
-        .then((server) => {
-          setContent(server);
-          setConflictServer(toDiffSource(toDraft(server)));
-          setConflict((prev) => (prev === null ? null : { ...prev, serverUpdatedAt: server.updatedAt }));
-        })
-        .catch(() => {
-          setConflictServer(null);
-        });
-      return;
-    }
-    setActionError(describeError(error).message);
-  }, [content?.updatedAt, contentId]);
+  const handleSaveError = useCallback(
+    (error: unknown) => {
+      if (isApiError(error) && error.code === CONTENT_VERSION_CONFLICT) {
+        const info = readConflictVersions(error.details, versionRef.current);
+        setConflict({ ...info, serverUpdatedAt: content?.updatedAt ?? null });
+        setConflictServer(null);
+        // 冲突时顺手拉一份服务端最新内容，供"查看差异"并排展示。
+        void contentApi
+          .get(contentId)
+          .then((server) => {
+            setContent(server);
+            setConflictServer(toDiffSource(toDraft(server)));
+            setConflict((prev) =>
+              prev === null ? null : { ...prev, serverUpdatedAt: server.updatedAt },
+            );
+          })
+          .catch(() => {
+            setConflictServer(null);
+          });
+        return;
+      }
+      setActionError(describeError(error).message);
+    },
+    [content?.updatedAt, contentId],
+  );
 
   const { controller, state: autosaveState } = useAutosaveController({
     save: async (signal) => {
@@ -344,22 +357,25 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
 
   // ---- 来源 / 标签 / 关联 / 媒体操作 ----
   // 统一包装：失败时把错误写进 sideError 并返回 null，成功时返回任务结果。
-  const runSideTask = useCallback(async <T,>(task: () => Promise<T>): Promise<T | null> => {
-    setSideBusy(true);
-    setSideError(null);
-    try {
-      return await task();
-    } catch (cause) {
-      if (isApiAuthError(cause)) {
-        onUnauthorized();
+  const runSideTask = useCallback(
+    async <T,>(task: () => Promise<T>): Promise<T | null> => {
+      setSideBusy(true);
+      setSideError(null);
+      try {
+        return await task();
+      } catch (cause) {
+        if (isApiAuthError(cause)) {
+          onUnauthorized();
+          return null;
+        }
+        setSideError(describeError(cause).message);
         return null;
+      } finally {
+        setSideBusy(false);
       }
-      setSideError(describeError(cause).message);
-      return null;
-    } finally {
-      setSideBusy(false);
-    }
-  }, [onUnauthorized]);
+    },
+    [onUnauthorized],
+  );
 
   const createSource = useCallback(
     async (): Promise<string | null> =>
@@ -369,9 +385,13 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
           title: newSource.title.trim(),
           ...(newSource.author.trim() === '' ? {} : { author: newSource.author.trim() }),
           ...(newSource.publisher.trim() === '' ? {} : { publisher: newSource.publisher.trim() }),
-          ...(newSource.publicationDate === '' ? {} : { publicationDate: newSource.publicationDate }),
+          ...(newSource.publicationDate === ''
+            ? {}
+            : { publicationDate: newSource.publicationDate }),
           ...(newSource.url.trim() === '' ? {} : { url: newSource.url.trim() }),
-          ...(newSource.citationText.trim() === '' ? {} : { citationText: newSource.citationText.trim() }),
+          ...(newSource.citationText.trim() === ''
+            ? {}
+            : { citationText: newSource.citationText.trim() }),
           ...(newSource.verificationNote.trim() === ''
             ? {}
             : { verificationNote: newSource.verificationNote.trim() }),
@@ -453,7 +473,11 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
         setActionError('民俗传统类型必须填写「传统类型」');
         return;
       }
-      const updated = await contentApi.update(contentId, patchFromDraft(current, ext), server.version);
+      const updated = await contentApi.update(
+        contentId,
+        patchFromDraft(current, ext),
+        server.version,
+      );
       setContent(updated);
       setVersion(updated.version);
       setDraft(current);
@@ -467,7 +491,9 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
       }
       setActionError(describeError(cause).message);
       if (isVersionConflict(cause)) {
-        setConflict(readConflictVersions(isApiError(cause) ? cause.details : undefined, versionRef.current));
+        setConflict(
+          readConflictVersions(isApiError(cause) ? cause.details : undefined, versionRef.current),
+        );
       }
     } finally {
       setConflictBusy(false);
@@ -500,7 +526,13 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
   }
 
   if (content === null || draft === null) {
-    return <ErrorState title="内容不可用" message="未能读取到内容数据，请返回列表重试。" onRetry={() => navigate('/contents')} />;
+    return (
+      <ErrorState
+        title="内容不可用"
+        message="未能读取到内容数据，请返回列表重试。"
+        onRetry={() => navigate('/contents')}
+      />
+    );
   }
 
   const readOnly = content.status !== 'DRAFT';
@@ -568,7 +600,8 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
             await libraryApi.attachSource(contentId, {
               sourceId: attach.sourceId.trim(),
               claimScope: attach.claimScope.trim(),
-              pageReference: attach.pageReference.trim() === '' ? null : attach.pageReference.trim(),
+              pageReference:
+                attach.pageReference.trim() === '' ? null : attach.pageReference.trim(),
               isPrimary: attach.isPrimary,
             });
             await refreshSideData(contentId);
@@ -738,9 +771,7 @@ function NewContentForm({
   return (
     <div style={{ ...card, ...stack, maxWidth: '40rem' }}>
       <h1 style={{ fontSize: '1.2rem', margin: 0 }}>新建草稿</h1>
-      <p style={mutedText}>
-        先确定类型、slug 与标题即可建稿；创建后进入编辑器补来源、版权与正文。
-      </p>
+      <p style={mutedText}>先确定类型、slug 与标题即可建稿；创建后进入编辑器补来源、版权与正文。</p>
       <label style={stack} htmlFor="new-title">
         <span style={{ fontWeight: 600 }}>标题 *</span>
         <input

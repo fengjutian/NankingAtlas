@@ -21,7 +21,9 @@ function doc(...content: TiptapNode[]): TiptapDocument {
 
 function p(text: string, marks?: TiptapNode['marks']): TiptapNode {
   const textNode: TiptapNode = { type: 'text', text };
-  return marks === undefined ? { type: 'paragraph', content: [textNode] } : { type: 'paragraph', content: [{ ...textNode, marks }] };
+  return marks === undefined
+    ? { type: 'paragraph', content: [textNode] }
+    : { type: 'paragraph', content: [{ ...textNode, marks }] };
 }
 
 function h(level: number, text: string): TiptapNode {
@@ -66,7 +68,10 @@ describe('tiptap document validation', () => {
     it('renders bulletList / orderedList / listItem', () => {
       const list = doc({
         type: 'bulletList',
-        content: [{ type: 'listItem', content: [p('甲')] }, { type: 'listItem', content: [p('乙')] }],
+        content: [
+          { type: 'listItem', content: [p('甲')] },
+          { type: 'listItem', content: [p('乙')] },
+        ],
       });
       expect(render(list)).toBe('<ul><li><p>甲</p></li><li><p>乙</p></li></ul>');
       expect(
@@ -82,14 +87,27 @@ describe('tiptap document validation', () => {
         render(doc({ type: 'codeBlock', content: [{ type: 'text', text: 'const a = 1;' }] })),
       ).toBe('<pre><code>const a = 1;</code></pre>');
       expect(render(doc({ type: 'horizontalRule' }))).toBe('<hr>');
-      expect(render(doc({ type: 'paragraph', content: [{ type: 'hardBreak' }, { type: 'text', text: '第二行' }] }))).toBe(
-        '<p><br>第二行</p>',
-      );
+      expect(
+        render(
+          doc({
+            type: 'paragraph',
+            content: [{ type: 'hardBreak' }, { type: 'text', text: '第二行' }],
+          }),
+        ),
+      ).toBe('<p><br>第二行</p>');
     });
 
     it('renders image with escaped src, alt and lazy loading', () => {
       const html = render(
-        doc({ type: 'image', attrs: { src: 'https://example.com/a.png?x=1&y=2', alt: '明城墙', width: 800, height: 600 } }),
+        doc({
+          type: 'image',
+          attrs: {
+            src: 'https://example.com/a.png?x=1&y=2',
+            alt: '明城墙',
+            width: 800,
+            height: 600,
+          },
+        }),
       );
       expect(html).toBe(
         '<img src="https://example.com/a.png?x=1&amp;y=2" alt="明城墙" width="800" height="600" loading="lazy">',
@@ -118,7 +136,9 @@ describe('tiptap document validation', () => {
 
     it('renders link with forced rel', () => {
       const html = render(
-        doc(p('链接', [{ type: 'link', attrs: { href: 'https://example.com/a', target: '_blank' } }])),
+        doc(
+          p('链接', [{ type: 'link', attrs: { href: 'https://example.com/a', target: '_blank' } }]),
+        ),
       );
       expect(html).toBe(
         `<p><a href="https://example.com/a" rel="${FORCED_LINK_REL}" target="_blank">链接</a></p>`,
@@ -147,11 +167,13 @@ describe('tiptap document validation', () => {
 
     it('rejects non-whitelisted attributes such as onerror', () => {
       expect(() =>
-        render(doc({ type: 'image', attrs: { src: 'https://example.com/a.png', onerror: 'alert(1)' } })),
+        render(
+          doc({ type: 'image', attrs: { src: 'https://example.com/a.png', onerror: 'alert(1)' } }),
+        ),
       ).toThrow(TiptapDocumentError);
-      expect(() => render(doc(p('x', [{ type: 'link', attrs: { href: 'https://a.test', onclick: 'x' } }])))).toThrow(
-        TiptapDocumentError,
-      );
+      expect(() =>
+        render(doc(p('x', [{ type: 'link', attrs: { href: 'https://a.test', onclick: 'x' } }]))),
+      ).toThrow(TiptapDocumentError);
     });
 
     it('rejects marks on non-text nodes', () => {
@@ -161,18 +183,24 @@ describe('tiptap document validation', () => {
     });
 
     it('rejects text directly inside doc', () => {
-      expect(() => parseTiptapDocument({ type: 'doc', content: [{ type: 'text', text: 'x' }] })).toThrow(
-        TiptapDocumentError,
-      );
+      expect(() =>
+        parseTiptapDocument({ type: 'doc', content: [{ type: 'text', text: 'x' }] }),
+      ).toThrow(TiptapDocumentError);
     });
 
     it('rejects empty text nodes', () => {
-      expect(() => parseTiptapDocument({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: '' }] }] })).toThrow(
-        TiptapDocumentError,
-      );
-      expect(() => parseTiptapDocument({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text' }] }] })).toThrow(
-        TiptapDocumentError,
-      );
+      expect(() =>
+        parseTiptapDocument({
+          type: 'doc',
+          content: [{ type: 'paragraph', content: [{ type: 'text', text: '' }] }],
+        }),
+      ).toThrow(TiptapDocumentError);
+      expect(() =>
+        parseTiptapDocument({
+          type: 'doc',
+          content: [{ type: 'paragraph', content: [{ type: 'text' }] }],
+        }),
+      ).toThrow(TiptapDocumentError);
     });
 
     it('rejects listItem without children', () => {
@@ -182,7 +210,9 @@ describe('tiptap document validation', () => {
     });
 
     it('rejects block nodes inside bulletList', () => {
-      expect(() => render(doc({ type: 'bulletList', content: [p('x')] }))).toThrow(TiptapDocumentError);
+      expect(() => render(doc({ type: 'bulletList', content: [p('x')] }))).toThrow(
+        TiptapDocumentError,
+      );
     });
 
     it('rejects paragraphs nested directly inside a paragraph', () => {
@@ -208,16 +238,18 @@ describe('tiptap document validation', () => {
     ];
 
     it.each(badHrefs)('rejects link href %j', (href) => {
-      expect(() => render(doc(p('x', [{ type: 'link', attrs: { href } }])))).toThrow(TiptapDocumentError);
+      expect(() => render(doc(p('x', [{ type: 'link', attrs: { href } }])))).toThrow(
+        TiptapDocumentError,
+      );
     });
 
     it('rejects javascript: and protocol-relative image src', () => {
       expect(() => render(doc({ type: 'image', attrs: { src: 'javascript:alert(1)' } }))).toThrow(
         TiptapDocumentError,
       );
-      expect(() => render(doc({ type: 'image', attrs: { src: '//evil.example.com/x.png' } }))).toThrow(
-        TiptapDocumentError,
-      );
+      expect(() =>
+        render(doc({ type: 'image', attrs: { src: '//evil.example.com/x.png' } })),
+      ).toThrow(TiptapDocumentError);
     });
 
     it('rejects non-http protocols for image src', () => {
@@ -227,14 +259,16 @@ describe('tiptap document validation', () => {
     });
 
     it('accepts mailto and tel for links but decodes entities', () => {
-      expect(render(doc(p('邮箱', [{ type: 'link', attrs: { href: 'mailto:a@example.com' } }])))).toContain(
-        'href="mailto:a@example.com"',
-      );
-      expect(render(doc(p('电话', [{ type: 'link', attrs: { href: 'tel:+862512345' } }])))).toContain(
-        'href="tel:+862512345"',
-      );
       expect(
-        render(doc(p('x', [{ type: 'link', attrs: { href: 'https://example.com/?a=1&amp;b=2' } }]))),
+        render(doc(p('邮箱', [{ type: 'link', attrs: { href: 'mailto:a@example.com' } }]))),
+      ).toContain('href="mailto:a@example.com"');
+      expect(
+        render(doc(p('电话', [{ type: 'link', attrs: { href: 'tel:+862512345' } }]))),
+      ).toContain('href="tel:+862512345"');
+      expect(
+        render(
+          doc(p('x', [{ type: 'link', attrs: { href: 'https://example.com/?a=1&amp;b=2' } }])),
+        ),
       ).toContain('href="https://example.com/?a=1&amp;b=2"');
     });
 
@@ -243,19 +277,25 @@ describe('tiptap document validation', () => {
     });
 
     it('rejects invalid link target', () => {
-      expect(() => render(doc(p('x', [{ type: 'link', attrs: { href: 'https://a.test', target: '_top' } }])))).toThrow(
-        TiptapDocumentError,
-      );
+      expect(() =>
+        render(doc(p('x', [{ type: 'link', attrs: { href: 'https://a.test', target: '_top' } }]))),
+      ).toThrow(TiptapDocumentError);
     });
 
     it('rejects image without src and image with children', () => {
-      expect(() => parseTiptapDocument({ type: 'doc', content: [{ type: 'image', attrs: {} }] })).toThrow(
-        TiptapDocumentError,
-      );
+      expect(() =>
+        parseTiptapDocument({ type: 'doc', content: [{ type: 'image', attrs: {} }] }),
+      ).toThrow(TiptapDocumentError);
       expect(() =>
         parseTiptapDocument({
           type: 'doc',
-          content: [{ type: 'image', attrs: { src: 'https://a.test/x.png' }, content: [{ type: 'text', text: 'x' }] }],
+          content: [
+            {
+              type: 'image',
+              attrs: { src: 'https://a.test/x.png' },
+              content: [{ type: 'text', text: 'x' }],
+            },
+          ],
         }),
       ).toThrow(TiptapDocumentError);
     });
@@ -265,7 +305,12 @@ describe('tiptap document validation', () => {
     it('rejects heading level out of range or non-integer', () => {
       for (const level of [0, 7, 2.5, '2', null]) {
         expect(() =>
-          parseTiptapDocument({ type: 'doc', content: [{ type: 'heading', attrs: { level }, content: [{ type: 'text', text: 'x' }] }] }),
+          parseTiptapDocument({
+            type: 'doc',
+            content: [
+              { type: 'heading', attrs: { level }, content: [{ type: 'text', text: 'x' }] },
+            ],
+          }),
         ).toThrow(TiptapDocumentError);
       }
     });
@@ -275,7 +320,9 @@ describe('tiptap document validation', () => {
       for (let i = 0; i < 40; i += 1) {
         node = { type: 'blockquote', content: [node] };
       }
-      expect(() => parseTiptapDocument({ type: 'doc', content: [node] })).toThrow(TiptapDocumentError);
+      expect(() => parseTiptapDocument({ type: 'doc', content: [node] })).toThrow(
+        TiptapDocumentError,
+      );
     });
 
     it('rejects documents with more than 5000 nodes', () => {
@@ -288,7 +335,10 @@ describe('tiptap document validation', () => {
 
     it('reports structured issues with paths', () => {
       try {
-        parseTiptapDocument({ type: 'doc', content: [{ type: 'image', attrs: { src: 'javascript:alert(1)' } }] });
+        parseTiptapDocument({
+          type: 'doc',
+          content: [{ type: 'image', attrs: { src: 'javascript:alert(1)' } }],
+        });
         expect.unreachable('应当抛出 TiptapDocumentError');
       } catch (error) {
         expect(error).toBeInstanceOf(TiptapDocumentError);
@@ -301,8 +351,12 @@ describe('tiptap document validation', () => {
     it('rejects non-document input shapes', () => {
       expect(() => parseTiptapDocument(null)).toThrow(TiptapDocumentError);
       expect(() => parseTiptapDocument({ type: 'paragraph' })).toThrow(TiptapDocumentError);
-      expect(() => parseTiptapDocument({ type: 'doc', content: 'not-an-array' })).toThrow(TiptapDocumentError);
-      expect(() => parseTiptapDocument({ type: 'doc', content: [], extra: true })).toThrow(TiptapDocumentError);
+      expect(() => parseTiptapDocument({ type: 'doc', content: 'not-an-array' })).toThrow(
+        TiptapDocumentError,
+      );
+      expect(() => parseTiptapDocument({ type: 'doc', content: [], extra: true })).toThrow(
+        TiptapDocumentError,
+      );
     });
   });
 
@@ -312,7 +366,10 @@ describe('tiptap document validation', () => {
         parseTiptapDocument(
           doc(h(2, '明城墙'), p('始建于明洪武年'), {
             type: 'bulletList',
-            content: [{ type: 'listItem', content: [p('神策门')] }, { type: 'listItem', content: [p('中华门')] }],
+            content: [
+              { type: 'listItem', content: [p('神策门')] },
+              { type: 'listItem', content: [p('中华门')] },
+            ],
           }),
         ),
       );
@@ -328,7 +385,9 @@ describe('tiptap document validation', () => {
 
     it('keeps newlines inside codeBlock', () => {
       const text = extractPlainText(
-        parseTiptapDocument(doc({ type: 'codeBlock', content: [{ type: 'text', text: 'line1\nline2\n\nline3' }] })),
+        parseTiptapDocument(
+          doc({ type: 'codeBlock', content: [{ type: 'text', text: 'line1\nline2\n\nline3' }] }),
+        ),
       );
       // codeBlock 不折叠空白：空行是代码语义的一部分，必须保留
       expect(text).toBe('line1\nline2\n\nline3');
@@ -337,7 +396,11 @@ describe('tiptap document validation', () => {
     it('ignores image and marks when extracting text', () => {
       const text = extractPlainText(
         parseTiptapDocument(
-          doc(p('前', [{ type: 'bold' }]), { type: 'image', attrs: { src: 'https://a.test/x.png', alt: '图注' } }, p('后')),
+          doc(
+            p('前', [{ type: 'bold' }]),
+            { type: 'image', attrs: { src: 'https://a.test/x.png', alt: '图注' } },
+            p('后'),
+          ),
         ),
       );
       expect(text).toBe('前\n后');
@@ -361,7 +424,9 @@ describe('tiptap document validation', () => {
     it.each(payloads)('never emits unescaped <script for payload %j', (payload) => {
       const document = doc(
         p(payload),
-        p('链接', [{ type: 'link', attrs: { href: `https://example.com/${encodeURIComponent(payload)}` } }]),
+        p('链接', [
+          { type: 'link', attrs: { href: `https://example.com/${encodeURIComponent(payload)}` } },
+        ]),
       );
       const parsed = parseTiptapDocument(document);
       const html = renderTiptapToSafeHtml(parsed);
@@ -376,7 +441,10 @@ describe('tiptap document validation', () => {
 
     it('escapes quotes and angle brackets in text and attributes', () => {
       const html = render(
-        doc({ type: 'image', attrs: { src: 'https://example.com/x.png', alt: '"><script>alert(1)</script>' } }),
+        doc({
+          type: 'image',
+          attrs: { src: 'https://example.com/x.png', alt: '"><script>alert(1)</script>' },
+        }),
       );
       expect(html).not.toContain('<script>');
       expect(html).toContain('&quot;&gt;&lt;script&gt;');
@@ -398,11 +466,19 @@ describe('tiptap document validation', () => {
     });
 
     it('throws instead of silently dropping unknown node types at render time', () => {
-      const forged = { type: 'doc', content: [{ type: 'mysteryNode' }] } as unknown as TiptapDocument;
+      const forged = {
+        type: 'doc',
+        content: [{ type: 'mysteryNode' }],
+      } as unknown as TiptapDocument;
       expect(() => renderTiptapToSafeHtml(forged)).toThrow(TiptapRenderError);
       const forgedMark = {
         type: 'doc',
-        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'x', marks: [{ type: 'highlight' }] }] }],
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: 'x', marks: [{ type: 'highlight' }] }],
+          },
+        ],
       } as unknown as TiptapDocument;
       expect(() => renderTiptapToSafeHtml(forgedMark)).toThrow(TiptapRenderError);
     });
@@ -410,15 +486,26 @@ describe('tiptap document validation', () => {
     it('rejects an unsafe link href even when bypassing parseTiptapDocument', () => {
       const forged = {
         type: 'doc',
-        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'x', marks: [{ type: 'link', attrs: { href: 'javascript:alert(1)' } }] }] }],
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'text',
+                text: 'x',
+                marks: [{ type: 'link', attrs: { href: 'javascript:alert(1)' } }],
+              },
+            ],
+          },
+        ],
       } as unknown as TiptapDocument;
       expect(() => renderTiptapToSafeHtml(forged)).toThrow(TiptapRenderError);
     });
 
     it('refuses to render a non-doc root', () => {
-      expect(() => renderTiptapToSafeHtml({ type: 'paragraph' } as unknown as TiptapDocument)).toThrow(
-        TiptapRenderError,
-      );
+      expect(() =>
+        renderTiptapToSafeHtml({ type: 'paragraph' } as unknown as TiptapDocument),
+      ).toThrow(TiptapRenderError);
     });
   });
 });
