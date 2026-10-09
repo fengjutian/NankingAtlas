@@ -10,9 +10,9 @@ OpenAPI 共享契约包。后端 NestJS API 与前端 web/admin 之间交换的 
 
 ## 边界规则
 
-| 允许 | 禁止 |
-| --- | --- |
-| `apps/*`、`packages/*` import 本包 | 本包 import `apps/*` |
+| 允许                                                   | 禁止                                                                           |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `apps/*`、`packages/*` import 本包                     | 本包 import `apps/*`                                                           |
 | 本包导出只来自 `src/index.ts` 与未来 `src/generated/*` | `web`/`admin` import `@nanking-atlas/api` 内部模块或 `@nanking-atlas/database` |
 
 边界规则由根级 ESLint flat config 的 `no-restricted-imports` 强制执行。

@@ -189,6 +189,42 @@ importers:
         specifier: ^2.1.8
         version: 2.1.9(@types/node@20.19.43)(jsdom@25.0.1)(terser@5.51.2)
 
+  packages/api-contract:
+    devDependencies:
+      '@nanking-atlas/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@nanking-atlas/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      rimraf:
+        specifier: ^5.0.10
+        version: 5.0.10
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@20.19.43)(jsdom@25.0.1)(terser@5.51.2)
+
+  packages/database:
+    devDependencies:
+      '@nanking-atlas/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@nanking-atlas/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      rimraf:
+        specifier: ^5.0.10
+        version: 5.0.10
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@20.19.43)(jsdom@25.0.1)(terser@5.51.2)
+
   packages/eslint-config:
     dependencies:
       '@eslint/js':
@@ -217,6 +253,59 @@ importers:
         version: 8.71.1(eslint@9.39.5)(typescript@5.9.3)
 
   packages/tsconfig: {}
+
+  packages/ui:
+    dependencies:
+      react:
+        specifier: ^18.3.1
+        version: 18.3.1
+      react-dom:
+        specifier: ^18.3.1
+        version: 18.3.1(react@18.3.1)
+    devDependencies:
+      '@nanking-atlas/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@nanking-atlas/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      '@types/react':
+        specifier: ^18.3.18
+        version: 18.3.31
+      '@types/react-dom':
+        specifier: ^18.3.5
+        version: 18.3.7(@types/react@18.3.31)
+      rimraf:
+        specifier: ^5.0.10
+        version: 5.0.10
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@20.19.43)(jsdom@25.0.1)(terser@5.51.2)
+
+  packages/validation:
+    dependencies:
+      zod:
+        specifier: ^3.24.1
+        version: 3.25.76
+    devDependencies:
+      '@nanking-atlas/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@nanking-atlas/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      rimraf:
+        specifier: ^5.0.10
+        version: 5.0.10
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@20.19.43)(jsdom@25.0.1)(terser@5.51.2)
 
 packages:
 

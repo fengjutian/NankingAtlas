@@ -20,7 +20,7 @@ import { COLORS, SPACING } from '@nanking-atlas/ui';
 
 ## 边界规则
 
-| 允许 | 禁止 |
-| --- | --- |
-| web / admin import 本包 | 本包 import `@nanking-atlas/api`、`@nanking-atlas/database`、`apps/*` |
+| 允许                                                                           | 禁止                                                                                   |
+| ------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------- |
+| web / admin import 本包                                                        | 本包 import `@nanking-atlas/api`、`@nanking-atlas/database`、`apps/*`                  |
 | 本包 import 其他 `@nanking-atlas/*` packages（仅 `@nanking-atlas/validation`） | 本包 import `@nanking-atlas/api-contract`（避免 web/admin → ui → api-contract 间接链） |

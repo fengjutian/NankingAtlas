@@ -10,7 +10,7 @@ Prisma schema、迁移、seed 与共享类型。**仅 `apps/api` 可导入**；w
 
 ## 边界规则
 
-| 允许 | 禁止 |
-| --- | --- |
-| `apps/api` import 本包 | `web`/`admin` import 本包 |
+| 允许                              | 禁止                                              |
+| --------------------------------- | ------------------------------------------------- |
+| `apps/api` import 本包            | `web`/`admin` import 本包                         |
 | 本包 export 只来自 `src/index.ts` | 本包 import `apps/*` 或 `@nanking-atlas/api` 内部 |
