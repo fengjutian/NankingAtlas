@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { requestIdSchema } from '@nanking-atlas/validation';
+
 import { API_ERROR_CODES, type ApiErrorCode } from './index.js';
 
 describe('api-contract smoke', () => {
@@ -21,5 +23,10 @@ describe('api-contract smoke', () => {
   it('narrows error codes to the union type', () => {
     const code: ApiErrorCode = API_ERROR_CODES.FORBIDDEN;
     expect(code).toBe('FORBIDDEN');
+  });
+
+  it('re-exports requestIdSchema as the canonical request id schema', () => {
+    expect(requestIdSchema.safeParse('req_abc123_-XYZ').success).toBe(true);
+    expect(requestIdSchema.safeParse('has space').success).toBe(false);
   });
 });

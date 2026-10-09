@@ -10,6 +10,9 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "dependencies": {
+    "@nanking-atlas/validation": "workspace:*"
+  },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",

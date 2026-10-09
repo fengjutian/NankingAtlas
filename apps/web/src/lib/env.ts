@@ -17,10 +17,7 @@ const APP_ENV = z.enum(['development', 'test', 'staging', 'production']);
 const blankToUndefined = (val: unknown): unknown =>
   val === '' || val === undefined ? undefined : val;
 
-const optionalUrl = z.preprocess(
-  blankToUndefined,
-  z.string().url().optional(),
-);
+const optionalUrl = z.preprocess(blankToUndefined, z.string().url().optional());
 
 // `next dev` always sets NODE_ENV=development. Use that safe local default so
 // a fresh checkout starts without requiring an untracked .env.local file.

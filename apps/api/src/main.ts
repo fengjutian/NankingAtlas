@@ -32,9 +32,11 @@ async function bootstrap(): Promise<void> {
   }
 
   await app.listen(env.API_PORT);
-  app.get(PinoLogger).log(
-    `Nanking Atlas API listening on http://localhost:${String(env.API_PORT)} (appEnv=${env.APP_ENV})`,
-  );
+  app
+    .get(PinoLogger)
+    .log(
+      `Nanking Atlas API listening on http://localhost:${String(env.API_PORT)} (appEnv=${env.APP_ENV})`,
+    );
 }
 
 bootstrap().catch((error: unknown) => {

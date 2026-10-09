@@ -29,9 +29,7 @@ const apiPort = z.preprocess(
 
 const logLevel = z.preprocess(
   blankToUndefined,
-  z
-    .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
-    .default('info'),
+  z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
 );
 
 const requestIdHeader = z.preprocess(

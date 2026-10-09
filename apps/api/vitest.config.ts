@@ -8,6 +8,8 @@ export default defineConfig({
     env: {
       APP_ENV: 'test',
       NODE_ENV: 'test',
+      LOG_LEVEL: 'silent',
+      REQUEST_ID_HEADER: 'x-request-id',
     },
     coverage: {
       reporter: ['text', 'html'],
