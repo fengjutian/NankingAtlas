@@ -61,7 +61,7 @@ describe('api env validation', () => {
   it('rejects non-file DATABASE_URL schemes', async () => {
     vi.stubEnv('APP_ENV', 'development');
     vi.stubEnv('DATABASE_URL', 'mysql://u:p@h:3306/db');
-    await expect(import('./env.js')).rejects.toThrow(/file:.*DATABASE_URL/);
+    await expect(import('./env.js')).rejects.toThrow(/DATABASE_URL[\s\S]*file:/);
   });
 
   it('accepts file:// DATABASE_URL', async () => {

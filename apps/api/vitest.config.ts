@@ -11,7 +11,7 @@ export default defineConfig({
       LOG_LEVEL: 'silent',
       REQUEST_ID_HEADER: 'x-request-id',
       // 占位 SQLite 文件：单测不需要真建文件；集成测试时另写迁移脚本。
-      DATABASE_URL: 'file:./packages/database/prisma/test.db',
+      DATABASE_URL: 'file:../packages/database/prisma/test.db',
     },
     coverage: {
       reporter: ['text', 'html'],

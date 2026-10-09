@@ -66,11 +66,11 @@ model UserRoleAssignment {
 model RefreshToken {
   id        String    @id @default(cuid())
   userId    String    @map("user_id")
-  tokenHash String
+  tokenHash String    @map("token_hash")
   expiresAt DateTime  @map("expires_at")
   revokedAt DateTime? @map("revoked_at")
   createdAt DateTime  @default(now()) @map("created_at")
-  userAgent String?
+  userAgent String?   @map("user_agent")
   ipHash    String?   @map("ip_hash")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)

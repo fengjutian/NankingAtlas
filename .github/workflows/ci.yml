@@ -143,11 +143,15 @@ jobs:
         with:
           path: ~/.local/share/pnpm/store
           key: pnpm-store-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+      # P1-01.b 起：生成 Prisma client 并在临时 test.db 上跑 migrate deploy，
+      # 验证迁移可在全新数据库上重放（AGENTS.md §7.5）。
+      - name: Prisma generate
+        run: pnpm --filter @nanking-atlas/database prisma:generate
+      - name: Prisma migrate deploy (test.db)
+        working-directory: packages/database
+        run: pnpm exec prisma migrate deploy --schema prisma/schema.prisma
       - run: pnpm test
-      # P1-01.b 起追加：
-      #   - pnpm --filter @nanking-atlas/database prisma:generate
-      #   - pnpm --filter @nanking-atlas/database prisma:migrate:deploy
-      # 见 docs/TECHNICAL_IMPLEMENTATION.md §16。
+      # 后续 P1-02 起追加 prisma seed 调用与集成测试套件。
 
   # ---- 5. Production build ----
   build:

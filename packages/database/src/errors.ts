@@ -14,12 +14,12 @@ export enum DatabaseErrorCode {
 }
 
 export class DatabaseError extends Error {
+  public override readonly name = 'DatabaseError';
   public readonly code: DatabaseErrorCode;
-  public readonly cause?: unknown;
+  public override readonly cause?: unknown;
 
   constructor(code: DatabaseErrorCode, message: string, cause?: unknown) {
     super(message);
-    this.name = 'DatabaseError';
     this.code = code;
     this.cause = cause;
   }

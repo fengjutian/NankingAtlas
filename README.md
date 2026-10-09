@@ -113,6 +113,26 @@ pnpm --filter @nanking-atlas/database prisma:generate
 pnpm --filter @nanking-atlas/database prisma:migrate:dev --name init
 ```
 
+P1-01.b 起会生成：
+
+- `packages/database/prisma/dev.db` —— 本地开发库
+- `packages/database/prisma/migrations/<timestamp>_init/migration.sql` —— 首个迁移
+- `packages/database/prisma/migrations/migration_lock.toml` —— Prisma 迁移锁
+
+集成测试库（CI 与 Vitest）按相同路径生成 `test.db`，命令：
+
+```bash
+DATABASE_URL='file:./test.db' pnpm --filter @nanking-atlas/database prisma:migrate:deploy
+```
+
+**Seed 占位**（P1-01.b）：当前不插入任何示例数据；入口稳定，命令：
+
+```bash
+pnpm --filter @nanking-atlas/database seed
+```
+
+P1-02 users/roles 落地后，seed 将按"幂等 + 显式标记示例/待核验"原则写入演示账号与最小内容。
+
 应用层 enum：因 SQLite 没有原生 ENUM，所有 enum 列实际存为 String。
 应用层通过 `@nanking-atlas/database` 的字面量联合 + zod 校验保证取值范围
 （见 `packages/database/src/enums.ts`）。
