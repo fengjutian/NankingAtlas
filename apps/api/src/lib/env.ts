@@ -44,9 +44,10 @@ const requestIdHeader = z.preprocess(
 );
 
 /**
- * Prisma `postgresql://` 连接串。
+ * Prisma `file:` SQLite 连接串。
  *
- * 校验目标：URL 结构合法；具体 host/db/user 是否可达由启服后 `$connect()` 决定。
+ * 校验目标：URL 结构合法（Prisma sqlite provider 要求 `file:./relative/path`
+ * 或 `file:/absolute/path`）；具体文件是否可写由启服后 `$connect()` 决定。
  * 测试环境（APP_ENV=test）允许为空——Vitest 单测不连数据库；连库的集成测试
  * 由 vitest.config.ts 注入 DATABASE_URL。
  */
@@ -54,11 +55,9 @@ const databaseUrl = z.preprocess(
   blankToUndefined,
   z
     .string()
-    .url()
-    .refine(
-      (value) => value.startsWith('postgresql://') || value.startsWith('postgres://'),
-      { message: 'DATABASE_URL 必须以 postgresql:// 或 postgres:// 开头' },
-    )
+    .refine((value) => value.startsWith('file:'), {
+      message: 'DATABASE_URL 必须以 file: 开头（SQLite provider）',
+    })
     .optional(),
 );
 

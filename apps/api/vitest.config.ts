@@ -10,9 +10,8 @@ export default defineConfig({
       NODE_ENV: 'test',
       LOG_LEVEL: 'silent',
       REQUEST_ID_HEADER: 'x-request-id',
-      // 占位连接串：单测不需要真连库；集成测试时另写 docker compose + 单独 suite。
-      DATABASE_URL:
-        'postgresql://nanking_atlas:nanking_atlas@localhost:5432/nanking_atlas_test?schema=public',
+      // 占位 SQLite 文件：单测不需要真建文件；集成测试时另写迁移脚本。
+      DATABASE_URL: 'file:./packages/database/prisma/test.db',
     },
     coverage: {
       reporter: ['text', 'html'],
