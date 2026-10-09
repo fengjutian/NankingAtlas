@@ -23,8 +23,15 @@ const schema = z.object({
   NEXT_PUBLIC_API_BASE_URL: optionalUrl.describe('API 基础 URL；P0 阶段可选，业务接入后必须配置'),
 });
 
+// `next dev` always sets NODE_ENV=development. Use that safe local default so
+// a fresh checkout starts without requiring an untracked .env.local file.
+// Non-development runtimes must still declare the public environment.
+const appEnv =
+  process.env.NEXT_PUBLIC_APP_ENV ||
+  (process.env.NODE_ENV === 'development' ? 'development' : undefined);
+
 const parsed = schema.safeParse({
-  NEXT_PUBLIC_APP_ENV: process.env.NEXT_PUBLIC_APP_ENV,
+  NEXT_PUBLIC_APP_ENV: appEnv,
   NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
 });
 

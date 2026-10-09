@@ -35,7 +35,15 @@ describe('web env validation', () => {
     await expect(import('./env')).rejects.toThrow(/invalid environment configuration/);
   });
 
-  it('rejects missing APP_ENV', async () => {
+  it('defaults a missing APP_ENV to development under next dev', async () => {
+    vi.stubEnv('NODE_ENV', 'development');
+    vi.stubEnv('NEXT_PUBLIC_APP_ENV', '');
+    const mod = await import('./env');
+    expect(mod.env.APP_ENV).toBe('development');
+  });
+
+  it('rejects missing APP_ENV outside development', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('NEXT_PUBLIC_APP_ENV', '');
     await expect(import('./env')).rejects.toThrow(/invalid environment configuration/);
   });
