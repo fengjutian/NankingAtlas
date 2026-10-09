@@ -77,3 +77,17 @@ pnpm --filter @nanking-atlas/api start:dev
 - P4 门禁：安全、性能、监控、备份恢复和上线 runbook 有真实证据。
 
 前一阶段未满足时，可以为后续做不破坏兼容性的准备，但不能宣称后续阶段已经交付。
+
+## CI
+
+PR 与 push 到 `main` 都会触发 `.github/workflows/ci.yml`：
+
+1. `install` — `pnpm install --frozen-lockfile`
+2. `format` — `pnpm format:check`
+3. `lint` — `pnpm lint`（含跨包依赖边界 `no-restricted-imports`）
+4. `typecheck` — `pnpm typecheck`
+5. `test` — `pnpm test`（P1 起追加 PostgreSQL/PostGIS service container）
+6. `build` — `pnpm build`，产物上传为 artifact
+7. `secret-scan` — gitleaks（AGENTS.md §4.6：禁止提交真实密钥）
+
+合并前 6 步全部必须通过。P0 阶段 `secret-scan` 是只读基线，命中即失败。

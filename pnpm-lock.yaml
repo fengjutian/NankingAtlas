@@ -197,6 +197,9 @@ importers:
       '@nanking-atlas/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+      eslint:
+        specifier: ^9.17.0
+        version: 9.39.5
       rimraf:
         specifier: ^5.0.10
         version: 5.0.10
@@ -215,6 +218,9 @@ importers:
       '@nanking-atlas/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+      eslint:
+        specifier: ^9.17.0
+        version: 9.39.5
       rimraf:
         specifier: ^5.0.10
         version: 5.0.10
@@ -275,6 +281,9 @@ importers:
       '@types/react-dom':
         specifier: ^18.3.5
         version: 18.3.7(@types/react@18.3.31)
+      eslint:
+        specifier: ^9.17.0
+        version: 9.39.5
       rimraf:
         specifier: ^5.0.10
         version: 5.0.10
@@ -297,6 +306,9 @@ importers:
       '@nanking-atlas/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+      eslint:
+        specifier: ^9.17.0
+        version: 9.39.5
       rimraf:
         specifier: ^5.0.10
         version: 5.0.10
