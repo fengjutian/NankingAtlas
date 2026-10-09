@@ -68,6 +68,31 @@ pnpm --filter @nanking-atlas/admin dev
 pnpm --filter @nanking-atlas/api start:dev
 ```
 
+### 本地 API 健康检查与 Request ID（P0-08 落盘）
+
+API 监听 `API_PORT`（默认 `4000`），同时暴露两组端点：
+
+| 端点                | 用途                                              | 前缀           |
+| ------------------- | ------------------------------------------------- | -------------- |
+| `GET /health/live`  | 仅证明进程存活（k8s liveness）                    | 不带 `/api/v1` |
+| `GET /health/ready` | 启动期就绪检查，附带 `appEnv` 与 `checks.process` | 不带 `/api/v1` |
+| 业务端点            | 受 `/api/v1` 前缀约束                             | `/api/v1/...`  |
+
+最小冒烟（API dev 启动后另开终端）：
+
+```bash
+curl -s http://localhost:4000/health/live | head -c 200
+curl -s http://localhost:4000/health/ready | head -c 200
+```
+
+Request ID 默认读取请求头 `x-request-id`，缺失时由 API 生成 16 字节 base64url。响应头会原样回传（命中客户端传入则复用）：
+
+```bash
+curl -i -H 'x-request-id: dev-smoke-001' http://localhost:4000/health/ready | head -n 20
+```
+
+所有请求都会通过 `nestjs-pino` 写出结构化日志（dev 环境 `pino-pretty`，prod JSON），日志级别由 `LOG_LEVEL` 控制。客户端传入的 request id 会随每条日志一起出现。
+
 ## 阶段门禁
 
 - P0 门禁：三个应用可独立运行；根级质量命令通过；开发配置无秘密。
