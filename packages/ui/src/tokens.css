@@ -1,0 +1,41 @@
+/*
+ * packages/ui 设计 tokens 的 CSS 变量。
+ * 与 packages/ui/src/tokens.ts 保持一致；TS 文件是事实来源，CSS 同步自 TS。
+ */
+:root {
+  /* 公开站 */
+  --nla-color-web-bg: #f8f5ef;
+  --nla-color-web-fg: #1f1d18;
+  --nla-color-web-muted: #6b665d;
+  --nla-color-web-accent: #8b1e1e;
+  --nla-color-web-border: #d9d4c7;
+  --nla-color-web-warning-fg: #5a4a14;
+  --nla-color-web-warning-bg: #fdf3d0;
+  --nla-color-web-warning-border: #e6cf7d;
+
+  /* 管理后台 */
+  --nla-color-admin-bg: #1f1d18;
+  --nla-color-admin-fg: #f5f1e8;
+  --nla-color-admin-muted: #b3ad9f;
+  --nla-color-admin-accent: #c8912a;
+  --nla-color-admin-border: #3b362d;
+  --nla-color-admin-warning-fg: #fbe5b6;
+  --nla-color-admin-warning-bg: #3a2e16;
+  --nla-color-admin-warning-border: #6f541d;
+
+  /* 字体 */
+  --nla-font-serif: 'Songti SC', 'STSong', 'Source Han Serif', serif;
+  --nla-font-sans: 'PingFang SC', 'Hiragino Sans GB', system-ui, sans-serif;
+
+  /* 间距 */
+  --nla-space-xs: 0.25rem;
+  --nla-space-sm: 0.5rem;
+  --nla-space-md: 1rem;
+  --nla-space-lg: 1.5rem;
+  --nla-space-xl: 2rem;
+  --nla-space-xxl: 3rem;
+
+  /* 内容最大宽度 */
+  --nla-max-content-web: 72rem;
+  --nla-max-content-admin: 80rem;
+}

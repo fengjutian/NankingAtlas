@@ -1,0 +1,26 @@
+{
+  "name": "@nanking-atlas/api-contract",
+  "version": "0.0.0",
+  "private": true,
+  "description": "OpenAPI 生成的前后端共享 DTO 与客户端类型（占位，生成物将在 P1-11 落地）",
+  "license": "UNLICENSED",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings 0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rimraf dist coverage"
+  },
+  "devDependencies": {
+    "@nanking-atlas/eslint-config": "workspace:*",
+    "@nanking-atlas/tsconfig": "workspace:*",
+    "rimraf": "^5.0.10",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8"
+  }
+}

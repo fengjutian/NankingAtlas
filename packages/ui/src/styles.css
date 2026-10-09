@@ -1,0 +1,2 @@
+/* 仅导入 tokens；任何业务样式仍由各应用自身的 globals.css 决定。 */
+@import './tokens.css';
