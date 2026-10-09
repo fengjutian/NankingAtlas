@@ -1,0 +1,29 @@
+{
+  "name": "nanking-atlas",
+  "version": "0.0.0",
+  "private": true,
+  "description": "南京城市文化数字档案、互动街巷地图与城市生活记录平台 (Nanking Atlas / 金陵风物志)",
+  "license": "UNLICENSED",
+  "packageManager": "pnpm@11.13.1",
+  "engines": {
+    "node": ">=20.18.0 <25"
+  },
+  "type": "module",
+  "scripts": {
+    "format": "prettier --write \"**/*.{ts,tsx,js,cjs,mjs,md,json,yaml,yml,css}\" --ignore-path .gitignore",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,cjs,mjs,md,json,yaml,yml,css}\" --ignore-path .gitignore",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "clean": "turbo run clean && rimraf \"**/dist\" \"**/.turbo\" \"**/.next\" \"**/coverage\""
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.0",
+    "prettier": "^3.6.2",
+    "rimraf": "^5.0.10",
+    "turbo": "^2.5.0",
+    "typescript": "^5.6.3"
+  }
+}

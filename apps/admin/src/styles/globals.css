@@ -1,0 +1,53 @@
+:root {
+  --color-bg: #1f1d18;
+  --color-fg: #f5f1e8;
+  --color-muted: #b3ad9f;
+  --color-accent: #c8912a;
+  --color-border: #3b362d;
+  --max-content: 80rem;
+  --font-body: 'PingFang SC', 'Hiragino Sans GB', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.shell {
+  max-width: var(--max-content);
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.muted {
+  color: var(--color-muted);
+}
+
+.banner {
+  background: #3a2e16;
+  border: 1px solid #6f541d;
+  color: #fbe5b6;
+  padding: 0.75rem 1rem;
+  border-radius: 0.25rem;
+  margin-top: 1rem;
+}
+
+a {
+  color: var(--color-accent);
+}
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}

@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# Turbo
+.turbo/
+
+# Coverage & test artifacts
+coverage/
+.nyc_output/
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs/
+
+# Env files (never commit secrets — see .env.example)
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.example.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Caches
+.eslintcache
+.stylelintcache
+.cache/
+
+# Prisma (P1+)
+/packages/database/prisma/migrations/dev/
+
+# Vite
+apps/admin/dist/
+
+# Nest
+apps/api/dist/

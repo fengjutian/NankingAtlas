@@ -1,0 +1,14 @@
+{
+  "name": "@nanking-atlas/tsconfig",
+  "version": "0.0.0",
+  "private": true,
+  "description": "共享 TypeScript strict 配置基线",
+  "license": "UNLICENSED",
+  "files": [
+    "base.json",
+    "nextjs.json",
+    "react.json",
+    "node.json",
+    "node-library.json"
+  ]
+}

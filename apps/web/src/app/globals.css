@@ -1,0 +1,54 @@
+:root {
+  --color-bg: #f8f5ef;
+  --color-fg: #1f1d18;
+  --color-muted: #6b665d;
+  --color-accent: #8b1e1e;
+  --color-border: #d9d4c7;
+  --max-content: 72rem;
+  --font-display: 'Songti SC', 'STSong', 'Source Han Serif', serif;
+  --font-body: 'PingFang SC', 'Hiragino Sans GB', system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.shell {
+  max-width: var(--max-content);
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+.banner {
+  background: #fdf3d0;
+  border: 1px solid #e6cf7d;
+  color: #5a4a14;
+  padding: 0.75rem 1rem;
+  border-radius: 0.25rem;
+  font-size: 0.9rem;
+}
