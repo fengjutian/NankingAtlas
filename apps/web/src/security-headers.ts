@@ -56,30 +56,45 @@ export function applySecurityHeaders(response: NextResponse, nonce: string): Nex
 }
 
 /**
+ * 高德地图 JS API 需要的域名。
+ *
+ * 按用途分三类，缺一整块地图就是白屏：
+ * - `webapi.amap.com` —— 主脚本（`https://webapi.amap.com/maps?v=2.0&key=…`）
+ * - `*.amap.com`    —— 矢量瓦片、样式、自定义图层（`*.is.amap.com`、`vweb.amap.com`…）
+ * - `*.autonavi.com`—— 瓦片与数据服务的实际取图域名（`*.is.autonavi.com` 等）
+ *
+ * ⚠️ 高德没有提供"逐瓦片失败事件"，所以任何一个域名漏掉的表现都是
+ * **静默白屏**，只在控制台报错 —— 很难从用户侧定位。这些域名是**照抄官方
+ * 加载行为**得到的，不是"图省事放开 https:"；`default-src 'self'` 仍然闭合。
+ */
+const AMAP_SCRIPT_SOURCES = ["'strict-dynamic'", 'https://webapi.amap.com'];
+const AMAP_CONNECT_SOURCES = ['https://*.amap.com', 'https://*.autonavi.com'];
+const AMAP_IMG_SOURCES = [
+  'https://*.amap.com',
+  'https://*.autonavi.com',
+  'https://*.is.autonavi.com',
+];
+
+/**
  * 构造 CSP。
  *
  * `nonce` 由 middleware 生成并透传给 Next（见 `src/middleware.ts`）。
  * `'strict-dynamic'` 没有 nonce 就等于把 `'self'` 也废掉 ——
  * 页面会退化成纯 SSR 静态 HTML，客户端完全不水合。
  *
- * `NEXT_PUBLIC_API_BASE_URL` 与 `NEXT_PUBLIC_MAP_TILE_URL` 若配置了外部源，
- * 必须加进 `connect-src` / `img-src`；否则对应请求被 CSP 拒掉
- * （表现为"底图加载失败"或"无法连接地点接口"的降级提示，
+ * `NEXT_PUBLIC_API_BASE_URL` 若配置了外部源，必须加进 `connect-src` /
+ * `img-src`；否则对应请求被 CSP 拒掉（表现为"无法连接地点接口"的降级提示，
  * 属于功能回归而非安全增强）。
  */
 function buildCsp(nonce: string): string {
-  const tileUrl = process.env.NEXT_PUBLIC_MAP_TILE_URL;
-  // 自定义瓦片源通常形如 https://{s}.tile.example.org/{z}/{x}/{y}.png
-  const tileOrigin = tileUrl === undefined || tileUrl === '' ? null : safeOrigin(tileUrl);
-
-  // API 源必须放行：web 与 API 通常不同源（本地 3000 vs 4000），
+  // API 源必须放行：web 与 API 通常不同源（本地 3111 vs 4000），
   // 地图页的 bbox / 搜索请求都是浏览器直接 fetch 绝对地址。
   // 漏掉它 → 浏览器拒连 → 地图降级成"无法连接地点接口"，
   // 平移/缩放/关键词筛选全部失效，只剩首屏 SSR 数据。
   const apiOrigin = safeOrigin(process.env.NEXT_PUBLIC_API_BASE_URL ?? '');
 
-  const imgSources = ["'self'", 'data:', 'blob:', 'https://*.tile.openstreetmap.org'];
-  const connectSources = ["'self'"];
+  const imgSources = ["'self'", 'data:', 'blob:', ...AMAP_IMG_SOURCES];
+  const connectSources = ["'self'", ...AMAP_CONNECT_SOURCES];
 
   if (apiOrigin !== null) {
     // 图片也可能来自 API（媒体 URL），一并放行
@@ -87,17 +102,32 @@ function buildCsp(nonce: string): string {
     connectSources.push(apiOrigin);
   }
 
-  if (tileOrigin !== null) {
-    imgSources.push(tileOrigin);
-    connectSources.push(tileOrigin);
-  }
-
   return [
     "default-src 'self'",
     // strict-dynamic 必须配 nonce 才有效（见 middleware.ts 的说明）。
-    // 有 nonce 时 CSP3 浏览器信任带该 nonce 的脚本及其动态加载的后代；
-    // 不支持 CSP3 的老浏览器忽略 strict-dynamic，回落到 'self'。
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev() ? " 'unsafe-eval'" : ''}`,
+    // 有 nonce 时 CSP3 浏览器信任带该 nonce 的脚本及其动态加载的后代 ——
+    // 这正是高德主脚本能加载的机制；不支持 CSP3 的老浏览器回落 'self' + 白名单域名。
+    //
+    // ⚠️ `'unsafe-eval'` 在**生产也必须保留**，这不是偷懒，是高德 2.0 的硬要求。
+    // 实测（真实浏览器 + 真实 Key）：高德插件加载器
+    // `jsapi-service.amap.com/mapsplugincdn` 的 `window._jsload_` 内部对字符串求值，
+    // CSP 不给 `unsafe-eval` 时直接抛 EvalError，表现为 **WebGLRender is not a constructor**，
+    // 底图一片灰、控制台两条红 —— 而所有网络请求都是 200，极易误判成"Key 有问题"。
+    //
+    // 残余风险与边界：放开 `unsafe-eval` 只放宽"能否 eval 字符串"，
+    // **不放宽脚本来源**（nonce + strict-dynamic 仍在），`unsafe-inline` 也没有给脚本。
+    // 即前提仍是"先有 XSS 才能利用"，但相比 strict CSP 这条前提被削弱了 ——
+    // 因此 §4 的输入净化、DTO 白名单、正文安全渲染一条都不能松。
+    // 若日后要收回，需换掉高德（自托管 SDK 不存在），属架构变更，需 ADR + 人工批准。
+    [
+      "script-src 'self'",
+      `'nonce-${nonce}'`,
+      "'unsafe-eval'",
+      ...AMAP_SCRIPT_SOURCES,
+      isDev() ? "'unsafe-eval'" : '',
+    ]
+      .filter((part) => part !== '')
+      .join(' '),
     // 样式：Next.js 的样式注入需要 inline；字体走 self
     "style-src 'self' 'unsafe-inline'",
     "font-src 'self' data:",

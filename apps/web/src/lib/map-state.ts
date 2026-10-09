@@ -5,7 +5,7 @@
  * - 组件只负责渲染与副作用，"什么时候发请求、什么时候丢弃响应"必须有单测钉死；
  * - 技术方案 §9.2 的四条降级规则都能在这个文件里被穷举验证。
  *
- * 本文件不 import React、DOM 或 leaflet，因此可直接被 Vitest（node 环境）覆盖。
+ * 本文件不 import React、DOM 或地图 SDK，因此可直接被 Vitest（node 环境）覆盖。
  */
 
 import { markerPosition } from './map-data';
@@ -18,7 +18,7 @@ import type { LonLat } from './map-geo';
 // 去抖（技术方案 §9.2「移动结束后去抖请求」）
 // ---------------------------------------------------------------------------
 
-/** 地图移动后的去抖窗口。Leaflet 的 `moveend` 在惯性滚动时会连续触发。 */
+/** 地图移动后的去抖窗口。高德的 `moveend` 在惯性滚动时会连续触发。 */
 export const MAP_MOVE_DEBOUNCE_MS = 450;
 
 export interface Debouncer {
@@ -192,9 +192,9 @@ export function selectedIndex(items: readonly MapPlaceItem[], selectedSlug: stri
 export type MapSurfaceState =
   | 'loading'
   | 'ready'
-  /** Leaflet 脚本 / 地图容器不可用（SSR、动态 import 失败、浏览器不支持）。 */
+  /** 高德脚本 / 地图容器不可用（SSR、动态 import 失败、浏览器不支持）。 */
   | 'unavailable'
-  /** 底图瓦片加载失败（列表照常可用）。 */
+  /** 底图加载失败（列表照常可用）。 */
   | 'basemap_failed';
 
 export type RegionState =
@@ -264,29 +264,51 @@ export function isRegionError(state: RegionState): boolean {
 /**
  * 地图表面的可用性判定（纯函数，便于穷举验证 §9.2 第 2 条）。
  *
- * `loaded=false`（SSR / 动态 import 未完成 / 抛错）→ `unavailable`；
- * `loaded=true` 但瓦片失败 → `basemap_failed`。两者都**不影响列表渲染**。
+ * - `loaded=false`（SSR / 动态 import 未完成 / 抛错）→ `loading`；
+ * - `basemapFailed=true`（脚本被 CSP 拦、Key 被拒、或底图在期限内没就绪）→
+ *   `basemap_failed`。两者都**不影响列表渲染**。
+ *
+ * ⚠️ 这里**不再有 `tileErrors` 计数**：高德 `AMap.TileLayer` 只暴露
+ * `complete`，没有逐瓦片的 `error`/`tileerror` 事件（官方文档已核对），
+ * 因此底图健康度只能靠「`complete` 是否在期限内到达」判断。
+ * 早先基于「累计失败瓦片数超阈值」的判定是 Leaflet 时代的设计，
+ * 换到高德后若照搬，会永远判定为"底图正常"。
  */
 export function mapSurfaceState(input: {
   readonly loaded: boolean;
-  readonly tileErrors: number;
-  readonly tileLoaded: boolean;
+  readonly basemapFailed: boolean;
 }): MapSurfaceState {
   if (!input.loaded) return 'loading';
-  if (input.tileErrors > 0 && input.tileLoaded) return 'basemap_failed';
+  if (input.basemapFailed) return 'basemap_failed';
   return 'ready';
 }
 
-/** 底图失败阈值：单张瓦片 404 属于常态噪声，累计到阈值才判定为底图不可用。 */
-export const BASEMAP_ERROR_THRESHOLD = 3;
+/** 底图健康度。`failed` 优先于 `ready`：失败必须是"看得见"的状态。 */
+export type BasemapStatus = 'pending' | 'ok' | 'failed';
 
-export function tileFailureState(
-  tileErrors: number,
-  tileLoaded: boolean,
-): 'pending' | 'ok' | 'failed' {
-  if (tileErrors >= BASEMAP_ERROR_THRESHOLD) return 'failed';
-  return tileLoaded ? 'ok' : 'pending';
+/**
+ * 底图健康度 → 状态。
+ *
+ * `ready` = 高德 `complete` 事件已到达；`failed` = 脚本加载失败或超时。
+ * 两者互斥且都由外部显式给出，本函数不做推断 —— 时序判断留给运行时。
+ */
+export function basemapStatus(input: {
+  readonly ready: boolean;
+  readonly failed: boolean;
+}): BasemapStatus {
+  if (input.failed) return 'failed';
+  return input.ready ? 'ok' : 'pending';
 }
+
+/**
+ * 底图就绪期限。
+ *
+ * 高德不提供逐瓦片失败事件，只能给 `complete` 设一个上限：
+ * 超过这个时间还没就绪就判定底图不可用（网络受限、Key 域名不匹配、
+ * 底图服务故障）。取值要明显大于正常首屏时间（通常 < 2s），
+ * 又不能长到让用户干等 —— 8 秒是"用户还在等"与"用户已放弃"的分界。
+ */
+export const BASEMAP_LOAD_DEADLINE_MS = 8000;
 
 /** 是否需要跳到"纯列表"降级（无 window / 无地图容器 / 动态 import 失败）。 */
 export function shouldDegradeToList(input: {
@@ -300,7 +322,8 @@ const BASEMAP_MESSAGES: Readonly<Record<MapSurfaceState, string>> = {
   loading: '地图正在加载，地点列表可先行浏览。',
   ready: '',
   unavailable: '当前环境无法加载交互地图，下方地点列表仍可完整使用。',
-  basemap_failed: '底图加载失败（可能是网络受限或瓦片服务不可用）。下方地点列表与筛选不受影响。',
+  basemap_failed:
+    '底图加载失败（可能是高德 Key 未配置、域名白名单不匹配或网络受限）。下方地点列表与筛选不受影响。',
 };
 
 /** 地图表面状态 → 提示文案。列表区不因此隐藏（§9.2 第 2 条）。 */
@@ -319,7 +342,7 @@ export function prefersReducedMotion(): boolean {
 }
 
 /**
- * HTML 文本转义（marker 的 divIcon 内联 SVG/可访问文本经 innerHTML 注入）。
+ * HTML 文本转义（marker 的自定义 HTML 内容经 `innerHTML` 注入）。
  *
  * 只用于本文件内我们自己拼装、且所有动态值都过这里的标记；
  * 任何来自 API 的文本都不得未经本函数直接进入 innerHTML。

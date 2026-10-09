@@ -19,6 +19,20 @@ const blankToUndefined = (val: unknown): unknown =>
 
 const optionalUrl = z.preprocess(blankToUndefined, z.string().url().optional());
 
+/**
+ * 公开凭据的形状：16~64 位的十六进制串（高德当前签发 32 位）。
+ *
+ * 刻意不锁死长度：格式变更时宁可多一道运行时提示，也不要让整站启动失败。
+ */
+const optionalCredential = z.preprocess(
+  blankToUndefined,
+  z
+    .string()
+    .regex(/^[0-9a-zA-Z]{16,64}$/)
+    .describe('公开凭据（高德 Key / jscode）')
+    .optional(),
+);
+
 // `next dev` always sets NODE_ENV=development. Use that safe local default so
 // a fresh checkout starts without requiring an untracked .env.local file.
 // Non-development runtimes must still declare the public environment.
@@ -29,11 +43,18 @@ const appEnv =
 const schema = z.object({
   NEXT_PUBLIC_APP_ENV: APP_ENV,
   NEXT_PUBLIC_API_BASE_URL: optionalUrl.describe('API 基础 URL；P0 阶段可选，业务接入后必须配置'),
+  // 高德 JS API 2.0 的两个公开凭据。**可选**：未配置时地图页走纯列表降级，
+  // 而不是让整页 fail-fast —— 地图是增强，列表才是主功能（技术方案 §9.2）。
+  // 是否"已配置"由 `lib/amap-config.ts` 判定（fail-closed），这里只做形状校验。
+  NEXT_PUBLIC_AMAP_KEY: optionalCredential.describe('高德 Web端(JS API) Key'),
+  NEXT_PUBLIC_AMAP_SECURITY_CODE: optionalCredential.describe('高德 JS API 2.0 安全密钥 jscode'),
 });
 
 const parsed = schema.safeParse({
   NEXT_PUBLIC_APP_ENV: appEnv,
   NEXT_PUBLIC_API_BASE_URL: process.env.NEXT_PUBLIC_API_BASE_URL,
+  NEXT_PUBLIC_AMAP_KEY: process.env.NEXT_PUBLIC_AMAP_KEY,
+  NEXT_PUBLIC_AMAP_SECURITY_CODE: process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE,
 });
 
 if (!parsed.success) {
@@ -47,6 +68,8 @@ if (!parsed.success) {
 export const env = Object.freeze({
   APP_ENV: parsed.data.NEXT_PUBLIC_APP_ENV,
   API_BASE_URL: parsed.data.NEXT_PUBLIC_API_BASE_URL ?? null,
+  AMAP_KEY: parsed.data.NEXT_PUBLIC_AMAP_KEY ?? null,
+  AMAP_SECURITY_CODE: parsed.data.NEXT_PUBLIC_AMAP_SECURITY_CODE ?? null,
 });
 
 export type WebEnv = typeof env;

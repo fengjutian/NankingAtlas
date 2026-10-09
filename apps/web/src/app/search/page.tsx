@@ -47,7 +47,7 @@ export default async function SearchPage({
           matchesKeyword([item.title, item.subtitle, item.summary], query.q),
       )
     : [];
-  const { pageItems, totalItems, totalPages, capped } = paginate(matched, query);
+  const { pageItems, totalItems, totalPages, capped, page } = paginate(matched, query);
 
   return (
     <div className="shell">
@@ -103,7 +103,7 @@ export default async function SearchPage({
         />
       )}
 
-      <Pagination basePath={BASE_PATH} query={query} totalPages={totalPages} />
+      <Pagination basePath={BASE_PATH} query={query} totalPages={totalPages} currentPage={page} />
 
       <p className="muted home-section__note">
         需要查询其他内容？可前往

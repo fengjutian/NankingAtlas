@@ -1,8 +1,25 @@
-import { randomBytes } from 'node:crypto';
-
 import { NextResponse, type NextRequest } from 'next/server';
 
 import { applySecurityHeaders } from '@/security-headers';
+
+/**
+ * 生成 CSP nonce。
+ *
+ * 用 **Web Crypto**（`crypto.getRandomValues`）而不是 `node:crypto`：
+ * middleware 跑在 Edge Runtime，webpack 不允许 `node:*` 内建模块进 bundle。
+ * Web Crypto 在 Edge、Node 18+、现代浏览器都有，且 `getRandomValues` 是
+ * CSPRNG —— nonce 必须不可预测，用 `Math.random()` 等于 CSP 失效。
+ */
+function generateNonce(): string {
+  const bytes = new Uint8Array(16);
+  crypto.getRandomValues(bytes);
+  // base64：Edge Runtime 有 btoa；Buffer 在 Edge 不可用
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
+}
 
 /**
  * 全站安全响应头（P4-04 / P4-07）。
@@ -28,14 +45,11 @@ import { applySecurityHeaders } from '@/security-headers';
  *   3. Next 在输出 <script nonce="..."> 时自动带上
  *   4. CSP 的 script-src 声明同一个 nonce
  *
- * 随机性来源用 `randomBytes`（CSPRNG），不是 `Math.random()` ——
- * nonce  predictability 等于 CSP 失效。
- *
  * 匹配范围：排除 `_next/static`、`_next/image`（Next 自己管缓存头）
  * 与静态资源；其余全部路径（含 `/api/revalidate`）都加。
  */
 export function middleware(request: NextRequest): NextResponse {
-  const nonce = randomBytes(16).toString('base64');
+  const nonce = generateNonce();
 
   // Next 会读取 `x-nonce` 请求头并把它写进渲染出的 <script nonce="...">。
   const requestHeaders = new Headers(request.headers);

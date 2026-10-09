@@ -89,9 +89,15 @@ export function failureMessage(reason: ApiFailureReason): string {
  *
  * `forbidden`（403）也算：内容存在但不对公开访问，对外暴露 403 等于
  * 告诉爬虫"这个 slug 有东西"，泄露未发布内容的存在性。
+ *
+ * `invalid_payload` **不算**：它表示响应结构对不上 zod schema，
+ * 通常是**契约漂移**（后端改了字段名 / 加了字段），而不是内容被撤。
+ * 把它当 404 会让爬虫在一次契约变更后把全站移出索引，
+ * 而且运维完全看不出是"接口坏了"而不是"内容下架"——
+ * 与同文件 `isServiceUnavailable` 存在的意义正好相反。
  */
 export function isTerminalNotFound(reason: ApiFailureReason): boolean {
-  return reason === 'not_found' || reason === 'forbidden' || reason === 'invalid_payload';
+  return reason === 'not_found' || reason === 'forbidden';
 }
 
 /**
@@ -442,11 +448,21 @@ export function setPageSize(current: ListQuery, pageSize: number): ListQuery {
  *
  * 公开列表端点当前没有游标分页（P1 契约），因此这里只对一次性取回的真实条目做切片，
  * 不伪造"下一页"数据。`capped` 表示服务端结果数达到请求上限，翻页并不覆盖全量。
+ *
+ * 返回值里的 `page` 是**夹取后**的页码。URL 里的 `?page=999` 会被夹到末页，
+ * 组件必须用这里的 `page` 渲染「第 N 页」与上一页/下一页链接 —— 否则会出现
+ * "内容是第 2 页、分页条却写第 999 页"，且「上一页」永远点不到有效页。
  */
 export function paginate<T>(
   items: readonly T[],
   query: ListQuery,
-): { pageItems: T[]; totalItems: number; totalPages: number; capped: boolean } {
+): {
+  pageItems: T[];
+  totalItems: number;
+  totalPages: number;
+  page: number;
+  capped: boolean;
+} {
   const totalItems = items.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / query.pageSize));
   const page = Math.min(query.page, totalPages);
@@ -455,6 +471,7 @@ export function paginate<T>(
     pageItems: items.slice(start, start + query.pageSize),
     totalItems,
     totalPages,
+    page,
     capped: totalItems >= MAX_PAGE_SIZE,
   };
 }

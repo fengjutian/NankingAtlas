@@ -254,7 +254,10 @@ describe('revalidation 请求体契约一致性', () => {
     // RequestInit.body 是 BodyInit；这里明确断言是 string 再解析，
     // 避免 String(obj) 静默产出 '[object Object]'（no-base-to-string）。
     expect(typeof rawBody).toBe('string');
-    const sent = JSON.parse(typeof rawBody === 'string' ? rawBody : '{}') as Record<string, unknown>;
+    const sent = JSON.parse(typeof rawBody === 'string' ? rawBody : '{}') as Record<
+      string,
+      unknown
+    >;
 
     // 与 web 端 payloadSchema 的 key 集合比对。
     // web 端 4 个字段全是 `.optional()`，所以**子集**就合法；

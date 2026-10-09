@@ -10,11 +10,13 @@ import { MapErrorBoundary } from './MapErrorBoundary';
 import { MapToolbar } from './MapToolbar';
 import { PlaceList } from './PlaceList';
 
+import type { ResolvedAmapConfig } from '@/lib/amap-config';
 import type { ApiFailure } from '@/lib/api';
 import type { MapPlaceResult } from '@/lib/map-data';
 import type { BBoxErrorCode, MapBBox } from '@/lib/map-geo';
 import type { MapQuery } from '@/lib/map-url';
 
+import { AMAP_ATTRIBUTION } from '@/lib/amap-config';
 import { areaOnlyNote, requestPlacesInBBox } from '@/lib/map-data';
 import { MAP_RESULT_LIMIT, bboxErrorMessage, validateBBox } from '@/lib/map-geo';
 import {
@@ -40,14 +42,16 @@ function css(name: string): string {
  * 地图页的交互外壳（P3-02 ~ P3-04、P3-07）。
  *
  * 由服务端 `app/map/page.tsx` 以首屏结果（`initialPlaces` / `initialFailure`）驱动，
- * 因此**列表与筛选在首屏 HTML 里就存在** —— Leaflet 是延迟加载的增强块，
- * 地图脚本、瓦片、容器任一失败都不会影响列表（技术方案 §9.2 前两条）。
+ * 因此**列表与筛选在首屏 HTML 里就存在** —— 高德地图是延迟加载的增强块，
+ * 地图脚本、底图、容器任一失败都不会影响列表（技术方案 §9.2 前两条）。
  *
- * `baseUrl` 由服务端从 `env.API_BASE_URL` 注入：客户端不读 `lib/env.ts`
- * （它 fail-fast 且依赖 node:crypto），未配置时直接走 `unconfigured` 降级。
+ * `baseUrl` / `amap` 由服务端从 `env` 注入：客户端不读 `lib/env.ts`
+ * （它 fail-fast 且依赖 node:crypto），未配置时直接走降级。
  */
 export interface MapExplorerProps {
   readonly baseUrl: string | null;
+  /** 高德接入配置；null 表示 Key 或安全密钥未配置，地图块整体降级。 */
+  readonly amap: ResolvedAmapConfig | null;
   readonly initialBBox: MapBBox;
   readonly initialQuery: MapQuery;
   readonly initialPlaces: MapPlaceResult | null;
@@ -68,6 +72,7 @@ const MapCanvas = dynamic(() => import('./MapCanvas'), {
 
 export function MapExplorer({
   baseUrl,
+  amap,
   initialBBox,
   initialQuery,
   initialPlaces,
@@ -197,6 +202,7 @@ export function MapExplorer({
               items={items}
               selected={selected}
               initialBBox={initialBBox}
+              amap={amap}
               onViewportChange={(bbox) => void loadBBox(bbox)}
               onSelect={handleSelect}
               onSurfaceState={setSurface}
@@ -216,7 +222,7 @@ export function MapExplorer({
         <MapToolbar basePath="/map" query={initialQuery} allowedTypes={['PLACE']} />
 
         <ul className={css('mapLegend')} role="list">
-          <li>底图：OpenStreetMap（署名见地图右下角）</li>
+          <li>底图：{AMAP_ATTRIBUTION}</li>
           <li>仅核验通过的地点显示精确点位</li>
           <li>仅区域级 / 未核验位置只显示说明</li>
         </ul>

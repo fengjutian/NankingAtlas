@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  BASEMAP_ERROR_THRESHOLD,
+  BASEMAP_LOAD_DEADLINE_MS,
   MAP_MOVE_DEBOUNCE_MS,
+  basemapStatus,
   createDebouncer,
   createLatestRequest,
   escapeHtml,
@@ -16,7 +17,6 @@ import {
   resolveSelectionTarget,
   selectedIndex,
   shouldDegradeToList,
-  tileFailureState,
   toggleSelection,
 } from './map-state';
 
@@ -335,27 +335,38 @@ describe('API 失败原因 → 区域降级状态', () => {
 });
 
 describe('地图表面降级（底图 / 脚本失败不隐藏列表）', () => {
-  it('地图未加载完 → loading', () => {
-    expect(mapSurfaceState({ loaded: false, tileErrors: 0, tileLoaded: false })).toBe('loading');
+  it('SDK 未就绪 → loading', () => {
+    expect(mapSurfaceState({ loaded: false, basemapFailed: false })).toBe('loading');
   });
 
-  it('底图有失败瓦片 → basemap_failed', () => {
-    expect(mapSurfaceState({ loaded: true, tileErrors: 4, tileLoaded: true })).toBe(
-      'basemap_failed',
-    );
+  it('SDK 未就绪且底图已失败 → 仍然是 loading（先失败的是脚本，不是底图）', () => {
+    // 脚本都挂了，"底图加载失败"这个说法会误导排障方向：
+    // 真正的原因在 mapSurfaceMessage 的兜底路径上。
+    expect(mapSurfaceState({ loaded: false, basemapFailed: true })).toBe('loading');
   });
 
-  it('瓦片正常 → ready', () => {
-    expect(mapSurfaceState({ loaded: true, tileErrors: 0, tileLoaded: true })).toBe('ready');
+  it('SDK 就绪但底图失败 → basemap_failed', () => {
+    expect(mapSurfaceState({ loaded: true, basemapFailed: true })).toBe('basemap_failed');
   });
 
-  it('累计错误达到阈值即判定底图失败（单张 404 属于常态噪声）', () => {
-    expect(tileFailureState(BASEMAP_ERROR_THRESHOLD - 1, true)).toBe('ok');
-    expect(tileFailureState(BASEMAP_ERROR_THRESHOLD, false)).toBe('failed');
+  it('SDK 就绪且底图正常 → ready', () => {
+    expect(mapSurfaceState({ loaded: true, basemapFailed: false })).toBe('ready');
   });
 
-  it('未加载完成且没有错误 → pending', () => {
-    expect(tileFailureState(0, false)).toBe('pending');
+  it('底图状态：complete 到达即 ok，未到达且未失败是 pending', () => {
+    expect(basemapStatus({ ready: true, failed: false })).toBe('ok');
+    expect(basemapStatus({ ready: false, failed: false })).toBe('pending');
+  });
+
+  it('底图状态：failed 优先于 ready（超时后迟到的 complete 不能把失败翻回成功）', () => {
+    // 超时判定之后高德才姗姗来迟地 complete，必须仍然显示失败。
+    // 反过来写会让"用户看到加载失败、界面又自己好了"这种自相矛盾状态出现。
+    expect(basemapStatus({ ready: true, failed: true })).toBe('failed');
+  });
+
+  it('底图就绪期限是合理量级：明显大于正常首屏，又不至于让用户干等', () => {
+    expect(BASEMAP_LOAD_DEADLINE_MS).toBeGreaterThan(3000);
+    expect(BASEMAP_LOAD_DEADLINE_MS).toBeLessThanOrEqual(15_000);
   });
 
   it('每种地图状态都有对应提示，且都不要求隐藏列表', () => {
@@ -367,6 +378,8 @@ describe('地图表面降级（底图 / 脚本失败不隐藏列表）', () => {
     }
     expect(mapSurfaceMessage('unavailable')).toContain('列表');
     expect(mapSurfaceMessage('basemap_failed')).toContain('列表');
+    // 换到高德后最常见的失败原因是 Key / 域名白名单，提示必须点到这一项
+    expect(mapSurfaceMessage('basemap_failed')).toContain('高德');
   });
 
   it('无 DOM 或动态 import 失败时降级为纯列表', () => {

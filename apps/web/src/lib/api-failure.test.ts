@@ -31,8 +31,11 @@ describe('API failure classification', () => {
       expect(isTerminalNotFound('forbidden')).toBe(true);
     });
 
-    it('treats invalid_payload as terminal (数据不对，页面对访客无意义)', () => {
-      expect(isTerminalNotFound('invalid_payload')).toBe(true);
+    it('treats invalid_payload as a CONTRACT failure, not as "content removed"', () => {
+      // invalid_payload = 响应结构对不上 zod schema → 后端改了字段而前端没跟。
+      // 当成 404 会让爬虫把全站移出索引，且运维看不出是接口坏了。
+      expect(isTerminalNotFound('invalid_payload')).toBe(false);
+      expect(isServiceUnavailable('invalid_payload')).toBe(true);
     });
 
     it('does NOT treat service failures as terminal', () => {
@@ -58,7 +61,6 @@ describe('API failure classification', () => {
     it('does NOT treat content-level failures as service unavailability', () => {
       expect(isServiceUnavailable('not_found')).toBe(false);
       expect(isServiceUnavailable('forbidden')).toBe(false);
-      expect(isServiceUnavailable('invalid_payload')).toBe(false);
     });
 
     it('is exactly the complement of isTerminalNotFound', () => {

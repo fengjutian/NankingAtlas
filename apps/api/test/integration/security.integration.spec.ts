@@ -1323,24 +1323,39 @@ describe('7. 信息泄露', () => {
     expectNoInternalKeys(res.body, 'GET /search');
   });
 
-  it('5xx 响应不含堆栈 / SQL / 文件路径 / 内部错误文案', async () => {
-    // 管理员禁用自己会走到一条未归类的 throw，是一条真实的 500 路径。
+  it('业务规则失败返回 4xx 而不是 500（管理员不能禁用自己）', async () => {
+    // 之前这里是裸 `throw new Error`，落进兜底分支返回 500 INTERNAL_ERROR，
+    // 让"操作被拒"被记成"服务端故障"。现已改为 ForbiddenError。
     const res = await request(serverOf(liveApp()))
       .patch(`/api/v1/admin/users/${admin.id}`)
       .set('Authorization', bearer(tokenFor(admin)))
       .send({ disabled: true });
-    expect(res.status).toBe(500);
+
+    expect(res.status).toBe(403);
+    const body = res.body as { error: { code: string; requestId: string } };
+    expect(body.error.code).toBe('FORBIDDEN');
+    expect(body.error.requestId).toBeTruthy();
+  });
+
+  it('错误响应不含堆栈 / SQL / 文件路径 / 内部错误文案', async () => {
+    // 走一条确定失败且带业务语义的路径：给一个不存在的用户改角色。
+    const res = await request(serverOf(liveApp()))
+      .patch('/api/v1/admin/users/does-not-exist')
+      .set('Authorization', bearer(tokenFor(admin)))
+      .send({ displayName: 'x' });
+
+    expect(res.status).toBeGreaterThanOrEqual(400);
     const text = JSON.stringify(res.body);
-    expect((res.body as { error: { code: string } }).error.code).toBe('INTERNAL_ERROR');
     expect(text).not.toContain('stack');
     expect(text).not.toContain('SQLITE');
     expect(text).not.toContain('prisma');
     expect(text).not.toContain('.ts');
     expect(text).not.toContain('\\');
-    // 内部异常文案本身也不能外泄
-    expect(text).not.toContain('不能禁用');
     expect(text).not.toContain('Error:');
-    expect((res.body as { error: { requestId: string } }).error.requestId).toBeTruthy();
+    const body = res.body as { error: { requestId: string } };
+    expect(body.error.requestId).toBeTruthy();
+    // requestId 必须来自中间件（不是硬编码的 'unknown'）
+    expect(body.error.requestId).not.toBe('unknown');
   });
 
   it('登录失败文案统一：账号不存在 vs 密码错误 完全一致', async () => {

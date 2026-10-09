@@ -147,7 +147,7 @@ describe('validateBBox 的判定顺序与分类', () => {
 });
 
 describe('视口换算', () => {
-  it('Leaflet bounds → bbox（处理 south/north 顺序颠倒）', () => {
+  it('SDK 边界 → bbox（处理 south/north 顺序颠倒）', () => {
     expect(bboxFromBounds({ west: 118.7, south: 32.2, east: 118.9, north: 32.0 })).toEqual(VALID);
   });
 

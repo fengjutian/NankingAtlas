@@ -11,8 +11,8 @@ import {
   normalizeRoles,
 } from './users.service.js';
 import { requireUser } from '../../common/auth/auth.guard.js';
-import { ForbiddenError } from '../../common/auth/roles.guard.js';
 import { RequireRoles } from '../../common/auth/roles.decorator.js';
+import { ForbiddenError } from '../../common/auth/roles.guard.js';
 import { hashPassword } from '../../lib/password.js';
 import { prisma } from '../../lib/prisma.js';
 
@@ -137,8 +137,7 @@ export class UsersController {
 
     // 密码哈希**先算好再进事务** —— argon2 是 CPU 密集的（~50ms），
     // 放进事务会长时间占着 SQLite 的写锁。
-    const passwordHash =
-      body.password === undefined ? null : await hashPassword(body.password);
+    const passwordHash = body.password === undefined ? null : await hashPassword(body.password);
 
     /**
      * 角色 / 显示名 / 禁用 / 密码 / 会话撤销 / 审计必须在**同一事务**里。
@@ -174,8 +173,7 @@ export class UsersController {
       }
 
       // 禁用或改密码后强制下线（撤销所有活跃 refresh token）
-      const shouldRevokeSessions =
-        (body.disabled === true) || passwordHash !== null;
+      const shouldRevokeSessions = body.disabled === true || passwordHash !== null;
       if (shouldRevokeSessions) {
         await tx.refreshToken.updateMany({
           where: { userId: id, revokedAt: null },

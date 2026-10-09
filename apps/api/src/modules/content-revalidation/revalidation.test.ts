@@ -186,9 +186,7 @@ describe('triggerRevalidation', () => {
 
   it('succeeds on the first attempt', async () => {
     await withEnv({ REVALIDATION_URL: 'http://localhost:3111/api/revalidate' }, async (mod) => {
-      globalThis.fetch = vi
-        .fn()
-        .mockResolvedValue(new Response('{}', { status: 200 }));
+      globalThis.fetch = vi.fn().mockResolvedValue(new Response('{}', { status: 200 }));
       const result = await mod.triggerRevalidation({ paths: ['/'], slug: 'test', type: 'TOPIC' });
       expect(result.ok).toBe(true);
       if (result.ok) {

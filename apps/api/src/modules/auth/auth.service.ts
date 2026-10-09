@@ -90,6 +90,7 @@ export class AuthService {
         actorId: null,
         requestId: ctx.requestId,
         action: 'auth.login.failed',
+        entityType: 'user',
         // entity_id 存的是**匿名化**标识，不是明文邮箱。
         // 本文件对 IP 已经用 hashIp 匿名化；若把邮箱原样留库，
         // 一次撞库失败就会把对方邮箱永久写进审计表 —— 与自身的
@@ -326,22 +327,7 @@ export class AuthService {
     };
   }
 
-  /**
- * 匿名化标识符。
- *
- * 用于审计日志里"用户还没登录，但我们知道是谁尝试登录"的场景。
- * 与 `hashIp` 同理：用 secret 做 HMAC 而不是裸 sha256，
- * 否则攻击者拿常见邮箱列表就能离线比对反查。
- * 域前缀区分用途，避免同一个值在不同语义间被关联。
- */
-export function hashIdentifier(value: string): string {
-  return createHmac('sha256', env.AUTH_ACCESS_SECRET)
-    .update('identifier:')
-    .update(value)
-    .digest('hex');
-}
-
-/** 审计写入（SQLite 下 JSON 列为 TEXT）。 */
+  /** 审计写入（SQLite 下 JSON 列为 TEXT）。 */
   private async writeAudit(entry: {
     actorId: string | null;
     requestId: string;
@@ -371,4 +357,19 @@ export function hashIdentifier(value: string): string {
 export async function setUserPassword(userId: string, newPassword: string): Promise<void> {
   const passwordHash = await hashPassword(newPassword);
   await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+}
+
+/**
+ * 匿名化标识符。
+ *
+ * 用于审计日志里"用户还没登录，但我们知道是谁尝试登录"的场景。
+ * 与 hashIp 同理：用 secret 做 HMAC 而不是裸 sha256，
+ * 否则攻击者拿常见邮箱列表就能离线比对反查。
+ * 域前缀区分用途，避免同一个值在不同语义间被关联。
+ */
+export function hashIdentifier(value: string): string {
+  return createHmac('sha256', env.AUTH_ACCESS_SECRET)
+    .update('identifier:')
+    .update(value)
+    .digest('hex');
 }

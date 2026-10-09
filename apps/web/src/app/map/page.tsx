@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 
 import { MapExplorer } from '@/components/map/MapExplorer';
+import { resolveAmapConfig } from '@/lib/amap-config';
 import { env } from '@/lib/env';
 import { requestPlacesInBBox } from '@/lib/map-data';
 import { MAP_RESULT_LIMIT } from '@/lib/map-geo';
@@ -42,6 +43,10 @@ export default async function MapPage({
     limit: MAP_RESULT_LIMIT,
   });
 
+  // 高德配置：Key 或 jscode 缺失时为 null，地图块整体降级为纯列表。
+  const amap = resolveAmapConfig();
+  const amapConfig = amap.ok ? { key: amap.key, securityJsCode: amap.securityJsCode } : null;
+
   return (
     <div className="shell">
       <header className="page-header">
@@ -51,6 +56,7 @@ export default async function MapPage({
 
       <MapExplorer
         baseUrl={env.API_BASE_URL}
+        amap={amapConfig}
         initialBBox={bbox}
         initialQuery={query}
         initialPlaces={result.ok ? result.data : null}
@@ -59,9 +65,9 @@ export default async function MapPage({
       />
 
       <p className="muted home-section__note">
-        坐标未核验或仅有区域级位置的条目不显示精确点位，只在列表中给出说明。本站地图为 OpenStreetMap
-        公共底图，仅供本地开发与预览；正式上线前须按运维要求替换为已获授权的 底图供应商（技术方案
-        §19 未决事项）。
+        坐标未核验或仅有区域级位置的条目不显示精确点位，只在列表中给出说明。底图由高德地图提供，
+        站点存储的原始坐标为 WGS-84，仅在渲染时转换为 GCJ-02。上线前须在高德开放平台为本域名申请 Key
+        并配置域名白名单与配额（技术方案 §19「底图供应商 ADR」仍待维护者确认）。
       </p>
     </div>
   );

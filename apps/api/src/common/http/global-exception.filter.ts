@@ -11,6 +11,7 @@ import { ZodError } from 'zod';
 
 import { TiptapDocumentError } from '@nanking-atlas/validation';
 
+import { PasswordPolicyError } from '../../lib/password.js';
 import { AuthError } from '../../modules/auth/auth.service.js';
 import { IfMatchRequiredError } from '../../modules/contents/content.controller.js';
 import {
@@ -24,7 +25,6 @@ import {
   RouteNotFoundError,
 } from '../../modules/places/places-search.controller.js';
 import { UserNotFoundError, InvalidRoleError } from '../../modules/users/users.service.js';
-import { PasswordPolicyError } from '../../lib/password.js';
 import { UnauthorizedError } from '../auth/auth.guard.js';
 import { ForbiddenError } from '../auth/roles.guard.js';
 

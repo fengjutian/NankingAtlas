@@ -25,7 +25,7 @@ export interface MapBBox {
   readonly maxLat: number;
 }
 
-/** Leaflet `LatLngBounds` 的最小结构（避免在纯逻辑里依赖 leaflet 类型）。 */
+/** 地图 SDK 视窗边界的最小结构（避免在纯逻辑里依赖高德的 `AMap.Bounds` 类型）。 */
 export interface ViewportBounds {
   readonly west: number;
   readonly south: number;
@@ -174,7 +174,7 @@ export function formatBBox(bbox: MapBBox, precision = 4): string {
   return [round(bbox.minLon), round(bbox.minLat), round(bbox.maxLon), round(bbox.maxLat)].join(',');
 }
 
-/** 地图移动 → 请求 bbox。跨 180° 经线时 Leaflet 可能给出 west > east，这里不吞异常，交由校验拒绝。 */
+/** 地图移动 → 请求 bbox。跨 180° 经线时 SDK 可能给出 west > east，这里不吞异常，交由校验拒绝。 */
 export function bboxFromBounds(bounds: ViewportBounds): MapBBox {
   return {
     minLon: Math.min(bounds.west, bounds.east),

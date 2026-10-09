@@ -45,7 +45,7 @@ export default async function LivingListPage({
           matchesKeyword([item.title, item.subtitle, item.summary], query.q),
       )
     : [];
-  const { pageItems, totalItems, totalPages, capped } = paginate(scoped, query);
+  const { pageItems, totalItems, totalPages, capped, page } = paginate(scoped, query);
 
   return (
     <div className="shell">
@@ -95,7 +95,7 @@ export default async function LivingListPage({
         />
       )}
 
-      <Pagination basePath={BASE_PATH} query={query} totalPages={totalPages} />
+      <Pagination basePath={BASE_PATH} query={query} totalPages={totalPages} currentPage={page} />
     </div>
   );
 }
