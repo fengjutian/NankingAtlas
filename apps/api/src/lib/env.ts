@@ -61,6 +61,40 @@ const databaseUrl = z.preprocess(
     .optional(),
 );
 
+/**
+ * 认证相关 secrets。
+ *
+ * 生产环境必须由部署平台注入；本地允许缺省为固定 dev 值以免起服即崩，
+ * 但 `APP_ENV=production` 时缺省会直接 fail-fast（见下方 superRefine）。
+ *
+ * 长度要求：HS256 签名密钥至少 32 字节，避免暴力破解。
+ */
+const authAccessSecret = z.preprocess(
+  blankToUndefined,
+  z
+    .string()
+    .min(32, 'AUTH_ACCESS_SECRET 至少 32 字符')
+    .default('dev-only-insecure-access-secret-please-override'),
+);
+
+const authRefreshSecret = z.preprocess(
+  blankToUndefined,
+  z
+    .string()
+    .min(32, 'AUTH_REFRESH_SECRET 至少 32 字符')
+    .default('dev-only-insecure-refresh-secret-please-override'),
+);
+
+const authAccessTtlSeconds = z.preprocess(
+  blankToUndefined,
+  z.coerce.number().int().min(60).max(3600).default(900),
+);
+
+const authRefreshTtlSeconds = z.preprocess(
+  blankToUndefined,
+  z.coerce.number().int().min(300).max(60 * 60 * 24 * 30).default(60 * 60 * 24 * 14),
+);
+
 const schema = z
   .object({
     APP_ENV,
@@ -71,6 +105,10 @@ const schema = z
     LOG_LEVEL: logLevel,
     REQUEST_ID_HEADER: requestIdHeader,
     DATABASE_URL: databaseUrl,
+    AUTH_ACCESS_SECRET: authAccessSecret,
+    AUTH_REFRESH_SECRET: authRefreshSecret,
+    AUTH_ACCESS_TTL_SECONDS: authAccessTtlSeconds,
+    AUTH_REFRESH_TTL_SECONDS: authRefreshTtlSeconds,
   })
   .superRefine((data, ctx) => {
     if (data.APP_ENV !== 'test' && !data.DATABASE_URL) {
@@ -79,6 +117,26 @@ const schema = z
         path: ['DATABASE_URL'],
         message: '非 test 环境必须配置 DATABASE_URL',
       });
+    }
+
+    // 生产必须用平台注入的真实 secret，不能吃 dev 缺省值。
+    if (data.APP_ENV === 'production') {
+      const devAccess = 'dev-only-insecure-access-secret-please-override';
+      const devRefresh = 'dev-only-insecure-refresh-secret-please-override';
+      if (data.AUTH_ACCESS_SECRET === devAccess) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['AUTH_ACCESS_SECRET'],
+          message: '生产环境必须注入真实 AUTH_ACCESS_SECRET',
+        });
+      }
+      if (data.AUTH_REFRESH_SECRET === devRefresh) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['AUTH_REFRESH_SECRET'],
+          message: '生产环境必须注入真实 AUTH_REFRESH_SECRET',
+        });
+      }
     }
   });
 
@@ -91,6 +149,10 @@ const parsed = schema.safeParse({
   LOG_LEVEL: process.env.LOG_LEVEL,
   REQUEST_ID_HEADER: process.env.REQUEST_ID_HEADER,
   DATABASE_URL: process.env.DATABASE_URL,
+  AUTH_ACCESS_SECRET: process.env.AUTH_ACCESS_SECRET,
+  AUTH_REFRESH_SECRET: process.env.AUTH_REFRESH_SECRET,
+  AUTH_ACCESS_TTL_SECONDS: process.env.AUTH_ACCESS_TTL_SECONDS,
+  AUTH_REFRESH_TTL_SECONDS: process.env.AUTH_REFRESH_TTL_SECONDS,
 });
 
 if (!parsed.success) {
@@ -109,6 +171,10 @@ export const env = Object.freeze({
   LOG_LEVEL: parsed.data.LOG_LEVEL,
   REQUEST_ID_HEADER: parsed.data.REQUEST_ID_HEADER,
   DATABASE_URL: parsed.data.DATABASE_URL ?? null,
+  AUTH_ACCESS_SECRET: parsed.data.AUTH_ACCESS_SECRET,
+  AUTH_REFRESH_SECRET: parsed.data.AUTH_REFRESH_SECRET,
+  AUTH_ACCESS_TTL_SECONDS: parsed.data.AUTH_ACCESS_TTL_SECONDS,
+  AUTH_REFRESH_TTL_SECONDS: parsed.data.AUTH_REFRESH_TTL_SECONDS,
 });
 
 export type ApiEnv = typeof env;
