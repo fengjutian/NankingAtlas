@@ -17,6 +17,18 @@
       "description": "存活与就绪探针。"
     },
     {
+      "name": "places",
+      "description": "地点空间查询（bbox）与坐标核验状态。"
+    },
+    {
+      "name": "routes",
+      "description": "路线与有序站点。"
+    },
+    {
+      "name": "search",
+      "description": "公开关键词检索。"
+    },
+    {
       "name": "auth",
       "description": "后台认证与会话。"
     },
@@ -670,6 +682,491 @@
           },
           "500": {
             "description": "服务内部错误。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/places": {
+      "get": {
+        "operationId": "listPlacesInBbox",
+        "summary": "按 bbox 查询地点",
+        "description": "只返回 PUBLISHED 且未归档的地点。`bbox` 必须是 `minLon,minLat,maxLon,maxLat`；反向矩形、超出经纬度范围、面积超过 4 平方度均返回 400。坐标不可信（accuracy≠EXACT 或 verificationStatus≠VERIFIED）时 `lon/lat` 返回 null，并通过 `hasPoint=false` 与 `note` 说明原因（AGENTS.md §3.5）。",
+        "tags": ["places"],
+        "security": [],
+        "parameters": [
+          {
+            "name": "bbox",
+            "in": "query",
+            "description": "矩形范围，格式 `minLon,minLat,maxLon,maxLat`。必须 minLon<maxLon、minLat<maxLat，且面积不超过 4 平方度。",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 9,
+              "maxLength": 64,
+              "pattern": "^-?\\d+(\\.\\d+)?,-?\\d+(\\.\\d+)?,-?\\d+(\\.\\d+)?,-?\\d+(\\.\\d+)?$"
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "按内容类型过滤。",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ContentType"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回条数上限，默认 20，最大 100。",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "bbox 范围内的地点列表。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlaceBboxResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "bbox 非法：格式错误 / 反向 / 超范围 / 面积过大。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务内部错误。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/places/{slug}": {
+      "get": {
+        "operationId": "getPublicPlace",
+        "summary": "公开地点详情",
+        "description": "未发布、已归档与不存在统一返回 404。坐标不可信时不返回精确经纬度。",
+        "tags": ["places"],
+        "security": [],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "description": "内容 slug。",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "地点详情（含地址与坐标）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ContentPublicResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "地点不存在或未发布。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务内部错误。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/routes/{slug}": {
+      "get": {
+        "operationId": "getPublicRoute",
+        "summary": "公开路线与有序站点",
+        "description": "站点严格按 position 升序返回（策展顺序即内容）。引用的地点缺失时保留序号并置 place=null，不静默丢弃。只有全部站点坐标均可信时才返回 `line`（地图连线），否则为空数组。",
+        "tags": ["routes"],
+        "security": [],
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "description": "内容 slug。",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+              "minLength": 1,
+              "maxLength": 120
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "路线与有序站点。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RouteResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "路线不存在或未发布。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务内部错误。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/search": {
+      "get": {
+        "operationId": "searchPublicContent",
+        "summary": "公开关键词检索",
+        "description": "查询长度 1–100（短于 2 直接返回空结果）。LIKE 通配符被转义，输入 `%` / `_` 不会退化为全表扫描。无结果时返回 `suggestions`（库中真实存在的热门标签），**不生成任何合成答案**。",
+        "tags": ["search"],
+        "security": [],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "检索关键词，1–100 字符。短于 2 直接返回空结果。",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          },
+          {
+            "name": "type",
+            "in": "query",
+            "description": "按内容类型过滤。",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ContentType"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回条数上限，默认 20，最大 100。",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "检索结果与无结果建议。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "查询参数非法（长度超限等）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务内部错误。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/places/reindex": {
+      "post": {
+        "operationId": "reindexPlaces",
+        "summary": "重建地点空间索引",
+        "description": "R*Tree 是 SQLite 虚表，触发器无法直接写入；写入或更新坐标后需调用本接口刷新。仅 ADMIN 可调用。",
+        "tags": ["places"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "可选。技术方案 §7.1：写接口支持 Idempotency-Key。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 255,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "索引已重建。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReindexResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "未认证。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "需要 ADMIN 角色。",
             "content": {
               "application/json": {
                 "schema": {
@@ -4520,6 +5017,351 @@
           }
         }
       },
+      "Bbox": {
+        "type": "object",
+        "description": "矩形范围。",
+        "required": ["minLon", "minLat", "maxLon", "maxLat"],
+        "additionalProperties": false,
+        "properties": {
+          "minLon": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "minLat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "maxLon": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "maxLat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          }
+        }
+      },
+      "GeoPoint": {
+        "type": "object",
+        "description": "经纬度点。",
+        "required": ["lon", "lat"],
+        "additionalProperties": false,
+        "properties": {
+          "lon": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          }
+        }
+      },
+      "PlaceBboxItem": {
+        "type": "object",
+        "description": "bbox 内的一个地点。",
+        "required": [
+          "slug",
+          "title",
+          "summary",
+          "type",
+          "lon",
+          "lat",
+          "hasPoint",
+          "note",
+          "accuracy",
+          "verificationStatus"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "slug": {
+            "type": "string",
+            "description": "地点 slug。",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "title": {
+            "type": "string",
+            "description": "标题。",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "summary": {
+            "type": ["string", "null"],
+            "maxLength": 1000
+          },
+          "type": {
+            "$ref": "#/components/schemas/ContentType"
+          },
+          "lon": {
+            "type": ["number", "null"],
+            "description": "经度；`hasPoint=false` 时为 null（坐标未核验，不给精确点）。"
+          },
+          "lat": {
+            "type": ["number", "null"],
+            "description": "纬度；`hasPoint=false` 时为 null。"
+          },
+          "hasPoint": {
+            "type": "boolean",
+            "description": "是否可绘制精确点。仅 accuracy=EXACT 且 verificationStatus=VERIFIED 时为 true。"
+          },
+          "note": {
+            "type": ["string", "null"],
+            "description": "坐标不可信时的说明（区域级 / 未核验等）；可绘制时为 null。"
+          },
+          "accuracy": {
+            "type": "string",
+            "enum": ["EXACT", "APPROXIMATE", "AREA_ONLY", "UNKNOWN"]
+          },
+          "verificationStatus": {
+            "type": "string",
+            "enum": ["UNVERIFIED", "PARTIAL", "VERIFIED", "DISPUTED"]
+          }
+        }
+      },
+      "PlaceBbox": {
+        "type": "object",
+        "description": "bbox 查询结果。",
+        "required": ["bbox", "center", "total", "truncated", "items"],
+        "additionalProperties": false,
+        "properties": {
+          "bbox": {
+            "$ref": "#/components/schemas/Bbox"
+          },
+          "center": {
+            "$ref": "#/components/schemas/GeoPoint"
+          },
+          "total": {
+            "type": "integer",
+            "description": "本次返回条数。"
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "是否因 limit 截断（可能还有更多）。"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PlaceBboxItem"
+            }
+          }
+        }
+      },
+      "RouteStopPlace": {
+        "type": "object",
+        "required": [
+          "slug",
+          "title",
+          "accuracy",
+          "verificationStatus",
+          "lon",
+          "lat",
+          "hasPoint",
+          "pointNote"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "slug": {
+            "type": "string",
+            "description": "地点 slug。",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "description": "标题。",
+            "minLength": 1
+          },
+          "accuracy": {
+            "type": "string",
+            "enum": ["EXACT", "APPROXIMATE", "AREA_ONLY", "UNKNOWN"]
+          },
+          "verificationStatus": {
+            "type": "string",
+            "enum": ["UNVERIFIED", "PARTIAL", "VERIFIED", "DISPUTED"]
+          },
+          "lon": {
+            "type": ["number", "null"]
+          },
+          "lat": {
+            "type": ["number", "null"]
+          },
+          "hasPoint": {
+            "type": "boolean"
+          },
+          "pointNote": {
+            "type": ["string", "null"]
+          }
+        }
+      },
+      "RouteStop": {
+        "type": "object",
+        "description": "路线的一个站点。",
+        "required": ["position", "note", "place"],
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "站点序号（从 0 起，严格升序）。"
+          },
+          "note": {
+            "type": ["string", "null"],
+            "description": "策展备注。"
+          },
+          "place": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RouteStopPlace"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "引用的地点；未发布或已归档时为 null（保留序号，不静默丢弃）。"
+          }
+        }
+      },
+      "Route": {
+        "type": "object",
+        "description": "路线与有序站点。",
+        "required": [
+          "slug",
+          "title",
+          "summary",
+          "durationMinutes",
+          "distanceMeters",
+          "stopCount",
+          "stops",
+          "line"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "slug": {
+            "type": "string",
+            "description": "路线 slug。",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "title": {
+            "type": "string",
+            "description": "路线标题。",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "summary": {
+            "type": ["string", "null"],
+            "maxLength": 1000
+          },
+          "durationMinutes": {
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "description": "预计时长（分钟）。"
+          },
+          "distanceMeters": {
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "description": "总距离（米）。"
+          },
+          "stopCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "stops": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RouteStop"
+            }
+          },
+          "line": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/GeoPoint"
+            },
+            "description": "地图连线；仅当全部站点坐标均可信时非空，否则为 []（画错线比不画更糟）。"
+          }
+        }
+      },
+      "SearchHit": {
+        "type": "object",
+        "required": ["slug", "type", "title", "summary", "matchedOn"],
+        "additionalProperties": false,
+        "properties": {
+          "slug": {
+            "type": "string",
+            "description": "内容 slug。",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "type": {
+            "$ref": "#/components/schemas/ContentType"
+          },
+          "title": {
+            "type": "string",
+            "description": "标题。",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "summary": {
+            "type": ["string", "null"],
+            "maxLength": 1000
+          },
+          "matchedOn": {
+            "type": "string",
+            "enum": ["title", "summary", "body", "tag"]
+          }
+        }
+      },
+      "SearchResult": {
+        "type": "object",
+        "description": "检索结果。",
+        "required": ["query", "total", "items", "suggestions", "backend"],
+        "additionalProperties": false,
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "规范化后的查询词。",
+            "maxLength": 100
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchHit"
+            }
+          },
+          "suggestions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "无结果时的推荐标签（库中真实存在的热门标签；**不生成合成答案**）。"
+          },
+          "backend": {
+            "type": "string",
+            "enum": ["like"],
+            "description": "检索后端。SQLite 无 pg_trgm，当前为 LIKE 降级实现。"
+          }
+        }
+      },
+      "ReindexResult": {
+        "type": "object",
+        "required": ["ok"],
+        "additionalProperties": false,
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        }
+      },
       "CreateContentRequest": {
         "type": "object",
         "required": ["type", "slug", "title", "body", "extension"],
@@ -4660,6 +5502,50 @@
             "items": {
               "$ref": "#/components/schemas/ContentAdmin"
             }
+          }
+        }
+      },
+      "PlaceBboxResponse": {
+        "type": "object",
+        "description": "bbox 范围内的地点响应。",
+        "required": ["data"],
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/PlaceBbox"
+          }
+        }
+      },
+      "RouteResponse": {
+        "type": "object",
+        "description": "路线与有序站点响应。",
+        "required": ["data"],
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Route"
+          }
+        }
+      },
+      "SearchResponse": {
+        "type": "object",
+        "description": "检索结果与无结果建议响应。",
+        "required": ["data"],
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SearchResult"
+          }
+        }
+      },
+      "ReindexResponse": {
+        "type": "object",
+        "description": "空间索引重建响应。",
+        "required": ["data"],
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/ReindexResult"
           }
         }
       },

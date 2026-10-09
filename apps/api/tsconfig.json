@@ -7,7 +7,6 @@
       "@/*": ["./src/*"]
     },
     "outDir": "./dist",
-    "rootDir": "./src",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "verbatimModuleSyntax": false,
@@ -15,6 +14,13 @@
     "declarationMap": false,
     "isolatedModules": false
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "coverage", "test"]
+  // 开发 / 类型检查配置：覆盖 src + test + scripts。
+  //
+  // `test/` 与 `scripts/` 由 vitest / tsx 执行，不进构建产物 ——
+  // nest build 走 tsconfig.build.json（只 include src，见 nest-cli.json）。
+  //
+  // 刻意**不设** rootDir：设了 ./src 会让 src 之外的 test/ scripts/
+  // 在 tsc 下触发 TS6059。
+  "include": ["src/**/*.ts", "test/**/*.ts", "scripts/**/*.ts"],
+  "exclude": ["node_modules", "dist", "coverage", "prisma-test"]
 }

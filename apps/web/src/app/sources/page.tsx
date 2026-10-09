@@ -1,10 +1,9 @@
 import Link from 'next/link';
 
-import { SOURCE_KIND_LABELS, RIGHTS_LABELS, type RightsStatus, type SourceKind } from '@/lib/types';
-import { buildPageMetadata, truncateDescription } from '@/lib/seo';
-
 import type { Metadata } from 'next';
-import type { Route } from 'next';
+
+import { buildPageMetadata, truncateDescription } from '@/lib/seo';
+import { SOURCE_KIND_LABELS, RIGHTS_LABELS, type RightsStatus, type SourceKind } from '@/lib/types';
 
 const BASE_PATH = '/sources';
 const DESCRIPTION =
@@ -98,7 +97,9 @@ export default function SourcesPage() {
           如果你发现某条目的史实、引用、坐标或版权信息有误，请通过项目维护渠道反馈，并在描述中写明：
         </p>
         <ul role="list">
-          <li>条目 URL 或 slug（例如 <code>/chronicle/example-slug</code>）；</li>
+          <li>
+            条目 URL 或 slug（例如 <code>/chronicle/example-slug</code>）；
+          </li>
           <li>具体有争议的表述或字段；</li>
           <li>你依据的来源（书名、页码、档案号或可核验链接）。</li>
         </ul>
@@ -115,9 +116,8 @@ export default function SourcesPage() {
       <section aria-labelledby="sources-more">
         <h2 id="sources-more">继续浏览</h2>
         <p>
-          <Link href={'/chronicle' as Route}>文化志</Link> ·{' '}
-          <Link href={'/living' as Route}>生活录</Link> ·{' '}
-          <Link href={'/search' as Route}>全站检索</Link>
+          <Link href={'/chronicle'}>文化志</Link> · <Link href={'/living'}>生活录</Link> ·{' '}
+          <Link href={'/search'}>全站检索</Link>
         </p>
       </section>
     </div>

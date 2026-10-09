@@ -1,14 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { INestApplication } from '@nestjs/common';
 
-import {
-  closeTestApp,
-  createTestApp,
-  prisma,
-  request,
-  serverOf,
-} from '../../../test/app-harness.js';
-import { hashPassword } from '../../lib/password.js';
+import { hashPassword } from '../../src/lib/password.js';
+import { closeTestApp, createTestApp, prisma, request, serverOf } from '../app-harness.js';
+
+import type { INestApplication } from '@nestjs/common';
 
 /**
  * 媒体上传意图与对象确认的集成测试（P1-09）。

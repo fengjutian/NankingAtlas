@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
-import { prisma } from '../../lib/prisma.js';
 import { ForbiddenError } from '../../common/auth/roles.guard.js';
+import { prisma } from '../../lib/prisma.js';
 
 /**
  * 首页槽位（P2-02）。

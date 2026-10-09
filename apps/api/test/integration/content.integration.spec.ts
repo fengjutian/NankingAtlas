@@ -1,13 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import {
-  closeTestApp,
-  createTestApp,
-  prisma,
-  request,
-  serverOf,
-} from '../../../test/app-harness.js';
-import { hashPassword } from '../../lib/password.js';
+import { hashPassword } from '../../src/lib/password.js';
+import { closeTestApp, createTestApp, prisma, request, serverOf } from '../app-harness.js';
 
 import type { INestApplication } from '@nestjs/common';
 

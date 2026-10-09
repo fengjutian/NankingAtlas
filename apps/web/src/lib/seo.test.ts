@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import type { PublicContent } from './types';
 import type * as SeoModule from './seo';
+import type { PublicContent } from './types';
 
 /**
  * `seo.ts` 读取 `NEXT_PUBLIC_SITE_URL` 决定 canonical 形态，
@@ -11,7 +11,7 @@ async function loadSeo(siteUrl: string | null): Promise<typeof SeoModule> {
   vi.resetModules();
   vi.stubEnv('NEXT_PUBLIC_APP_ENV', 'test');
   vi.stubEnv('NEXT_PUBLIC_API_BASE_URL', '');
-  vi.stubEnv('NEXT_PUBLIC_SITE_URL', siteUrl === null ? '' : siteUrl);
+  vi.stubEnv('NEXT_PUBLIC_SITE_URL', siteUrl ?? '');
   return import('./seo');
 }
 
@@ -91,8 +91,9 @@ describe('buildPageMetadata', () => {
       type: 'article',
       publishedAt: '2026-10-09T00:00:00.000Z',
     });
-    expect(ok.openGraph?.type).toBe('article');
-    expect(ok.openGraph?.publishedTime).toBe('2026-10-09T00:00:00.000Z');
+    expect(ok).toMatchObject({
+      openGraph: { type: 'article', publishedTime: '2026-10-09T00:00:00.000Z' },
+    });
 
     const bad = buildPageMetadata({
       title: 'T',
@@ -101,20 +102,23 @@ describe('buildPageMetadata', () => {
       type: 'article',
       publishedAt: 'not-a-date',
     });
-    expect(bad.openGraph?.publishedTime).toBeUndefined();
+    expect(bad).toMatchObject({ openGraph: { type: 'article' } });
+    expect(bad.openGraph).not.toHaveProperty('publishedTime');
   });
 
   it('includes OG images only when an asset URL is supplied', async () => {
     const { buildPageMetadata } = await loadSeo(null);
     const without = buildPageMetadata({ title: 'T', description: 'D', path: '/' });
-    expect(without.openGraph?.images).toBeUndefined();
+    expect(without.openGraph).not.toHaveProperty('images');
     const withImage = buildPageMetadata({
       title: 'T',
       description: 'D',
       path: '/',
       imageUrl: 'https://atlas.example.invalid/og.jpg',
     });
-    expect(withImage.openGraph?.images).toEqual([{ url: 'https://atlas.example.invalid/og.jpg' }]);
+    expect(withImage).toMatchObject({
+      openGraph: { images: [{ url: 'https://atlas.example.invalid/og.jpg' }] },
+    });
   });
 
   it('honours noIndex for pages that must stay out of the index', async () => {
@@ -126,7 +130,9 @@ describe('buildPageMetadata', () => {
   it('truncates an over-long description', async () => {
     const { buildPageMetadata, truncateDescription } = await loadSeo(null);
     expect(truncateDescription('文'.repeat(300))).toHaveLength(151);
-    expect(buildPageMetadata({ title: 'T', description: 'x'.repeat(300), path: '/' }).description).toHaveLength(151);
+    expect(
+      buildPageMetadata({ title: 'T', description: 'x'.repeat(300), path: '/' }).description,
+    ).toHaveLength(151);
   });
 });
 
@@ -140,20 +146,24 @@ describe('buildJsonLd', () => {
     const { buildJsonLd } = await loadSeo('https://atlas.example.invalid');
     const data = buildJsonLd({ content: content({ type: 'PERSON' }), plainText: '正文纯文本' });
     expect(data?.['@type']).toBe('Article');
-    expect(data?.['headline']).toBe('示例标题');
-    expect(data?.['datePublished']).toBe('2026-10-09T00:00:00.000Z');
-    expect(data?.['url']).toBe('https://atlas.example.invalid/people/a-slug');
-    expect(data?.['author']).toEqual({ '@type': 'Organization', name: 'Nanking Atlas 编辑部' });
-    expect(data?.['inLanguage']).toBe('zh-CN');
+    expect(data?.headline).toBe('示例标题');
+    expect(data?.datePublished).toBe('2026-10-09T00:00:00.000Z');
+    expect(data?.url).toBe('https://atlas.example.invalid/people/a-slug');
+    expect(data?.author).toEqual({ '@type': 'Organization', name: 'Nanking Atlas 编辑部' });
+    expect(data?.inLanguage).toBe('zh-CN');
   });
 
   it('emits Place for PLACE and TouristRoute for ROUTE', async () => {
     const { buildJsonLd } = await loadSeo(null);
-    expect(buildJsonLd({ content: content({ type: 'PLACE' }), plainText: '' })?.['@type']).toBe('Place');
+    expect(buildJsonLd({ content: content({ type: 'PLACE' }), plainText: '' })?.['@type']).toBe(
+      'Place',
+    );
     expect(buildJsonLd({ content: content({ type: 'ROUTE' }), plainText: '' })?.['@type']).toBe(
       'TouristRoute',
     );
-    expect(buildJsonLd({ content: content({ type: 'TOPIC' }), plainText: '' })?.['@type']).toBe('Article');
+    expect(buildJsonLd({ content: content({ type: 'TOPIC' }), plainText: '' })?.['@type']).toBe(
+      'Article',
+    );
     expect(buildJsonLd({ content: content({ type: 'TRADITION' }), plainText: '' })?.['@type']).toBe(
       'Article',
     );
@@ -173,12 +183,12 @@ describe('buildJsonLd', () => {
         address: '某路 1 号',
       },
     });
-    expect(verified?.['geo']).toEqual({
+    expect(verified?.geo).toEqual({
       '@type': 'GeoCoordinates',
       longitude: 118.78,
       latitude: 32.06,
     });
-    expect(verified?.['address']).toBe('某路 1 号');
+    expect(verified?.address).toBe('某路 1 号');
   });
 
   it('omits geo when the accuracy is UNKNOWN or AREA_ONLY', async () => {
@@ -189,7 +199,7 @@ describe('buildJsonLd', () => {
         plainText: '',
         place: { lon: 118.78, lat: 32.06, accuracy, verificationStatus: 'VERIFIED' },
       });
-      expect(data?.['geo']).toBeUndefined();
+      expect(data?.geo).toBeUndefined();
     }
   });
 
@@ -201,7 +211,7 @@ describe('buildJsonLd', () => {
         plainText: '',
         place: { lon: 118.78, lat: 32.06, accuracy: 'EXACT', verificationStatus },
       });
-      expect(data?.['geo']).toBeUndefined();
+      expect(data?.geo).toBeUndefined();
     }
   });
 
@@ -212,16 +222,16 @@ describe('buildJsonLd', () => {
       plainText: '',
       place: { lon: 400, lat: 32.06, accuracy: 'EXACT', verificationStatus: 'VERIFIED' },
     });
-    expect(data?.['geo']).toBeUndefined();
+    expect(data?.geo).toBeUndefined();
   });
 
   it('omits datePublished when the publication time is missing or invalid', async () => {
     const { buildJsonLd } = await loadSeo(null);
     expect(
-      buildJsonLd({ content: content({ publishedAt: null }), plainText: '' })?.['datePublished'],
+      buildJsonLd({ content: content({ publishedAt: null }), plainText: '' })?.datePublished,
     ).toBeUndefined();
     expect(
-      buildJsonLd({ content: content({ publishedAt: 'soon' }), plainText: '' })?.['datePublished'],
+      buildJsonLd({ content: content({ publishedAt: 'soon' }), plainText: '' })?.datePublished,
     ).toBeUndefined();
   });
 
@@ -239,28 +249,35 @@ describe('buildJsonLd', () => {
         ],
       },
     });
-    expect(data?.['totalTime']).toBe('PT90M');
-    const itinerary = data?.['itinerary'] as { numberOfItems: number } | undefined;
+    expect(data?.totalTime).toBe('PT90M');
+    const itinerary = data?.itinerary as { numberOfItems: number } | undefined;
     expect(itinerary?.numberOfItems).toBe(1);
   });
 
   it('omits itinerary when a route has no public stops', async () => {
     const { buildJsonLd } = await loadSeo(null);
-    const data = buildJsonLd({ content: content({ type: 'ROUTE' }), plainText: '', route: { stops: [] } });
-    expect(data?.['itinerary']).toBeUndefined();
+    const data = buildJsonLd({
+      content: content({ type: 'ROUTE' }),
+      plainText: '',
+      route: { stops: [] },
+    });
+    expect(data?.itinerary).toBeUndefined();
   });
 
   it('uses the summary as description and falls back to the body text', async () => {
     const { buildJsonLd } = await loadSeo(null);
-    const withSummary = buildJsonLd({ content: content({ summary: '摘要内容' }), plainText: '正文' });
-    expect(withSummary?.['description']).toBe('摘要内容');
+    const withSummary = buildJsonLd({
+      content: content({ summary: '摘要内容' }),
+      plainText: '正文',
+    });
+    expect(withSummary?.description).toBe('摘要内容');
     const withoutSummary = buildJsonLd({ content: content(), plainText: '仅有正文纯文本' });
-    expect(withoutSummary?.['description']).toBe('仅有正文纯文本');
+    expect(withoutSummary?.description).toBe('仅有正文纯文本');
   });
 
   it('marks English content with the en language tag', async () => {
     const { buildJsonLd } = await loadSeo(null);
-    expect(buildJsonLd({ content: content({ language: 'EN' }), plainText: '' })?.['inLanguage']).toBe(
+    expect(buildJsonLd({ content: content({ language: 'EN' }), plainText: '' })?.inLanguage).toBe(
       'en',
     );
   });

@@ -2,20 +2,23 @@ import Link from 'next/link';
 
 import { DETAIL_PATHS, contentTypeLabel, type ContentRelation } from '@/lib/types';
 
-import type { Route } from 'next';
-
 export interface RelationListProps {
   readonly available: boolean;
   readonly relations: readonly ContentRelation[];
 }
 
 function relationHref(relation: ContentRelation): string | null {
-  if (relation.targetSlug === null || relation.targetSlug === undefined || relation.targetSlug === '') {
+  if (
+    relation.targetSlug === null ||
+    relation.targetSlug === undefined ||
+    relation.targetSlug === ''
+  ) {
     return null;
   }
-  const base = relation.targetType === null || relation.targetType === undefined
-    ? DETAIL_PATHS.TOPIC
-    : DETAIL_PATHS[relation.targetType];
+  const base =
+    relation.targetType === null || relation.targetType === undefined
+      ? DETAIL_PATHS.TOPIC
+      : DETAIL_PATHS[relation.targetType];
   return `${base}/${relation.targetSlug}`;
 }
 
@@ -42,7 +45,7 @@ export function RelationList({ available, relations }: RelationListProps) {
             {href === null ? (
               <span className="relation-list__label">{label}</span>
             ) : (
-              <Link href={href as Route} className="relation-list__label">
+              <Link href={href} className="relation-list__label">
                 {label}
               </Link>
             )}

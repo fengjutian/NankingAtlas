@@ -16,21 +16,31 @@ P0-01 ~ P0-09 已交付：三应用骨架、共享 strict 配置与依赖边界�
 
 **P1-01 ~ P1-10 已实现并通过验证**（SQLite 方案，见下方"数据层"章节的功能差异说明）：
 
-| 任务  | 内容                                                              | 验证                                   |
-| ----- | ----------------------------------------------------------------- | -------------------------------------- |
-| P1-01 | Prisma schema（25 表）+ 迁移 + seed                               | `migrate deploy` 在空库成功；seed 幂等 |
-| P1-02 | Argon2id 密码、登录/刷新/登出、refresh 旋转与重放检测、限流       | 23 条集成用例                          |
-| P1-03 | AuthGuard（401）+ RolesGuard（403，fail-closed）                  | 401/403 真实 HTTP 断言                 |
-| P1-04 | 内容 CRUD + 7 种类型扩展 + slug + 乐观锁（409）+ 软删除           | 并发更新 409 断言                      |
-| P1-05 | sources / relations / tags + 自关联与重复拒绝                     | 完整性约束断言                         |
-| P1-06 | Tiptap JSON 白名单 + 安全渲染（`@nanking-atlas/validation`）      | 59 条用例（XSS / `javascript:` 绕过）  |
-| P1-07 | revisions / review_actions / audit_logs 事务内只增                | 事务一致性断言                         |
-| P1-08 | 状态机 + 退回理由 + publication readiness（422 结构化）           | 非法流转 403；缺来源 422               |
-| P1-09 | upload intent + 对象确认 + MIME 魔数 / 版权校验                   | 21 条校验用例                          |
-| P1-10 | 后台列表、编辑器八区、自动保存（debounce + 并发保护）、冲突对话框 | 67 条用例                              |
-| P1-11 | OpenAPI 生成与 breaking-change 检查                               | 见 CI                                  |
+| 任务        | 内容                                                              | 验证                                     |
+| ----------- | ----------------------------------------------------------------- | ---------------------------------------- |
+| P1-01       | Prisma schema（25 表）+ 迁移 + seed                               | `migrate deploy` 在空库成功；seed 幂等   |
+| P1-02       | Argon2id 密码、登录/刷新/登出、refresh 旋转与重放检测、限流       | 23 条集成用例                            |
+| P1-03       | AuthGuard（401）+ RolesGuard（403，fail-closed）                  | 401/403 真实 HTTP 断言                   |
+| P1-04       | 内容 CRUD + 7 种类型扩展 + slug + 乐观锁（409）+ 软删除           | 并发更新 409 断言                        |
+| P1-05       | sources / relations / tags + 自关联与重复拒绝                     | 完整性约束断言                           |
+| P1-06       | Tiptap JSON 白名单 + 安全渲染（`@nanking-atlas/validation`）      | 59 条用例（XSS / `javascript:` 绕过）    |
+| P1-07       | revisions / review_actions / audit_logs 事务内只增                | 事务一致性断言                           |
+| P1-08       | 状态机 + 退回理由 + publication readiness（422 结构化）           | 非法流转 403；缺来源 422                 |
+| P1-09       | upload intent + 对象确认 + MIME 魔数 / 版权校验                   | 21 条校验用例                            |
+| P1-10       | 后台列表、编辑器八区、自动保存（debounce + 并发保护）、冲突对话框 | 67 条用例                                |
+| P1-11       | OpenAPI 生成与 breaking-change 检查                               | 32 operations / 68 schemas               |
+| P2-01       | public content API（只返回已发布字段）                            | 内部字段不外泄（字段白名单断言）         |
+| P2-02       | 首页槽位 + 后台配置（仅 ADMIN）                                   | 时间窗生效 + 内容撤回后槽位自动失效      |
+| P2-03~P2-06 | 文化志 / 生活录列表、六类详情、TOC、SEO、sitemap、robots          | 131 条 web 测试                          |
+| P2-07       | 签名 revalidation（HMAC + 300s 防重放 + 指数退避重试）            | 篡改 / 过期 / 重放均被拒                 |
+| P2-08       | 响应式与 WCAG AA（语义 HTML、焦点可见、reduced-motion）           | 组件级语义断言                           |
+| P3-01       | SQLite R\*Tree 空间索引 + bbox 两段式查询                         | 触发器同步 → 索引构建 → 命中，端到端实测 |
+| P3-02       | `GET /places?bbox=`（格式 / 反向 / 超范围 / 面积上限）            | 坐标不可信时不返回精确点                 |
+| P3-05       | `GET /search?q=`（LIKE + 通配符转义 + 无结果建议标签）            | 输入 `%` 不会退化为全表扫描              |
+| P3-06       | `GET /routes/:slug` 有序站点                                      | 按 position 排序；不可信坐标不进连线     |
 
-**P1-11（OpenAPI）尚在进行中。** 下一阶段为 P2（公开站真实数据接入、SEO、revalidation）。
+**P3-02 / P3-03 / P3-04 / P3-07（`/map` 页：Leaflet 延迟加载、marker/card 联动、请求取消与去抖、键盘与读屏）正在实现中。**
+下一阶段为 P4（安全审计、E2E、性能、备份恢复、上线 runbook）。
 
 ## 仓库结构
 

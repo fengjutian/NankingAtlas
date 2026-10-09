@@ -1,6 +1,6 @@
-import { siteOrigin } from '@/lib/seo';
-
 import type { MetadataRoute } from 'next';
+
+import { siteOrigin } from '@/lib/seo';
 
 /**
  * robots.txt（P2-06）。

@@ -2,8 +2,6 @@ import Link from 'next/link';
 
 import { setPage, withListQuery, type ListQuery } from '@/lib/api';
 
-import type { Route } from 'next';
-
 export interface PaginationProps {
   readonly basePath: string;
   readonly query: ListQuery;
@@ -19,7 +17,11 @@ export function Pagination({ basePath, query, totalPages }: PaginationProps) {
   return (
     <nav className="pagination" aria-label="分页导航">
       {query.page > 1 ? (
-        <Link href={withListQuery(basePath, setPage(query, previousPage)) as Route} className="btn" rel="prev">
+        <Link
+          href={withListQuery(basePath, setPage(query, previousPage))}
+          className="btn"
+          rel="prev"
+        >
           上一页
         </Link>
       ) : (
@@ -31,11 +33,7 @@ export function Pagination({ basePath, query, totalPages }: PaginationProps) {
         第 {query.page} / {totalPages} 页
       </p>
       {query.page < totalPages ? (
-        <Link
-          href={withListQuery(basePath, setPage(query, nextPage)) as Route}
-          className="btn"
-          rel="next"
-        >
+        <Link href={withListQuery(basePath, setPage(query, nextPage))} className="btn" rel="next">
           下一页
         </Link>
       ) : (

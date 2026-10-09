@@ -35,12 +35,7 @@ export const MAX_PAGE_SIZE = 100;
 // ---------------------------------------------------------------------------
 
 export type ApiFailureReason =
-  | 'unconfigured'
-  | 'network'
-  | 'not_found'
-  | 'forbidden'
-  | 'http_error'
-  | 'invalid_payload';
+  'unconfigured' | 'network' | 'not_found' | 'forbidden' | 'http_error' | 'invalid_payload';
 
 export interface ApiFailure {
   readonly ok: false;
@@ -87,6 +82,26 @@ const REASON_MESSAGES: Readonly<Record<ApiFailureReason, string>> = {
 
 export function failureMessage(reason: ApiFailureReason): string {
   return REASON_MESSAGES[reason];
+}
+
+/**
+ * 失败是否意味着"这个内容确实对访客不可见"（→ 404）。
+ *
+ * `forbidden`（403）也算：内容存在但不对公开访问，对外暴露 403 等于
+ * 告诉爬虫"这个 slug 有东西"，泄露未发布内容的存在性。
+ */
+export function isTerminalNotFound(reason: ApiFailureReason): boolean {
+  return reason === 'not_found' || reason === 'forbidden' || reason === 'invalid_payload';
+}
+
+/**
+ * 失败是否意味着"站点或接口暂时不可用"（→ 503，而不是 404）。
+ *
+ * 区分很重要：接口抖动时若返回 404，搜索引擎会把"暂时不可用"当成
+ * "内容已撤"而移除索引，运维也看不出站点故障。
+ */
+export function isServiceUnavailable(reason: ApiFailureReason): boolean {
+  return !isTerminalNotFound(reason);
 }
 
 // ---------------------------------------------------------------------------
@@ -147,7 +162,11 @@ function parseBody(text: string): unknown {
   }
 }
 
-async function request(path: string, query: QueryParams, options: RequestOptions): Promise<ApiResult<unknown>> {
+async function request(
+  path: string,
+  query: QueryParams,
+  options: RequestOptions,
+): Promise<ApiResult<unknown>> {
   const url = buildApiUrl(path, query);
   if (url === null) {
     return fail('unconfigured', failureMessage('unconfigured'));
@@ -156,7 +175,9 @@ async function request(path: string, query: QueryParams, options: RequestOptions
   const init: RequestInit = { headers: { accept: 'application/json' } };
   if (options.revalidate !== undefined) {
     init.next = {
-      ...(options.revalidate === false ? { revalidate: false } : { revalidate: options.revalidate }),
+      ...(options.revalidate === false
+        ? { revalidate: false }
+        : { revalidate: options.revalidate }),
       ...(options.tags !== undefined ? { tags: [...options.tags] } : {}),
     };
   }
@@ -226,12 +247,44 @@ export async function listPublishedContents(
   return result.ok ? { ok: true, data: result.data.data } : result;
 }
 
-/** `GET /api/v1/contents/:slug` —— 未发布/不存在统一 404。 */
+/**
+ * `GET /api/v1/contents/:slug` —— 未发布/不存在统一 404。
+ *
+ * 注意必须走 `requestEnvelope`：API 返回的是 `{ data: {...} }` 信封，
+ * 而 `publicContentSchema` 描述的是**裸内容对象**。直接把信封交给它
+ * 会 safeParse 失败 → `invalid_payload` → 页面误报 404
+ * （表现为"列表页有链接、点进去 404"，极难定位）。
+ */
 export async function getPublishedContentBySlug(
   slug: string,
   options: RequestOptions = {},
 ): Promise<ApiResult<PublicContent>> {
-  return requestData(`/contents/${encodeSlug(slug)}`, {}, publicContentSchema, options);
+  return requestEnvelope(`/contents/${encodeSlug(slug)}`, {}, publicContentSchema, options);
+}
+
+/**
+ * 校验 `{ data: T }` 信封并拆出 `data`。
+ *
+ * `z.object({ data: schema })` 的输出类型是 `baseObjectOutputType<...>`，
+ * 传给泛型返回值时 TS 推不出 `T`。用显式类型参数 `z.ZodType<T, z.ZodTypeDef, T>`
+ * 把 `data` 的类型固定为 `T`，否则 build 期报
+ * "Type ... is not assignable to type 'T'"。
+ */
+async function requestEnvelope<T>(
+  path: string,
+  query: QueryParams,
+  schema: z.ZodType<T, z.ZodTypeDef, T>,
+  options: RequestOptions,
+): Promise<ApiResult<T>> {
+  const raw = await request(path, query, options);
+  if (!raw.ok) return raw;
+  const envelope = z.object({ data: schema }).safeParse(raw.data);
+  if (!envelope.success) {
+    return fail('invalid_payload', failureMessage('invalid_payload'));
+  }
+  // safeParse 成功即保证 data 存在，但 zod 的输出类型带 `| undefined`
+  // （受 exactOptionalPropertyTypes 影响），用 NonNullable 显式收窄。
+  return { ok: true, data: envelope.data.data as NonNullable<typeof envelope.data.data> };
 }
 
 /** `GET /api/v1/places/:slug` —— 端点就绪前返回 not_found，调用方降级。 */
@@ -249,7 +302,7 @@ export async function getPlaceBySlug(
 
 /** `GET /api/v1/homepage` —— 后台槽位；未就绪时调用方降级为"无槽位内容"。 */
 export async function getHomepage(options: RequestOptions = {}): Promise<ApiResult<Homepage>> {
-  const raw = await request<unknown>('/homepage', {}, options);
+  const raw = await request('/homepage', {}, options);
   if (!raw.ok) return raw;
   const envelope = z.object({ data: homepageSchema }).safeParse(raw.data);
   if (!envelope.success) return fail('invalid_payload', failureMessage('invalid_payload'));
@@ -323,17 +376,15 @@ export function parseListQuery(
   params: Readonly<Record<string, string | string[] | undefined>>,
   allowedTypes: readonly ContentType[] = [],
 ): ListQuery {
-  const rawType = firstValue(params['type']);
-  const accepted: readonly string[] =
-    allowedTypes.length > 0 ? allowedTypes : CONTENT_TYPES;
-  const type =
-    rawType !== null && accepted.includes(rawType) ? (rawType as ContentType) : null;
+  const rawType = firstValue(params.type);
+  const accepted: readonly string[] = allowedTypes.length > 0 ? allowedTypes : CONTENT_TYPES;
+  const type = rawType !== null && accepted.includes(rawType) ? (rawType as ContentType) : null;
 
-  const rawQ = firstValue(params['q']) ?? '';
+  const rawQ = firstValue(params.q) ?? '';
   const q = rawQ.trim().slice(0, MAX_QUERY_LENGTH);
 
-  const page = toPositiveInt(firstValue(params['page'])) ?? 1;
-  const rawPageSize = toPositiveInt(firstValue(params['pageSize']));
+  const page = toPositiveInt(firstValue(params.page)) ?? 1;
+  const rawPageSize = toPositiveInt(firstValue(params.pageSize));
   const pageSize =
     rawPageSize !== null && (PAGE_SIZE_OPTIONS as readonly number[]).includes(rawPageSize)
       ? rawPageSize
@@ -429,8 +480,7 @@ export function signRevalidationPayload(timestamp: string, body: string, secret:
 export type RevalidationFailure = 'missing' | 'malformed' | 'expired' | 'mismatch';
 
 export type RevalidationCheck =
-  | { readonly ok: true }
-  | { readonly ok: false; readonly reason: RevalidationFailure };
+  { readonly ok: true } | { readonly ok: false; readonly reason: RevalidationFailure };
 
 /**
  * 校验签名与时间戳。
@@ -474,6 +524,6 @@ export function verifyRevalidationSignature(input: {
 
 /** `REVALIDATION_SECRET` 读取；未配置时接收端必须 503，而不是跳过校验。 */
 export function getRevalidationSecret(): string | null {
-  const secret = process.env['REVALIDATION_SECRET'];
+  const secret = process.env.REVALIDATION_SECRET;
   return typeof secret === 'string' && secret !== '' ? secret : null;
 }

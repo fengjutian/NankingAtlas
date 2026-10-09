@@ -50,3 +50,14 @@ apps/admin/dist/
 
 # Nest
 apps/api/dist/
+
+# tsx 执行 .ts 时可能落下的编译残留（源码是 .ts）
+apps/api/scripts/**/*.js
+apps/api/scripts/**/*.js.map
+apps/api/test/**/*.js
+apps/api/test/**/*.js.map
+
+# 集成测试的临时 SQLite 库（由 apps/api/test/global-setup.ts 创建）
+apps/api/prisma-test/
+packages/database/prisma/*.db
+packages/database/prisma/*.db-journal

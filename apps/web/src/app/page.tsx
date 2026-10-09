@@ -1,13 +1,13 @@
 import Link from 'next/link';
 
+import type { PublicContent } from '@/lib/types';
+import type { Metadata } from 'next';
+import type { Route } from 'next';
+
 import { ContentCard } from '@/components/ContentCard';
 import { EmptyState } from '@/components/EmptyState';
 import { getHomepage, listPublishedContents } from '@/lib/api';
 import { buildPageMetadata } from '@/lib/seo';
-import type { PublicContent } from '@/lib/types';
-
-import type { Metadata } from 'next';
-import type { Route } from 'next';
 
 const REVALIDATE_SECONDS = 300;
 
@@ -26,10 +26,30 @@ interface ColumnCard {
 }
 
 const COLUMNS: readonly ColumnCard[] = [
-  { title: '文化志', description: '以人物、事件、建筑、民俗为线索的长文与档案。', href: '/chronicle', countLabel: '条已发布' },
-  { title: '生活录', description: '当代人对街巷、节令、饮食与日常的记录。', href: '/living', countLabel: '条已发布' },
-  { title: '全站检索', description: '按关键词与内容类型检索已发布档案。', href: '/search', countLabel: '条可检索' },
-  { title: '来源说明', description: '来源类型、引用规范、版权与纠错入口。', href: '/sources', countLabel: '' },
+  {
+    title: '文化志',
+    description: '以人物、事件、建筑、民俗为线索的长文与档案。',
+    href: '/chronicle',
+    countLabel: '条已发布',
+  },
+  {
+    title: '生活录',
+    description: '当代人对街巷、节令、饮食与日常的记录。',
+    href: '/living',
+    countLabel: '条已发布',
+  },
+  {
+    title: '全站检索',
+    description: '按关键词与内容类型检索已发布档案。',
+    href: '/search',
+    countLabel: '条可检索',
+  },
+  {
+    title: '来源说明',
+    description: '来源类型、引用规范、版权与纠错入口。',
+    href: '/sources',
+    countLabel: '',
+  },
 ];
 
 export default async function HomePage() {
@@ -42,7 +62,9 @@ export default async function HomePage() {
 
   const latest: PublicContent[] = homepage.ok
     ? [...homepage.data.featured, ...homepage.data.latest].slice(0, 6)
-    : (latestResult.ok ? latestResult.data.slice(0, 6) : []);
+    : latestResult.ok
+      ? latestResult.data.slice(0, 6)
+      : [];
   const availableCount = latestResult.ok ? latestResult.data.length : 0;
   const interfaceReady = homepage.ok && latestResult.ok;
 
@@ -57,10 +79,10 @@ export default async function HomePage() {
           以可核验的史料、版权与坐标为底，建设一座对所有人开放的南京城市文化档案、互动街巷地图与生活记录平台。
         </p>
         <div className="home-hero__cta">
-          <Link href={'/chronicle' as Route} className="home-hero__btn home-hero__btn--primary">
+          <Link href={'/chronicle'} className="home-hero__btn home-hero__btn--primary">
             浏览文化志
           </Link>
-          <Link href={'/living' as Route} className="home-hero__btn">
+          <Link href={'/living'} className="home-hero__btn">
             阅读生活录
           </Link>
         </div>

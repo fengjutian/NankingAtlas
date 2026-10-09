@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import type { TiptapDocument, TiptapNode } from '@nanking-atlas/validation';
+
 import {
   extractHeadingEntries,
   extractToc,
@@ -8,9 +10,7 @@ import {
   slugifyHeading,
 } from './seo';
 
-import type { TiptapDocument } from '@nanking-atlas/validation';
-
-function heading(level: number, text: string): Record<string, unknown> {
+function heading(level: number, text: string): TiptapNode {
   return {
     type: 'heading',
     attrs: { level },
@@ -18,8 +18,8 @@ function heading(level: number, text: string): Record<string, unknown> {
   };
 }
 
-function doc(...nodes: Record<string, unknown>[]): TiptapDocument {
-  return { type: 'doc', content: nodes } as TiptapDocument;
+function doc(...nodes: TiptapNode[]): TiptapDocument {
+  return { type: 'doc', content: nodes };
 }
 
 describe('slugifyHeading', () => {
@@ -58,7 +58,9 @@ describe('extractHeadingEntries', () => {
   });
 
   it('de-duplicates repeated headings with an increasing suffix', () => {
-    const entries = extractHeadingEntries(doc(heading(2, '沿革'), heading(2, '沿革'), heading(2, '沿革')));
+    const entries = extractHeadingEntries(
+      doc(heading(2, '沿革'), heading(2, '沿革'), heading(2, '沿革')),
+    );
     expect(entries.map((entry) => entry.id)).toEqual(['沿革', '沿革-2', '沿革-3']);
   });
 
@@ -77,7 +79,9 @@ describe('extractHeadingEntries', () => {
 
 describe('extractToc', () => {
   it('keeps only h2/h3 by default', () => {
-    const toc = extractToc(doc(heading(1, '标题'), heading(2, '章节'), heading(3, '小节'), heading(4, '更小')));
+    const toc = extractToc(
+      doc(heading(1, '标题'), heading(2, '章节'), heading(3, '小节'), heading(4, '更小')),
+    );
     expect(toc.map((entry) => entry.text)).toEqual(['章节', '小节']);
   });
 
@@ -87,7 +91,9 @@ describe('extractToc', () => {
   });
 
   it('returns an empty list for a document without headings', () => {
-    expect(extractToc(doc({ type: 'paragraph', content: [{ type: 'text', text: '正文' }] }))).toEqual([]);
+    expect(
+      extractToc(doc({ type: 'paragraph', content: [{ type: 'text', text: '正文' }] })),
+    ).toEqual([]);
   });
 });
 

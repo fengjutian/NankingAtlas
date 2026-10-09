@@ -1,8 +1,13 @@
 import type { Metadata } from 'next';
 
-import { ArchivePage, buildArchiveMetadata, DETAIL_REVALIDATE_SECONDS } from '@/components/ArchivePage';
+import { ArchivePage, buildArchiveMetadata } from '@/components/ArchivePage';
 
-export const revalidate = DETAIL_REVALIDATE_SECONDS;
+/**
+ * force-dynamic + await 的理由见 chronicle/[slug]/page.tsx 的注释。
+ * 简述：JSX 形式的 async component 会被 React 独立调度，notFound() 只能换内容
+ * 不能改状态码（已撤回的内容会返回 200，违反技术方案 §9.3）。
+ */
+export const dynamic = 'force-dynamic';
 
 const ALLOWED = ['ROUTE'] as const;
 
@@ -15,11 +20,12 @@ export async function generateMetadata({
   return buildArchiveMetadata(slug, ALLOWED);
 }
 
-export default async function RouteDetailPage({
-  params,
-}: {
-  params: Promise<{ slug: string }>;
-}) {
+export default async function RouteDetailPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  return ArchivePage({ slug, allowedTypes: ALLOWED, backHref: '/chronicle', backLabel: '返回文化志' });
+  return await ArchivePage({
+    slug,
+    allowedTypes: ALLOWED,
+    backHref: '/chronicle',
+    backLabel: '返回文化志',
+  });
 }

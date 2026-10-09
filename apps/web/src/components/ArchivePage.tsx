@@ -1,12 +1,18 @@
 import { notFound } from 'next/navigation';
 import { z } from 'zod';
 
+import type { TocEntry } from '@/lib/seo';
+import type { Metadata } from 'next';
+
 import { ArchiveTemplate } from '@/components/ArchiveTemplate';
 import {
+  failureMessage,
   getContentRelations,
   getContentSources,
   getPlaceBySlug,
   getPublishedContentBySlug,
+  isServiceUnavailable,
+  type ApiFailureReason,
 } from '@/lib/api';
 import { buildJsonLd, buildPageMetadata, renderArticle, truncateDescription } from '@/lib/seo';
 import {
@@ -25,20 +31,22 @@ import {
   type RouteStop,
 } from '@/lib/types';
 
-import type { Metadata } from 'next';
-import type { TocEntry } from '@/lib/seo';
-
 /** 详情页缓存策略：ISR 300 秒（技术方案 §9.1）。 */
 export const DETAIL_REVALIDATE_SECONDS = 300;
 
 const relationArraySchema = z.array(contentRelationSchema);
 const sourceArraySchema = z.array(publicSourceSchema);
 
+/** `Array.isArray` 的安全守卫：避免把 `any[]` 当成 `unknown[]` 返回。 */
+function isUnknownArray(value: unknown): value is unknown[] {
+  return Array.isArray(value);
+}
+
 function extractArray(payload: unknown): unknown[] | null {
-  if (Array.isArray(payload)) return payload;
+  if (isUnknownArray(payload)) return payload;
   if (typeof payload === 'object' && payload !== null && 'data' in payload) {
-    const data = (payload as { data: unknown }).data;
-    if (Array.isArray(data)) return data;
+    const data = payload.data;
+    if (isUnknownArray(data)) return data;
   }
   return null;
 }
@@ -86,6 +94,14 @@ async function loadPlaceExtension(content: PublicContent): Promise<PlaceExtensio
   };
 }
 
+/**
+ * 路线扩展字段：公开端点尚未开放（`GET /api/v1/routes/:slug` 未实现），
+ * 因此返回 null，页面据此降级为"站点信息暂缺"，而不是伪造站点。
+ */
+function loadRouteExtension(_content: PublicContent): RouteExtension | null {
+  return null;
+}
+
 export interface ArchivePageProps {
   readonly slug: string;
   /** 栏目允许的内容类型；命中其他类型时按"类型专属 404"处理（P2-05）。 */
@@ -101,8 +117,18 @@ export async function ArchivePage({ slug, allowedTypes, backHref, backLabel }: A
     tags: [`content:${slug}`],
   });
 
-  // 未发布 / 不存在 / 接口未配置统一 404：不向访客暴露"资源存在但未发布"。
-  if (!result.ok) notFound();
+  if (!result.ok) {
+    // 区分"内容不存在"与"服务不可用"：
+    //   - not_found / forbidden / invalid_payload → 404（内容确实不可见）
+    //   - unconfigured / network / http_error     → 503（站点或接口故障）
+    //
+    // 混为一谈会让爬虫把"接口挂了"当成"内容已撤"而从索引移除，
+    // 也会让运维看不出站点故障（技术方案 §9.3 要求撤回后正确返回 404）。
+    if (isServiceUnavailable(result.reason)) {
+      return <ServiceUnavailableState reason={result.reason} />;
+    }
+    notFound();
+  }
 
   const content: PublicContent = result.data;
   if (!allowedTypes.includes(content.type)) notFound();
@@ -112,6 +138,7 @@ export async function ArchivePage({ slug, allowedTypes, backHref, backLabel }: A
     .filter((heading) => heading.level >= 2 && heading.level <= 3)
     .map((heading) => ({ id: heading.id, text: heading.text, level: heading.level }));
 
+  const route = loadRouteExtension(content);
   const [sources, relations, place] = await Promise.all([
     loadSources(content.id),
     loadRelations(content.id),
@@ -119,7 +146,6 @@ export async function ArchivePage({ slug, allowedTypes, backHref, backLabel }: A
   ]);
 
   // 路线站点：公开 DTO 尚未开放 route 扩展字段，取不到就不渲染该区块。
-  const route: RouteExtension | null = null;
   const stops: readonly RouteStop[] | undefined = route?.stops ?? undefined;
   const facts = buildTypeFacts(content, { place, route });
   const media: readonly PublicMedia[] = [];
@@ -145,6 +171,29 @@ export async function ArchivePage({ slug, allowedTypes, backHref, backLabel }: A
           relations: relations.items,
         })}
       />
+    </div>
+  );
+}
+
+/**
+ * 站点/接口不可用（503 语义）。
+ *
+ * 刻意**不调用** `notFound()`：那是 404，会让爬虫以为内容已撤而下架。
+ * 这里渲染可重试的错误页，并标 noindex（内容状态未知，不该进索引）。
+ */
+function ServiceUnavailableState({ reason }: { readonly reason: ApiFailureReason }) {
+  return (
+    <div className="shell">
+      <section aria-labelledby="unavailable-title" role="status" style={{ padding: '3rem 0' }}>
+        <h1 id="unavailable-title">内容暂时无法访问</h1>
+        <p>{failureMessage(reason)}</p>
+        <p>
+          这通常是站点维护或内容接口暂时故障导致的，<strong>不代表该内容已被移除</strong>。
+        </p>
+        <p>
+          <a href="/">返回首页</a>
+        </p>
+      </section>
     </div>
   );
 }

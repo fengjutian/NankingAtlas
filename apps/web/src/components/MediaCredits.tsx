@@ -1,9 +1,4 @@
-import {
-  RIGHTS_LABELS,
-  countHiddenMedia,
-  selectPublicMedia,
-  type PublicMedia,
-} from '@/lib/types';
+import { RIGHTS_LABELS, countHiddenMedia, selectPublicMedia, type PublicMedia } from '@/lib/types';
 
 export interface MediaCreditsProps {
   readonly media: readonly PublicMedia[];

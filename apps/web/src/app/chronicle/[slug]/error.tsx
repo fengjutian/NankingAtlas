@@ -3,8 +3,6 @@
 import Link from 'next/link';
 import { useEffect } from 'react';
 
-import type { Route } from 'next';
-
 /** 详情页局部错误边界：不显示堆栈，只给重试与回退路径。 */
 export default function ChronicleDetailError({
   error,
@@ -27,7 +25,7 @@ export default function ChronicleDetailError({
         <button type="button" className="btn btn--primary" onClick={reset}>
           重试
         </button>{' '}
-        <Link href={'/chronicle' as Route}>返回文化志</Link>
+        <Link href={'/chronicle'}>返回文化志</Link>
       </p>
     </div>
   );

@@ -206,7 +206,7 @@ function setRefreshCookie(res: Response, token: string, expiresAt: Date): void {
   res.cookie(REFRESH_COOKIE, token, {
     httpOnly: true,
     sameSite: 'strict',
-    secure: process.env.NODE_ENV === 'production',
+    secure: isProduction(),
     path: '/api/v1/auth',
     expires: expiresAt,
   });
@@ -216,9 +216,22 @@ function clearRefreshCookie(res: Response): void {
   res.clearCookie(REFRESH_COOKIE, {
     httpOnly: true,
     sameSite: 'strict',
-    secure: process.env.NODE_ENV === 'production',
+    secure: isProduction(),
     path: '/api/v1/auth',
   });
+}
+
+/**
+ * 是否处于生产。
+ *
+ * 用 `env.APP_ENV` 而不是 `process.env.NODE_ENV`：本项目所有生产强校验
+ * （secret 必填、REVALIDATION_URL 必填）都按 `APP_ENV` 判定，而
+ * `NODE_ENV` 缺省是 `development`。按 NODE_ENV 判断会让
+ * 「只设 APP_ENV=production」的部署发出不带 `Secure` 的 cookie，
+ * refresh token 就能走明文 HTTP。
+ */
+function isProduction(): boolean {
+  return env.APP_ENV === 'production';
 }
 
 /**
@@ -244,7 +257,18 @@ function readRefreshCookie(req: Request): string | null {
     const name = part.slice(0, eq).trim();
     if (name === REFRESH_COOKIE) {
       const value = part.slice(eq + 1).trim();
-      return value === '' ? null : decodeURIComponent(value);
+      if (value === '') {
+        return null;
+      }
+      try {
+        return decodeURIComponent(value);
+      } catch {
+        // 畸形百分号编码（`%`、`%zz`、`%E0%A4` 等）会让 decodeURIComponent 抛
+        // URIError。不接住的话它会一路冒到异常过滤器变成 500 —— 把**客户端
+        // 传错 cookie** 记成服务端故障，还会污染 5xx 告警。这里当作"没有
+        // cookie"，走标准的 TOKEN_REVOKED 401。
+        return null;
+      }
     }
   }
   return null;

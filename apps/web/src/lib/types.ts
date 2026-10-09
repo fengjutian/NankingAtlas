@@ -216,9 +216,6 @@ export const traditionExtensionSchema = z.object({
 });
 export type TraditionExtension = z.infer<typeof traditionExtensionSchema>;
 
-/** `/places/:slug` 可能返回的扩展载荷（部分字段可能缺失）。 */
-export type PlaceContent = PublicContent & Partial<PlaceExtension>;
-
 /** `GET /api/v1/homepage`：本轮由 API 侧实现，缺失时页面降级。 */
 export const homepageSchema = z.object({
   slots: z
@@ -280,9 +277,7 @@ export type PublicMedia = z.infer<typeof publicMediaSchema>;
  * 且公开图片必须同时具备 alt 与 credit line，否则无法满足可访问性与署名要求。
  * 返回可直接渲染的媒体列表，被过滤的条目由调用方在"版权说明"里说明数量。
  */
-export function selectPublicMedia(
-  items: readonly PublicMedia[],
-): readonly PublicMedia[] {
+export function selectPublicMedia(items: readonly PublicMedia[]): readonly PublicMedia[] {
   return items.filter((item) => {
     if (NON_PUBLIC_RIGHTS.includes(item.rightsStatus)) return false;
     return hasText(item.altText) && hasText(item.creditLine);
@@ -304,11 +299,25 @@ function hasText(value: string | null | undefined): boolean {
 /**
  * 是否允许展示精确经纬度。
  *
- * `UNKNOWN`（坐标未核验）与 `AREA_ONLY`（仅区域级）都不展示精确点，
- * 页面改为显示精度与核验状态说明。
+ * AGENTS.md §3.5：「未确认坐标不得猜测精确点」
+ * 技术方案 §9.2：「未核实或仅区域级位置不画精确点」
+ *
+ * 判据与后端 `places-query.service.ts` 的 `hasTrustedPoint` **必须一致**：
+ *   `accuracy === 'EXACT'` **且** `verificationStatus === 'VERIFIED'`
+ *
+ * 曾经这里写成 `EXACT || APPROXIMATE` 且不看核验状态，
+ * 结果同一条目在 `/map` 被拒绝画点、详情页却打印 5 位小数。
  */
-export function canShowExactCoordinates(accuracy: LocationAccuracy | null | undefined): boolean {
-  return accuracy === 'EXACT' || accuracy === 'APPROXIMATE';
+export function canShowExactCoordinates(
+  accuracy: LocationAccuracy | null | undefined,
+  verificationStatus?: VerificationStatus | null,
+): boolean {
+  if (verificationStatus !== undefined && verificationStatus !== null) {
+    return accuracy === 'EXACT' && verificationStatus === 'VERIFIED';
+  }
+  // 没传核验状态时退化为只看精度（调用方若同时要求核验，
+  // 应自行再判一次；map-data 的 canRenderMarker 已额外要求 hasPoint）。
+  return accuracy === 'EXACT';
 }
 
 export function formatCoordinates(
@@ -358,8 +367,8 @@ function push(facts: TypeFact[], label: string, value: string | null, note?: str
 /**
  * 生成详情页"类型专属字段区"。
  *
- * 坐标规则（AGENTS.md §3.5）：`UNKNOWN` / `AREA_ONLY` 一律不展示精确经纬度，
- * 只说明精度与核验状态；`EXACT` / `APPROXIMATE` 且经纬度合法时才展示。
+ * 坐标规则（AGENTS.md §3.5）：只有 `EXACT` 且核验状态为 `VERIFIED` 才展示
+ * 精确经纬度，否则只说明精度与核验状态。
  */
 export function buildTypeFacts(content: PublicContent, extras: TypeExtras = {}): TypeFact[] {
   const facts: TypeFact[] = [];
@@ -380,7 +389,7 @@ export function buildTypeFacts(content: PublicContent, extras: TypeExtras = {}):
         '核验状态',
         place.verificationStatus != null ? VERIFICATION_LABELS[place.verificationStatus] : null,
       );
-      if (canShowExactCoordinates(place.accuracy)) {
+      if (canShowExactCoordinates(place.accuracy, place.verificationStatus)) {
         push(facts, '经纬度', formatCoordinates(place.lon, place.lat));
       } else {
         push(facts, '经纬度', '暂不展示', '坐标精度不足以支持精确点位');
@@ -472,7 +481,8 @@ export function buildExcerpt(
   bodyText: string,
   maxLength = 120,
 ): string {
-  const base = hasText(summary) ? summary.trim() : bodyText.trim();
+  const base =
+    typeof summary === 'string' && summary.trim() !== '' ? summary.trim() : bodyText.trim();
   const collapsed = base.replace(/\s+/g, ' ');
   if (collapsed.length <= maxLength) return collapsed;
   return `${collapsed.slice(0, maxLength)}…`;
@@ -506,7 +516,10 @@ export function detailHref(content: { type: ContentType; slug: string }): string
 }
 
 /** 关键词匹配（列表本地筛选；服务端搜索在 P3 接入）。 */
-export function matchesKeyword(fields: readonly (string | null | undefined)[], keyword: string): boolean {
+export function matchesKeyword(
+  fields: readonly (string | null | undefined)[],
+  keyword: string,
+): boolean {
   const needle = keyword.trim().toLowerCase();
   if (needle === '') return true;
   return fields.some((field) => typeof field === 'string' && field.toLowerCase().includes(needle));

@@ -20,6 +20,11 @@ export const NLA_API_PATHS = {
   '/api/v1/auth/me': ['GET'] as const,
   '/api/v1/contents': ['GET'] as const,
   '/api/v1/contents/{slug}': ['GET'] as const,
+  '/api/v1/places': ['GET'] as const,
+  '/api/v1/places/{slug}': ['GET'] as const,
+  '/api/v1/routes/{slug}': ['GET'] as const,
+  '/api/v1/search': ['GET'] as const,
+  '/api/v1/admin/places/reindex': ['POST'] as const,
   '/api/v1/admin/contents': ['GET', 'POST'] as const,
   '/api/v1/admin/contents/{id}': ['GET', 'PATCH'] as const,
   '/api/v1/admin/contents/{id}/transition': ['POST'] as const,
@@ -193,6 +198,82 @@ export type ContentAdmin = {
   readonly updatedAt: string;
 };
 
+export type Bbox = {
+  readonly minLon: number;
+  readonly minLat: number;
+  readonly maxLon: number;
+  readonly maxLat: number;
+};
+
+export type GeoPoint = { readonly lon: number; readonly lat: number };
+
+export type PlaceBboxItem = {
+  readonly slug: string;
+  readonly title: string;
+  readonly summary: string | null | null;
+  readonly type: ContentType;
+  readonly lon: number | null | null;
+  readonly lat: number | null | null;
+  readonly hasPoint: boolean;
+  readonly note: string | null | null;
+  readonly accuracy: 'EXACT' | 'APPROXIMATE' | 'AREA_ONLY' | 'UNKNOWN';
+  readonly verificationStatus: 'UNVERIFIED' | 'PARTIAL' | 'VERIFIED' | 'DISPUTED';
+};
+
+export type PlaceBbox = {
+  readonly bbox: Bbox;
+  readonly center: GeoPoint;
+  readonly total: number;
+  readonly truncated: boolean;
+  readonly items: readonly PlaceBboxItem[];
+};
+
+export type RouteStopPlace = {
+  readonly slug: string;
+  readonly title: string;
+  readonly accuracy: 'EXACT' | 'APPROXIMATE' | 'AREA_ONLY' | 'UNKNOWN';
+  readonly verificationStatus: 'UNVERIFIED' | 'PARTIAL' | 'VERIFIED' | 'DISPUTED';
+  readonly lon: number | null | null;
+  readonly lat: number | null | null;
+  readonly hasPoint: boolean;
+  readonly pointNote: string | null | null;
+};
+
+export type RouteStop = {
+  readonly position: number;
+  readonly note: string | null | null;
+  readonly place: unknown;
+};
+
+export type Route = {
+  readonly slug: string;
+  readonly title: string;
+  readonly summary: string | null | null;
+  readonly durationMinutes: number | null | null;
+  readonly distanceMeters: number | null | null;
+  readonly stopCount: number;
+  readonly stops: readonly RouteStop[];
+  readonly line: readonly GeoPoint[];
+};
+
+export type SearchHit = {
+  readonly slug: string;
+  readonly type: ContentType;
+  readonly title: string;
+  readonly summary: string | null | null;
+  readonly matchedOn: 'title' | 'summary' | 'body' | 'tag';
+};
+
+export type SearchResult = {
+  readonly query: string;
+  readonly total: number;
+  readonly items: readonly SearchHit[];
+  readonly suggestions: readonly string[];
+  readonly backend: 'like';
+};
+
+export type ReindexResult = { readonly ok: boolean };
+
 export type CreateContentRequest = {
   readonly type: ContentType;
   readonly slug: string;
@@ -225,6 +306,14 @@ export type ContentPublicListResponse = { readonly data: readonly ContentPublic[
 export type ContentAdminResponse = { readonly data: ContentAdmin };
 
 export type ContentAdminListResponse = { readonly data: readonly ContentAdmin[] };
+
+export type PlaceBboxResponse = { readonly data: PlaceBbox };
+
+export type RouteResponse = { readonly data: Route };
+
+export type SearchResponse = { readonly data: SearchResult };
+
+export type ReindexResponse = { readonly data: ReindexResult };
 
 export type ReadinessIssue = {
   readonly field: string;
@@ -489,6 +578,115 @@ export interface NlaOperationMap {
     readonly requestBody: undefined | undefined;
     readonly response: ContentPublicResponse;
     readonly errorResponses: { readonly '404': ErrorResponse; readonly '500': ErrorResponse };
+  };
+  /** GET /api/v1/places */
+  listPlacesInBbox: {
+    readonly method: 'GET';
+    readonly path: '/api/v1/places';
+    readonly tags: readonly ['places'];
+    readonly security: 'public';
+    readonly parameters: readonly [
+      | {
+          readonly name: 'bbox';
+          readonly in: 'query';
+          readonly required: true;
+          readonly type: string;
+        }
+      | {
+          readonly name: 'type';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: ContentType;
+        }
+      | {
+          readonly name: 'limit';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: number;
+        },
+    ];
+    readonly requestBody: undefined | undefined;
+    readonly response: PlaceBboxResponse;
+    readonly errorResponses: { readonly '400': ErrorResponse; readonly '500': ErrorResponse };
+  };
+  /** GET /api/v1/places/{slug} */
+  getPublicPlace: {
+    readonly method: 'GET';
+    readonly path: '/api/v1/places/{slug}';
+    readonly tags: readonly ['places'];
+    readonly security: 'public';
+    readonly parameters: readonly [
+      {
+        readonly name: 'slug';
+        readonly in: 'path';
+        readonly required: true;
+        readonly type: string;
+      },
+    ];
+    readonly requestBody: undefined | undefined;
+    readonly response: ContentPublicResponse;
+    readonly errorResponses: { readonly '404': ErrorResponse; readonly '500': ErrorResponse };
+  };
+  /** GET /api/v1/routes/{slug} */
+  getPublicRoute: {
+    readonly method: 'GET';
+    readonly path: '/api/v1/routes/{slug}';
+    readonly tags: readonly ['routes'];
+    readonly security: 'public';
+    readonly parameters: readonly [
+      {
+        readonly name: 'slug';
+        readonly in: 'path';
+        readonly required: true;
+        readonly type: string;
+      },
+    ];
+    readonly requestBody: undefined | undefined;
+    readonly response: RouteResponse;
+    readonly errorResponses: { readonly '404': ErrorResponse; readonly '500': ErrorResponse };
+  };
+  /** GET /api/v1/search */
+  searchPublicContent: {
+    readonly method: 'GET';
+    readonly path: '/api/v1/search';
+    readonly tags: readonly ['search'];
+    readonly security: 'public';
+    readonly parameters: readonly [
+      | { readonly name: 'q'; readonly in: 'query'; readonly required: true; readonly type: string }
+      | {
+          readonly name: 'type';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: ContentType;
+        }
+      | {
+          readonly name: 'limit';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: number;
+        },
+    ];
+    readonly requestBody: undefined | undefined;
+    readonly response: SearchResponse;
+    readonly errorResponses: { readonly '400': ErrorResponse; readonly '500': ErrorResponse };
+  };
+  /** POST /api/v1/admin/places/reindex */
+  reindexPlaces: {
+    readonly method: 'POST';
+    readonly path: '/api/v1/admin/places/reindex';
+    readonly tags: readonly ['places'];
+    readonly security: 'bearer';
+    readonly parameters: readonly [
+      {
+        readonly name: 'Idempotency-Key';
+        readonly in: 'header';
+        readonly required: false;
+        readonly type: string;
+      },
+    ];
+    readonly requestBody: undefined | undefined;
+    readonly response: ReindexResponse;
+    readonly errorResponses: { readonly '401': ErrorResponse; readonly '403': ErrorResponse };
   };
   /** GET /api/v1/admin/contents */
   listAdminContents: {

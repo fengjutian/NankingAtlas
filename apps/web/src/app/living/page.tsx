@@ -1,12 +1,18 @@
+import type { Metadata } from 'next';
+
 import { ContentCard } from '@/components/ContentCard';
 import { EmptyState } from '@/components/EmptyState';
 import { ListToolbar } from '@/components/ListToolbar';
 import { Pagination } from '@/components/Pagination';
-import { MAX_PAGE_SIZE, describeFailure, listPublishedContents, paginate, parseListQuery } from '@/lib/api';
+import {
+  MAX_PAGE_SIZE,
+  describeFailure,
+  listPublishedContents,
+  paginate,
+  parseListQuery,
+} from '@/lib/api';
 import { buildPageMetadata, truncateDescription } from '@/lib/seo';
 import { LIVING_TYPES, matchesKeyword } from '@/lib/types';
-
-import type { Metadata } from 'next';
 
 const BASE_PATH = '/living';
 const DESCRIPTION =

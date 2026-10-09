@@ -1,8 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import type { INestApplication } from '@nestjs/common';
 
-import { closeTestApp, createTestApp, request, serverOf } from '../../../test/app-harness.js';
-import { seedDatabase } from '../../../test/seed-fixture.js';
+import { closeTestApp, createTestApp, request, serverOf } from '../app-harness.js';
+import { seedDatabase } from '../seed-fixture.js';
+
+import type { INestApplication } from '@nestjs/common';
 
 /**
  * seed → 登录 的端到端验证。
@@ -20,9 +21,12 @@ function liveApp(): INestApplication {
   return app;
 }
 
-beforeAll(async () => {
-  await seedDatabase();
-  app = await createTestApp();
+beforeAll(() => {
+  // seedDatabase 内部同步等待子进程退出（execFileSync），不是 Promise。
+  seedDatabase();
+  return createTestApp().then((created) => {
+    app = created;
+  });
 });
 
 afterAll(async () => {

@@ -99,13 +99,13 @@ function deepResolve(value: unknown, document: JsonObject, refHops = 0): unknown
   }
 
   const node = value as JsonObject;
-  const ref = node['$ref'];
+  const ref = node.$ref;
   if (typeof ref === 'string' && ref.startsWith(SCHEMA_REF_PREFIX)) {
     if (refHops >= MAX_REF_HOPS) {
       return node;
     }
     const name = ref.slice(SCHEMA_REF_PREFIX.length);
-    const schemas = asObject(asObject(document['components'])['schemas']);
+    const schemas = asObject(asObject(document.components).schemas);
     const target = schemas[name];
     if (target === undefined) {
       return node;
@@ -160,16 +160,16 @@ function normalizeParameters(value: unknown): NormalizedParameter[] {
   const result: NormalizedParameter[] = [];
   for (const entry of value) {
     const param = asObject(entry);
-    const name = param['name'];
-    const location = param['in'];
+    const name = param.name;
+    const location = param.in;
     if (typeof name !== 'string' || typeof location !== 'string') {
       continue;
     }
     result.push({
       name,
       location,
-      required: param['required'] === true,
-      schema: asObject(param['schema']),
+      required: param.required === true,
+      schema: asObject(param.schema),
     });
   }
   return result;
@@ -232,8 +232,8 @@ function compareSchema(
   diff: DiffCollector,
   direction: 'request' | 'response',
 ): void {
-  const beforeTypes = asStringArray(baseline['type']);
-  const afterTypes = asStringArray(current['type']);
+  const beforeTypes = asStringArray(baseline.type);
+  const afterTypes = asStringArray(current.type);
   if (beforeTypes.length > 0 && afterTypes.length > 0) {
     const removedType = beforeTypes.find((item) => !afterTypes.includes(item));
     if (removedType !== undefined) {
@@ -263,8 +263,8 @@ function compareItems(
   diff: DiffCollector,
   direction: 'request' | 'response',
 ): void {
-  const before = baseline['items'];
-  const after = current['items'];
+  const before = baseline.items;
+  const after = current.items;
   if (before === undefined || after === undefined) {
     return;
   }
@@ -286,8 +286,8 @@ function compareVariants(
   diff: DiffCollector,
   direction: 'request' | 'response',
 ): void {
-  const before = Array.isArray(baseline['oneOf']) ? (baseline['oneOf'] as unknown[]) : [];
-  const after = Array.isArray(current['oneOf']) ? (current['oneOf'] as unknown[]) : [];
+  const before = Array.isArray(baseline.oneOf) ? (baseline.oneOf as unknown[]) : [];
+  const after = Array.isArray(current.oneOf) ? (current.oneOf as unknown[]) : [];
   if (before.length === 0 || after.length === 0) {
     return;
   }
@@ -321,8 +321,8 @@ function compareEnum(
   diff: DiffCollector,
   direction: 'request' | 'response',
 ): void {
-  const before = asStringArray(baseline['enum']);
-  const after = asStringArray(current['enum']);
+  const before = asStringArray(baseline.enum);
+  const after = asStringArray(current.enum);
   if (before.length === 0) {
     return;
   }
@@ -388,8 +388,8 @@ function comparePattern(
   location: string,
   diff: DiffCollector,
 ): void {
-  const before = baseline['pattern'];
-  const after = current['pattern'];
+  const before = baseline.pattern;
+  const after = current.pattern;
   if (typeof before !== 'string' || typeof after !== 'string' || before === after) {
     return;
   }
@@ -412,10 +412,10 @@ function compareProperties(
   diff: DiffCollector,
   direction: 'request' | 'response',
 ): void {
-  const beforeProps = asObject(baseline['properties']);
-  const afterProps = asObject(current['properties']);
-  const beforeRequired = new Set(asStringArray(baseline['required']));
-  const afterRequired = new Set(asStringArray(current['required']));
+  const beforeProps = asObject(baseline.properties);
+  const afterProps = asObject(current.properties);
+  const beforeRequired = new Set(asStringArray(baseline.required));
+  const afterRequired = new Set(asStringArray(current.required));
 
   for (const [name, beforeSchema] of Object.entries(beforeProps)) {
     const afterSchema = afterProps[name];
@@ -474,8 +474,8 @@ const HTTP_METHOD_KEYS = ['get', 'post', 'put', 'patch', 'delete'] as const;
 
 /** 取出 `content["application/json"].schema`；请求体与响应体结构一致，共用一个提取器。 */
 function jsonSchemaOf(container: unknown): JsonObject | null {
-  const content = asObject(asObject(container)['content']);
-  const schema = asObject(content['application/json'])['schema'];
+  const content = asObject(asObject(container).content);
+  const schema = asObject(content['application/json']).schema;
   return schema === undefined ? null : asObject(schema);
 }
 
@@ -485,8 +485,8 @@ function compareResponses(
   location: string,
   diff: DiffCollector,
 ): void {
-  const before = asObject(baselineOperation['responses']);
-  const after = asObject(currentOperation['responses']);
+  const before = asObject(baselineOperation.responses);
+  const after = asObject(currentOperation.responses);
 
   for (const [status, beforeResponse] of Object.entries(before)) {
     const afterResponse = after[status];
@@ -517,8 +517,8 @@ function compareRequestBody(
   location: string,
   diff: DiffCollector,
 ): void {
-  const before = asObject(baselineOperation['requestBody']);
-  const after = asObject(currentOperation['requestBody']);
+  const before = asObject(baselineOperation.requestBody);
+  const after = asObject(currentOperation.requestBody);
   const beforeSchema = jsonSchemaOf(before);
   const afterSchema = jsonSchemaOf(after);
 
@@ -526,7 +526,7 @@ function compareRequestBody(
     return;
   }
   if (beforeSchema === null) {
-    if (after['required'] === true) {
+    if (after.required === true) {
       diff.add('REQUEST_BODY_ADDED_REQUIRED', location, '新增必填请求体：旧客户端不会发送。');
     }
     return;
@@ -562,8 +562,8 @@ function compareOperations(
     const afterObj = asObject(afterOperation);
 
     compareParameters(
-      normalizeParameters(beforeObj['parameters']),
-      normalizeParameters(afterObj['parameters']),
+      normalizeParameters(beforeObj.parameters),
+      normalizeParameters(afterObj.parameters),
       location,
       diff,
     );
@@ -581,8 +581,8 @@ function compareDocuments(baselineDoc: JsonObject, currentDoc: JsonObject): read
   const diff = new DiffCollector();
   const beforeResolved = asObject(deepResolve(baselineDoc, baselineDoc));
   const afterResolved = asObject(deepResolve(currentDoc, currentDoc));
-  const beforePaths = asObject(beforeResolved['paths']);
-  const afterPaths = asObject(afterResolved['paths']);
+  const beforePaths = asObject(beforeResolved.paths);
+  const afterPaths = asObject(afterResolved.paths);
 
   for (const [path, beforePathItem] of Object.entries(beforePaths)) {
     const afterPathItem = afterPaths[path];

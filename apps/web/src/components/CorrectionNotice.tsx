@@ -1,7 +1,5 @@
 import Link from 'next/link';
 
-import type { Route } from 'next';
-
 /**
  * 纠错入口（P2-04）。
  *
@@ -16,7 +14,7 @@ export function CorrectionNotice({ slug }: { readonly slug: string }) {
       </h2>
       <p className="correction__text">
         发现史实、来源、坐标或版权信息有误？请在
-        <Link href={'/sources#corrections' as Route}>来源与纠错说明</Link>
+        <Link href={'/sources#corrections'}>来源与纠错说明</Link>
         中查看纠错流程，并注明条目
         <code className="correction__code">{slug}</code>
         与具体问题。

@@ -1,15 +1,20 @@
 import Link from 'next/link';
 
+import type { Metadata } from 'next';
+
 import { ContentCard } from '@/components/ContentCard';
 import { EmptyState } from '@/components/EmptyState';
 import { ListToolbar } from '@/components/ListToolbar';
 import { Pagination } from '@/components/Pagination';
-import { MAX_PAGE_SIZE, describeFailure, listPublishedContents, paginate, parseListQuery } from '@/lib/api';
+import {
+  MAX_PAGE_SIZE,
+  describeFailure,
+  listPublishedContents,
+  paginate,
+  parseListQuery,
+} from '@/lib/api';
 import { buildPageMetadata, truncateDescription } from '@/lib/seo';
 import { CONTENT_TYPES, matchesKeyword } from '@/lib/types';
-
-import type { Metadata } from 'next';
-import type { Route } from 'next';
 
 const BASE_PATH = '/search';
 const DESCRIPTION = '在已发布的南京城市文化档案中检索条目：支持关键词与内容类型筛选。';
@@ -102,7 +107,7 @@ export default async function SearchPage({
 
       <p className="muted home-section__note">
         需要查询其他内容？可前往
-        <Link href={'/sources' as Route}>来源说明</Link>
+        <Link href={'/sources'}>来源说明</Link>
         了解本站的收录与引用规范。
       </p>
     </div>

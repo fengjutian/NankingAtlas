@@ -7,16 +7,17 @@
   "scripts": {
     "dev": "nest start --watch",
     "build": "nest build",
-    "start": "node dist/main.js",
+    "start": "tsx src/main.ts",
     "start:dev": "nest start --watch",
     "lint": "eslint . --max-warnings 0",
-    "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "test:watch": "vitest",
+    "clean": "rimraf dist coverage",
     "openapi:generate": "tsx scripts/generate-openapi.ts",
     "openapi:check-breaking": "tsx scripts/check-openapi-breaking.ts",
-    "clean": "rimraf dist coverage"
+    "load:baseline": "node scripts/load-baseline.mjs"
   },
   "dependencies": {
     "@nanking-atlas/database": "workspace:*",
@@ -43,14 +44,15 @@
     "@types/node": "^20.19.0",
     "@types/supertest": "^6.0.2",
     "eslint": "^9.17.0",
-    "prettier": "^3.6.2",
+    "pino-pretty": "^13.2.0",
     "rimraf": "^5.0.10",
     "supertest": "^7.0.0",
     "ts-loader": "^9.5.2",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "tsx": "^4.23.15",
+    "tsx": "^4.19.2",
     "typescript": "^5.6.3",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "webpack": "^5.97.1"
   }
 }

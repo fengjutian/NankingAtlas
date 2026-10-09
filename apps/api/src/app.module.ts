@@ -5,11 +5,13 @@ import { LoggerModule } from 'nestjs-pino';
 
 import { HealthController } from './common/health/health.controller.js';
 import { GlobalExceptionFilter } from './common/http/global-exception.filter.js';
+import { securityHeaders } from './common/http/security-headers.middleware.js';
 import { RequestIdMiddleware } from './common/request-id/request-id.middleware.js';
 import { env } from './lib/env.js';
 import { ContentModule } from './modules/contents/content.module.js';
 import { HomepageModule } from './modules/homepage/homepage.module.js';
 import { MediaModule } from './modules/media/media.module.js';
+import { PlacesModule } from './modules/places/places.module.js';
 import { UsersAuthModule } from './modules/users/users-auth.module.js';
 
 import type { Params } from 'nestjs-pino';
@@ -72,6 +74,7 @@ const throttlerModuleOptions = {
     UsersAuthModule,
     ContentModule,
     HomepageModule,
+    PlacesModule,
     MediaModule,
   ],
   controllers: [HealthController],
@@ -87,7 +90,8 @@ const throttlerModuleOptions = {
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer): void {
-    consumer.apply(RequestIdMiddleware).forRoutes('*');
+    // 顺序很重要：安全响应头最先设置，后续中间件即使抛错也已经带上头。
+    consumer.apply(securityHeaders, RequestIdMiddleware).forRoutes('*');
   }
 }
 

@@ -105,6 +105,7 @@ export interface SchemaObject {
   readonly const?: JsonPrimitive;
   readonly default?: JsonPrimitive;
   readonly allOf?: readonly SchemaLike[];
+  readonly anyOf?: readonly SchemaLike[];
   readonly oneOf?: readonly SchemaLike[];
   readonly discriminator?: {
     readonly propertyName: string;
@@ -519,6 +520,208 @@ const ContentPublicSchema: SchemaObject = {
   },
 };
 
+// ---------------------------------------------------------------------------
+// 地图 / 搜索 / 路线（P3）
+// ---------------------------------------------------------------------------
+
+/**
+ * bbox 内的地点项。
+ *
+ * `lon`/`lat` 的可空性是**安全约束**而非可选优化：
+ * 只有 `hasPoint=true` 时才有精确坐标，否则为 null（AGENTS.md §3.5）。
+ */
+const PlaceBboxItemSchema: SchemaObject = {
+  type: 'object',
+  description: 'bbox 内的一个地点。',
+  required: [
+    'slug',
+    'title',
+    'summary',
+    'type',
+    'lon',
+    'lat',
+    'hasPoint',
+    'note',
+    'accuracy',
+    'verificationStatus',
+  ],
+  additionalProperties: false,
+  properties: {
+    slug: stringSchema('地点 slug。', { minLength: 1, maxLength: 120 }),
+    title: stringSchema('标题。', { minLength: 1, maxLength: 200 }),
+    summary: nullableStringField(1000),
+    type: ref('ContentType'),
+    lon: {
+      type: ['number', 'null'],
+      description: '经度；`hasPoint=false` 时为 null（坐标未核验，不给精确点）。',
+    },
+    lat: {
+      type: ['number', 'null'],
+      description: '纬度；`hasPoint=false` 时为 null。',
+    },
+    hasPoint: {
+      type: 'boolean',
+      description: '是否可绘制精确点。仅 accuracy=EXACT 且 verificationStatus=VERIFIED 时为 true。',
+    },
+    note: {
+      type: ['string', 'null'],
+      description: '坐标不可信时的说明（区域级 / 未核验等）；可绘制时为 null。',
+    },
+    accuracy: { type: 'string', enum: ['EXACT', 'APPROXIMATE', 'AREA_ONLY', 'UNKNOWN'] },
+    verificationStatus: { type: 'string', enum: ['UNVERIFIED', 'PARTIAL', 'VERIFIED', 'DISPUTED'] },
+  },
+};
+
+const PlaceBboxSchema: SchemaObject = {
+  type: 'object',
+  description: 'bbox 查询结果。',
+  required: ['bbox', 'center', 'total', 'truncated', 'items'],
+  additionalProperties: false,
+  properties: {
+    bbox: ref('Bbox'),
+    center: ref('GeoPoint'),
+    total: { type: 'integer', description: '本次返回条数。' },
+    truncated: { type: 'boolean', description: '是否因 limit 截断（可能还有更多）。' },
+    items: { type: 'array', items: ref('PlaceBboxItem') },
+  },
+};
+
+const BboxSchema: SchemaObject = {
+  type: 'object',
+  description: '矩形范围。',
+  required: ['minLon', 'minLat', 'maxLon', 'maxLat'],
+  additionalProperties: false,
+  properties: {
+    minLon: { type: 'number', minimum: -180, maximum: 180 },
+    minLat: { type: 'number', minimum: -90, maximum: 90 },
+    maxLon: { type: 'number', minimum: -180, maximum: 180 },
+    maxLat: { type: 'number', minimum: -90, maximum: 90 },
+  },
+};
+
+const GeoPointSchema: SchemaObject = {
+  type: 'object',
+  description: '经纬度点。',
+  required: ['lon', 'lat'],
+  additionalProperties: false,
+  properties: {
+    lon: { type: 'number', minimum: -180, maximum: 180 },
+    lat: { type: 'number', minimum: -90, maximum: 90 },
+  },
+};
+
+const RouteStopSchema: SchemaObject = {
+  type: 'object',
+  description: '路线的一个站点。',
+  required: ['position', 'note', 'place'],
+  additionalProperties: false,
+  properties: {
+    position: { type: 'integer', minimum: 0, description: '站点序号（从 0 起，严格升序）。' },
+    note: { type: ['string', 'null'], description: '策展备注。' },
+    place: {
+      anyOf: [ref('RouteStopPlace'), { type: 'null' }],
+      description: '引用的地点；未发布或已归档时为 null（保留序号，不静默丢弃）。',
+    },
+  },
+};
+
+const RouteStopPlaceSchema: SchemaObject = {
+  type: 'object',
+  required: [
+    'slug',
+    'title',
+    'accuracy',
+    'verificationStatus',
+    'lon',
+    'lat',
+    'hasPoint',
+    'pointNote',
+  ],
+  additionalProperties: false,
+  properties: {
+    slug: stringSchema('地点 slug。', { minLength: 1 }),
+    title: stringSchema('标题。', { minLength: 1 }),
+    accuracy: { type: 'string', enum: ['EXACT', 'APPROXIMATE', 'AREA_ONLY', 'UNKNOWN'] },
+    verificationStatus: { type: 'string', enum: ['UNVERIFIED', 'PARTIAL', 'VERIFIED', 'DISPUTED'] },
+    lon: { type: ['number', 'null'] },
+    lat: { type: ['number', 'null'] },
+    hasPoint: { type: 'boolean' },
+    pointNote: { type: ['string', 'null'] },
+  },
+};
+
+const RouteSchema: SchemaObject = {
+  type: 'object',
+  description: '路线与有序站点。',
+  required: [
+    'slug',
+    'title',
+    'summary',
+    'durationMinutes',
+    'distanceMeters',
+    'stopCount',
+    'stops',
+    'line',
+  ],
+  additionalProperties: false,
+  properties: {
+    slug: stringSchema('路线 slug。', { minLength: 1, maxLength: 120 }),
+    title: stringSchema('路线标题。', { minLength: 1, maxLength: 200 }),
+    summary: nullableStringField(1000),
+    durationMinutes: { type: ['integer', 'null'], minimum: 1, description: '预计时长（分钟）。' },
+    distanceMeters: { type: ['integer', 'null'], minimum: 1, description: '总距离（米）。' },
+    stopCount: { type: 'integer', minimum: 0 },
+    stops: { type: 'array', items: ref('RouteStop') },
+    line: {
+      type: 'array',
+      items: ref('GeoPoint'),
+      description: '地图连线；仅当全部站点坐标均可信时非空，否则为 []（画错线比不画更糟）。',
+    },
+  },
+};
+
+const SearchHitSchema: SchemaObject = {
+  type: 'object',
+  required: ['slug', 'type', 'title', 'summary', 'matchedOn'],
+  additionalProperties: false,
+  properties: {
+    slug: stringSchema('内容 slug。', { minLength: 1, maxLength: 120 }),
+    type: ref('ContentType'),
+    title: stringSchema('标题。', { minLength: 1, maxLength: 200 }),
+    summary: nullableStringField(1000),
+    matchedOn: { type: 'string', enum: ['title', 'summary', 'body', 'tag'] },
+  },
+};
+
+const SearchResultSchema: SchemaObject = {
+  type: 'object',
+  description: '检索结果。',
+  required: ['query', 'total', 'items', 'suggestions', 'backend'],
+  additionalProperties: false,
+  properties: {
+    query: stringSchema('规范化后的查询词。', { maxLength: 100 }),
+    total: { type: 'integer', minimum: 0 },
+    items: { type: 'array', items: ref('SearchHit') },
+    suggestions: {
+      type: 'array',
+      items: { type: 'string' },
+      description: '无结果时的推荐标签（库中真实存在的热门标签；**不生成合成答案**）。',
+    },
+    backend: {
+      type: 'string',
+      enum: ['like'],
+      description: '检索后端。SQLite 无 pg_trgm，当前为 LIKE 降级实现。',
+    },
+  },
+};
+
+const ReindexResultSchema: SchemaObject = {
+  type: 'object',
+  required: ['ok'],
+  additionalProperties: false,
+  properties: { ok: { type: 'boolean' } },
+};
+
 const ContentAdminSchema: SchemaObject = {
   type: 'object',
   description: '后台内容视图：在公开字段基础上追加状态、乐观锁版本与审计字段。',
@@ -914,6 +1117,17 @@ const SCHEMAS: Readonly<Record<string, SchemaObject>> = {
   TiptapDocument: TiptapDocumentSchema,
   ContentPublic: ContentPublicSchema,
   ContentAdmin: ContentAdminSchema,
+  // 地图 / 搜索 / 路线（P3）
+  Bbox: BboxSchema,
+  GeoPoint: GeoPointSchema,
+  PlaceBboxItem: PlaceBboxItemSchema,
+  PlaceBbox: PlaceBboxSchema,
+  RouteStopPlace: RouteStopPlaceSchema,
+  RouteStop: RouteStopSchema,
+  Route: RouteSchema,
+  SearchHit: SearchHitSchema,
+  SearchResult: SearchResultSchema,
+  ReindexResult: ReindexResultSchema,
   CreateContentRequest: CreateContentRequestSchema,
   PatchContentRequest: PatchContentRequestSchema,
   TransitionRequest: TransitionRequestSchema,
@@ -921,6 +1135,10 @@ const SCHEMAS: Readonly<Record<string, SchemaObject>> = {
   ContentPublicListResponse: dataListEnvelope(ref('ContentPublic'), '公开内容列表响应。'),
   ContentAdminResponse: dataEnvelope(ref('ContentAdmin'), '后台内容详情响应。'),
   ContentAdminListResponse: dataListEnvelope(ref('ContentAdmin'), '后台内容列表响应。'),
+  PlaceBboxResponse: dataEnvelope(ref('PlaceBbox'), 'bbox 范围内的地点响应。'),
+  RouteResponse: dataEnvelope(ref('Route'), '路线与有序站点响应。'),
+  SearchResponse: dataEnvelope(ref('SearchResult'), '检索结果与无结果建议响应。'),
+  ReindexResponse: dataEnvelope(ref('ReindexResult'), '空间索引重建响应。'),
   ReadinessIssue: ReadinessIssueSchema,
   ReadinessReport: {
     type: 'object',
@@ -1093,6 +1311,31 @@ const LIMIT_QUERY_PARAMETER: ParameterObject = {
   },
 };
 
+/** bbox 查询参数。`required: true` —— 缺它就没有视口可言。 */
+const BBOX_QUERY_PARAMETER: ParameterObject = {
+  name: 'bbox',
+  in: 'query',
+  description:
+    '矩形范围，格式 `minLon,minLat,maxLon,maxLat`。' +
+    '必须 minLon<maxLon、minLat<maxLat，且面积不超过 4 平方度。',
+  required: true,
+  schema: {
+    type: 'string',
+    minLength: 9,
+    maxLength: 64,
+    pattern: '^-?\\d+(\\.\\d+)?,-?\\d+(\\.\\d+)?,-?\\d+(\\.\\d+)?,-?\\d+(\\.\\d+)?$',
+  },
+};
+
+/** 搜索关键词。 */
+const SEARCH_QUERY_PARAMETER: ParameterObject = {
+  name: 'q',
+  in: 'query',
+  description: '检索关键词，1–100 字符。短于 2 直接返回空结果。',
+  required: true,
+  schema: { type: 'string', minLength: 1, maxLength: 100 },
+};
+
 const CONTENT_TYPE_QUERY_PARAMETER: ParameterObject = {
   name: 'type',
   in: 'query',
@@ -1247,6 +1490,95 @@ const PATHS: Readonly<Record<string, PathItemObject>> = {
         '200': okResponse('ContentPublicResponse', '公开内容详情。'),
         '404': errorResponse('内容不存在或未发布。'),
         '500': errorResponse('服务内部错误。'),
+      },
+    },
+  },
+
+  // ---- 地图 / 搜索 / 路线（P3）----
+  '/api/v1/places': {
+    get: {
+      operationId: 'listPlacesInBbox',
+      summary: '按 bbox 查询地点',
+      description:
+        '只返回 PUBLISHED 且未归档的地点。`bbox` 必须是 `minLon,minLat,maxLon,maxLat`；' +
+        '反向矩形、超出经纬度范围、面积超过 4 平方度均返回 400。' +
+        '坐标不可信（accuracy≠EXACT 或 verificationStatus≠VERIFIED）时 `lon/lat` 返回 null，' +
+        '并通过 `hasPoint=false` 与 `note` 说明原因（AGENTS.md §3.5）。',
+      tags: ['places'],
+      security: PUBLIC_SECURITY,
+      parameters: [BBOX_QUERY_PARAMETER, CONTENT_TYPE_QUERY_PARAMETER, LIMIT_QUERY_PARAMETER],
+      responses: {
+        '200': okResponse('PlaceBboxResponse', 'bbox 范围内的地点列表。'),
+        '400': errorResponse('bbox 非法：格式错误 / 反向 / 超范围 / 面积过大。'),
+        '500': errorResponse('服务内部错误。'),
+      },
+    },
+  },
+  '/api/v1/places/{slug}': {
+    get: {
+      operationId: 'getPublicPlace',
+      summary: '公开地点详情',
+      description: '未发布、已归档与不存在统一返回 404。坐标不可信时不返回精确经纬度。',
+      tags: ['places'],
+      security: PUBLIC_SECURITY,
+      parameters: [SLUG_PATH_PARAMETER],
+      responses: {
+        '200': okResponse('ContentPublicResponse', '地点详情（含地址与坐标）。'),
+        '404': errorResponse('地点不存在或未发布。'),
+        '500': errorResponse('服务内部错误。'),
+      },
+    },
+  },
+  '/api/v1/routes/{slug}': {
+    get: {
+      operationId: 'getPublicRoute',
+      summary: '公开路线与有序站点',
+      description:
+        '站点严格按 position 升序返回（策展顺序即内容）。' +
+        '引用的地点缺失时保留序号并置 place=null，不静默丢弃。' +
+        '只有全部站点坐标均可信时才返回 `line`（地图连线），否则为空数组。',
+      tags: ['routes'],
+      security: PUBLIC_SECURITY,
+      parameters: [SLUG_PATH_PARAMETER],
+      responses: {
+        '200': okResponse('RouteResponse', '路线与有序站点。'),
+        '404': errorResponse('路线不存在或未发布。'),
+        '500': errorResponse('服务内部错误。'),
+      },
+    },
+  },
+  '/api/v1/search': {
+    get: {
+      operationId: 'searchPublicContent',
+      summary: '公开关键词检索',
+      description:
+        '查询长度 1–100（短于 2 直接返回空结果）。' +
+        'LIKE 通配符被转义，输入 `%` / `_` 不会退化为全表扫描。' +
+        '无结果时返回 `suggestions`（库中真实存在的热门标签），**不生成任何合成答案**。',
+      tags: ['search'],
+      security: PUBLIC_SECURITY,
+      parameters: [SEARCH_QUERY_PARAMETER, CONTENT_TYPE_QUERY_PARAMETER, LIMIT_QUERY_PARAMETER],
+      responses: {
+        '200': okResponse('SearchResponse', '检索结果与无结果建议。'),
+        '400': errorResponse('查询参数非法（长度超限等）。'),
+        '500': errorResponse('服务内部错误。'),
+      },
+    },
+  },
+  '/api/v1/admin/places/reindex': {
+    post: {
+      operationId: 'reindexPlaces',
+      summary: '重建地点空间索引',
+      description:
+        'R*Tree 是 SQLite 虚表，触发器无法直接写入；写入或更新坐标后需调用本接口刷新。' +
+        '仅 ADMIN 可调用。',
+      tags: ['places'],
+      security: BEARER_SECURITY,
+      parameters: [idempotencyKeyHeader('可选。技术方案 §7.1：写接口支持 Idempotency-Key。')],
+      responses: {
+        '201': okResponse('ReindexResponse', '索引已重建。'),
+        '401': errorResponse('未认证。'),
+        '403': errorResponse('需要 ADMIN 角色。'),
       },
     },
   },
@@ -1610,6 +1942,9 @@ export const openApiDocument: OpenApiDocument = {
   servers: [{ url: '/', description: '同源部署路径（业务接口带 /api/v1 前缀）。' }],
   tags: [
     { name: 'health', description: '存活与就绪探针。' },
+    { name: 'places', description: '地点空间查询（bbox）与坐标核验状态。' },
+    { name: 'routes', description: '路线与有序站点。' },
+    { name: 'search', description: '公开关键词检索。' },
     { name: 'auth', description: '后台认证与会话。' },
     { name: 'contents', description: '内容（地点/人物/事件/建筑/民俗/专题/路线）。' },
     { name: 'sources', description: '史料来源与论断挂载。' },

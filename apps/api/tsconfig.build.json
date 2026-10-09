@@ -2,7 +2,11 @@
   "$schema": "https://json.schemastore.org/tsconfig",
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "./dist/tsconfig.build.tsbuildinfo"
+    // 构建配置：只含 src/，且显式声明 rootDir —— 否则 nest 会把
+    // 相对路径推成 `dist/src/...`，`pnpm start` 的 `dist/main.js` 就找不到。
+    "noEmit": false,
+    "rootDir": "./src"
   },
-  "exclude": ["node_modules", "dist", "coverage", "test", "**/*.spec.ts", "**/*.test.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "coverage", "prisma-test"]
 }

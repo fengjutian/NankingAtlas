@@ -11,6 +11,7 @@ import {
   normalizeRoles,
 } from './users.service.js';
 import { requireUser } from '../../common/auth/auth.guard.js';
+import { ForbiddenError } from '../../common/auth/roles.guard.js';
 import { RequireRoles } from '../../common/auth/roles.decorator.js';
 import { hashPassword } from '../../lib/password.js';
 import { prisma } from '../../lib/prisma.js';
@@ -112,14 +113,14 @@ export class UsersController {
 
     // 规则 1：禁用自己等于自杀式锁号。
     if (body.disabled === true && isSelf) {
-      throw new Error('不能禁用当前登录账号');
+      throw new SelfDisableForbiddenError();
     }
 
     // 规则 2：最后一个启用管理员不能被禁用。
     if (body.disabled === true && target.disabledAt === null) {
       const wasAdmin = target.roles.includes('ADMIN');
       if (wasAdmin && (await this.users.countActiveAdmins()) <= 1) {
-        throw new Error('不能禁用最后一个启用的管理员');
+        throw new LastAdminForbiddenError('禁用');
       }
     }
 
@@ -129,53 +130,77 @@ export class UsersController {
       const losesAdmin = target.roles.includes('ADMIN') && !nextRoles.includes('ADMIN');
       if (losesAdmin && target.disabledAt === null) {
         if ((await this.users.countActiveAdmins()) <= 1) {
-          throw new Error('不能移除最后一个启用管理员的管理员角色');
+          throw new LastAdminForbiddenError('降级');
         }
       }
-      await this.users.setRoles(id, nextRoles);
     }
 
-    if (body.displayName !== undefined) {
-      await prisma.user.update({ where: { id }, data: { displayName: body.displayName } });
-    }
+    // 密码哈希**先算好再进事务** —— argon2 是 CPU 密集的（~50ms），
+    // 放进事务会长时间占着 SQLite 的写锁。
+    const passwordHash =
+      body.password === undefined ? null : await hashPassword(body.password);
 
-    if (body.disabled !== undefined) {
-      await this.users.setDisabled(id, body.disabled);
-      if (body.disabled) {
-        // 禁用即刻撤销所有 refresh token，强制下线。
-        await prisma.refreshToken.updateMany({
+    /**
+     * 角色 / 显示名 / 禁用 / 密码 / 会话撤销 / 审计必须在**同一事务**里。
+     *
+     * 之前是六次独立写：任何一步失败（磁盘满、SQLITE_BUSY、进程退出）都会
+     * 留下"权限已改但没有审计记录"的中间态 —— 而审计是权限变更的追溯依据
+     * （AGENTS.md §5.4）。这里用交互式事务串起来。
+     */
+    await prisma.$transaction(async (tx) => {
+      if (body.roles !== undefined) {
+        await tx.userRoleAssignment.deleteMany({ where: { userId: id } });
+        await tx.userRoleAssignment.createMany({
+          data: normalizeRoles(body.roles).map((role) => ({ userId: id, role })),
+        });
+      }
+
+      const userData: {
+        displayName?: string;
+        disabledAt?: Date | null;
+        passwordHash?: string;
+      } = {};
+      if (body.displayName !== undefined) {
+        userData.displayName = body.displayName;
+      }
+      if (body.disabled !== undefined) {
+        userData.disabledAt = body.disabled ? new Date() : null;
+      }
+      if (passwordHash !== null) {
+        userData.passwordHash = passwordHash;
+      }
+      if (Object.keys(userData).length > 0) {
+        await tx.user.update({ where: { id }, data: userData });
+      }
+
+      // 禁用或改密码后强制下线（撤销所有活跃 refresh token）
+      const shouldRevokeSessions =
+        (body.disabled === true) || passwordHash !== null;
+      if (shouldRevokeSessions) {
+        await tx.refreshToken.updateMany({
           where: { userId: id, revokedAt: null },
           data: { revokedAt: new Date() },
         });
       }
-    }
 
-    if (body.password !== undefined) {
-      const passwordHash = await hashPassword(body.password);
-      await prisma.user.update({ where: { id }, data: { passwordHash } });
-      // 改密码后强制重新登录（所有会话失效）。
-      await prisma.refreshToken.updateMany({
-        where: { userId: id, revokedAt: null },
-        data: { revokedAt: new Date() },
+      await tx.auditLog.create({
+        data: {
+          actorId: actor.id,
+          requestId: req.requestId ?? 'unknown',
+          action: 'admin.user.update',
+          entityType: 'user',
+          entityId: id,
+          beforeJson: JSON.stringify({
+            roles: target.roles,
+            disabledAt: target.disabledAt?.toISOString() ?? null,
+          }),
+          afterJson: JSON.stringify({
+            roles: body.roles ?? target.roles,
+            disabled: body.disabled ?? null,
+            passwordChanged: passwordHash !== null,
+          }),
+        },
       });
-    }
-
-    await prisma.auditLog.create({
-      data: {
-        actorId: actor.id,
-        requestId: req.requestId ?? 'unknown',
-        action: 'admin.user.update',
-        entityType: 'user',
-        entityId: id,
-        beforeJson: JSON.stringify({
-          roles: target.roles,
-          disabledAt: target.disabledAt?.toISOString() ?? null,
-        }),
-        afterJson: JSON.stringify({
-          roles: body.roles ?? target.roles,
-          disabled: body.disabled ?? null,
-        }),
-      },
     });
 
     const updated = await this.users.findById(id);
@@ -195,3 +220,23 @@ export class UsersController {
 }
 
 export { InvalidRoleError };
+
+/**
+ * 管理员不能禁用自己。
+ *
+ * 用业务错误类而非裸 `Error`：裸 Error 落进全局 filter 的兜底分支 →
+ * 500 INTERNAL_ERROR。业务规则失败被记成"服务端故障"，污染 5xx 告警，
+ * 也让前端无法区分"操作被拒"与"系统坏了"。
+ */
+export class SelfDisableForbiddenError extends ForbiddenError {
+  constructor() {
+    super('不能禁用当前登录账号');
+  }
+}
+
+/** 不能禁用 / 降级最后一个启用的管理员（否则系统会被锁死）。 */
+export class LastAdminForbiddenError extends ForbiddenError {
+  constructor(operation: string) {
+    super(`不能${operation}最后一个启用的管理员`);
+  }
+}

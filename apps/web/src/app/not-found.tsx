@@ -1,7 +1,5 @@
 import Link from 'next/link';
 
-import type { Route } from 'next';
-
 export default function NotFound() {
   return (
     <div className="shell" aria-labelledby="nf-title">
@@ -11,16 +9,16 @@ export default function NotFound() {
       </p>
       <ul role="list" className="error-actions">
         <li>
-          <Link href={'/chronicle' as Route}>浏览文化志</Link>
+          <Link href={'/chronicle'}>浏览文化志</Link>
         </li>
         <li>
-          <Link href={'/living' as Route}>浏览生活录</Link>
+          <Link href={'/living'}>浏览生活录</Link>
         </li>
         <li>
-          <Link href={'/search' as Route}>全站检索</Link>
+          <Link href={'/search'}>全站检索</Link>
         </li>
         <li>
-          <Link href={'/' as Route}>返回首页</Link>
+          <Link href={'/'}>返回首页</Link>
         </li>
       </ul>
     </div>

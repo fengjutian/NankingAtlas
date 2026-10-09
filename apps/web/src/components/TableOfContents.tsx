@@ -6,7 +6,13 @@ import type { TocEntry } from '@/lib/seo';
  * 锚点由 `injectHeadingIds` 写入正文 `<h2>/<h3>`，两侧 id 同源，
  * 因此不会出现"目录能点但正文没锚点"的死链。
  */
-export function TableOfContents({ entries, headingId }: { readonly entries: readonly TocEntry[]; readonly headingId: string }) {
+export function TableOfContents({
+  entries,
+  headingId,
+}: {
+  readonly entries: readonly TocEntry[];
+  readonly headingId: string;
+}) {
   if (entries.length === 0) return null;
 
   return (

@@ -403,7 +403,8 @@ export class ContentService {
         if (AFFECTS_PUBLIC_VISIBILITY.has(decision.action)) {
           const result = await triggerRevalidation({
             paths: revalidationPathsFor({ slug: existing.slug, type: existing.type }),
-            reason: `content.${decision.action.toLowerCase()}`,
+            slug: existing.slug,
+            type: existing.type,
           });
           if (!result.ok) {
             // 失败进入重试由运维处理；这里不抛，避免影响发布结果

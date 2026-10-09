@@ -1,5 +1,8 @@
 import Link from 'next/link';
 
+import type { RenderedArticle, TocEntry } from '@/lib/seo';
+import type { Route } from 'next';
+
 import { ArticleBody } from '@/components/ArticleBody';
 import { CorrectionNotice } from '@/components/CorrectionNotice';
 import { JsonLdScript } from '@/components/JsonLdScript';
@@ -9,10 +12,15 @@ import { SourceList } from '@/components/SourceList';
 import { TableOfContents } from '@/components/TableOfContents';
 import { TypeBadge } from '@/components/TypeBadge';
 import { TypeFacts } from '@/components/TypeFacts';
-import { formatDateZh, type ContentRelation, type PublicContent, type PublicMedia, type PublicSource, type RouteStop, type TypeFact } from '@/lib/types';
-
-import type { RenderedArticle, TocEntry } from '@/lib/seo';
-import type { Route } from 'next';
+import {
+  formatDateZh,
+  type ContentRelation,
+  type PublicContent,
+  type PublicMedia,
+  type PublicSource,
+  type RouteStop,
+  type TypeFact,
+} from '@/lib/types';
 
 export interface ArchiveTemplateProps {
   readonly content: PublicContent;
@@ -35,14 +43,25 @@ export interface ArchiveTemplateProps {
  * 标题层级固定为 h1 → h2（正文内标题由编辑器控制为 h2/h3），不跳级。
  */
 export function ArchiveTemplate(props: ArchiveTemplateProps) {
-  const { content, article, toc, sources, relations, media, facts, stops, backHref, backLabel, jsonLd } =
-    props;
+  const {
+    content,
+    article,
+    toc,
+    sources,
+    relations,
+    media,
+    facts,
+    stops,
+    backHref,
+    backLabel,
+    jsonLd,
+  } = props;
   const published = formatDateZh(content.publishedAt);
 
   return (
     <article className="archive">
       <nav className="archive__breadcrumb" aria-label="面包屑">
-        <Link href={backHref as Route}>{backLabel}</Link>
+        <Link href={backHref}>{backLabel}</Link>
       </nav>
 
       <header className="archive__header">
@@ -70,9 +89,14 @@ export function ArchiveTemplate(props: ArchiveTemplateProps) {
           <h2 id="archive-stops">站点顺序</h2>
           <ol className="route-stops" role="list">
             {stops.map((stop) => (
-              <li key={`${stop.position}-${stop.placeSlug ?? stop.placeTitle ?? ''}`} className="route-stops__item">
+              <li
+                key={`${stop.position}-${stop.placeSlug ?? stop.placeTitle ?? ''}`}
+                className="route-stops__item"
+              >
                 <span className="route-stops__position">第 {stop.position + 1} 站</span>
-                {stop.placeSlug !== null && stop.placeSlug !== undefined && stop.placeSlug !== '' ? (
+                {stop.placeSlug !== null &&
+                stop.placeSlug !== undefined &&
+                stop.placeSlug !== '' ? (
                   <Link href={`/places/${stop.placeSlug}` as Route}>
                     {stop.placeTitle ?? stop.placeSlug}
                   </Link>

@@ -24,7 +24,7 @@ export function seedDatabase(): void {
     env: {
       ...process.env,
       // seed 内部用相对 schema.prisma 解析路径，这里给绝对路径最稳
-      DATABASE_URL: process.env['DATABASE_URL'] ?? '',
+      DATABASE_URL: process.env.DATABASE_URL ?? '',
     },
   });
 }

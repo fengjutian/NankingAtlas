@@ -15,8 +15,12 @@ export const REQUEST_ID_KEY = 'requestId' as const;
  * 读取请求头（默认 `x-request-id`）作为 request id；
  * - 缺省或格式非法时由 crypto.randomBytes 生成 16 字节 base64url。
  * - 透传同名响应头，便于客户端排错。
- * - 写入 res.locals.requestId 供 controller / logger / error filter 读取；
- *   用 res.locals 而不是 req 字段，避免改动 express 的 Request 类型（AGENTS.md §6.1）。
+ * - **同时写入 `req.requestId` 与 `res.locals.requestId`**：
+ *   controller、异常过滤器、审计日志都读 `req.requestId`，
+ *   只有 pino 的 customProps 读 `res.locals`。只写一处会让另一处恒为
+ *   `undefined`，错误体与 audit_logs 的 requestId 永远是 'unknown'，
+ *   排障时无法把客户端报障与日志对上。
+ * - `req.requestId` 的类型声明在 `common/auth/auth.guard.ts`。
  */
 @Injectable()
 export class RequestIdMiddleware implements NestMiddleware {
@@ -38,6 +42,7 @@ export class RequestIdMiddleware implements NestMiddleware {
     }
 
     res.locals[REQUEST_ID_KEY] = id;
+    req.requestId = id;
 
     next();
   }

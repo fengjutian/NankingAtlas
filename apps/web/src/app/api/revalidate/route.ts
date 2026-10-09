@@ -120,9 +120,15 @@ function detailPathFor(type: string, slug: string): string {
 }
 
 /** GET 不提供任何缓存操作能力。 */
-export async function GET(): Promise<Response> {
+export function GET(): Response {
   return Response.json(
-    { error: { code: 'METHOD_NOT_ALLOWED', message: '仅支持 POST。', requestId: crypto.randomUUID() } },
+    {
+      error: {
+        code: 'METHOD_NOT_ALLOWED',
+        message: '仅支持 POST。',
+        requestId: crypto.randomUUID(),
+      },
+    },
     { status: 405, headers: { allow: 'POST' } },
   );
 }

@@ -1,9 +1,9 @@
 import Link from 'next/link';
 
+import type { Route } from 'next';
+
 import { PAGE_SIZE_OPTIONS, toggleType, withListQuery, type ListQuery } from '@/lib/api';
 import { contentTypeLabel, type ContentType } from '@/lib/types';
-
-import type { Route } from 'next';
 
 export interface ListToolbarProps {
   readonly basePath: string;
@@ -24,7 +24,7 @@ export function ListToolbar({ basePath, query, allowedTypes }: ListToolbarProps)
         筛选
       </h2>
 
-      <form className="toolbar__form" role="search" method="get" action={basePath as Route}>
+      <form className="toolbar__form" role="search" method="get" action={basePath}>
         <div className="toolbar__field">
           <label className="toolbar__label" htmlFor="toolbar-keyword">
             关键词
@@ -66,10 +66,10 @@ export function ListToolbar({ basePath, query, allowedTypes }: ListToolbarProps)
       </form>
 
       <nav className="toolbar__facets" aria-label="按内容类型筛选">
-      <ul role="list">
+        <ul role="list">
           <li>
             <Link
-              href={withListQuery(basePath, toggleType(query, null)) as Route}
+              href={withListQuery(basePath, toggleType(query, null))}
               aria-current={query.type === null ? 'page' : undefined}
               className="chip"
             >

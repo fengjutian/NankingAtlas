@@ -1,8 +1,4 @@
-import {
-  SOURCE_KIND_LABELS,
-  isSourceKind,
-  type PublicSource,
-} from '@/lib/types';
+import { SOURCE_KIND_LABELS, isSourceKind, type PublicSource } from '@/lib/types';
 
 export interface SourceListProps {
   /** 公开接口是否返回了来源清单；false 时显示降级说明而不是空白。 */

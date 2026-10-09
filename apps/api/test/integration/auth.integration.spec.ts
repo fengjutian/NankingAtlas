@@ -1,13 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import {
-  closeTestApp,
-  createTestApp,
-  prisma,
-  request,
-  serverOf,
-} from '../../../test/app-harness.js';
-import { hashPassword } from '../../lib/password.js';
+import { hashPassword } from '../../src/lib/password.js';
+import { closeTestApp, createTestApp, prisma, request, serverOf } from '../app-harness.js';
 
 import type { INestApplication } from '@nestjs/common';
 
@@ -321,7 +315,7 @@ describe('rate limiting', () => {
 
     // 动态 import 会重新执行 auth.controller.ts，此时读到 limit=3。
     const strictApp = await (async () => {
-      const { createTestApp: create } = await import('../../../test/app-harness.js');
+      const { createTestApp: create } = await import('../app-harness.js');
       return create();
     })();
 

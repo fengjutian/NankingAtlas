@@ -31,7 +31,6 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  lang: 'zh-CN',
   width: 'device-width',
   initialScale: 1,
 };

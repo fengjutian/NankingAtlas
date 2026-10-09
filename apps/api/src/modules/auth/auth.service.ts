@@ -1,3 +1,5 @@
+import { createHmac } from 'node:crypto';
+
 import { Inject, Injectable } from '@nestjs/common';
 
 import { env } from '../../lib/env.js';
@@ -88,8 +90,11 @@ export class AuthService {
         actorId: null,
         requestId: ctx.requestId,
         action: 'auth.login.failed',
-        entityType: 'user',
-        entityId: email.trim().toLowerCase(),
+        // entity_id 存的是**匿名化**标识，不是明文邮箱。
+        // 本文件对 IP 已经用 hashIp 匿名化；若把邮箱原样留库，
+        // 一次撞库失败就会把对方邮箱永久写进审计表 —— 与自身的
+        // 匿名化原则相反。entity_type 保持 'user' 以便按类型检索。
+        entityId: hashIdentifier(email.trim().toLowerCase()),
         beforeJson: null,
         afterJson: null,
         ipHash: ctx.ip === null ? null : hashIp(ctx.ip),
@@ -246,6 +251,18 @@ export class AuthService {
    *
    * `revokeTokenId` 为 null 表示首次签发；否则撤销指定 token 的**主键 id** 后发新的。
    * 整个过程在一个事务里，避免"旧 token 已撤销但新 token 没发出去"。
+   *
+   * ## 并发安全（重放检测的关键）
+   *
+   * 撤销用 `updateMany({ where: { id, revokedAt: null } })` 而不是
+   * `update({ where: { id } })`：
+   *   - `update` 无条件覆盖 `revokedAt`。同一个 cookie 并发发两次刷新时，
+   *     两个请求都读到 `revokedAt = null`（各自的事务快照），
+   *     都会"成功"撤销并各自发一个新 token —— 一次重放换出两个会话，
+   *     重放检测只在**串行**二次刷新时才生效。
+   *   - `updateMany` 的 WHERE 带 `revokedAt: null`，第二个并发请求
+   *     匹配不到行，`count === 0` 即说明 token 已被别处使用 → 判定为重放，
+   *     撤销该用户整条会话链。
    */
   private async rotateRefreshToken(
     revokeTokenId: string | null,
@@ -258,10 +275,31 @@ export class AuthService {
 
     await prisma.$transaction(async (tx) => {
       if (revokeTokenId !== null) {
-        await tx.refreshToken.update({
-          where: { id: revokeTokenId },
+        const revoked = await tx.refreshToken.updateMany({
+          where: { id: revokeTokenId, revokedAt: null },
           data: { revokedAt: new Date() },
         });
+        if (revoked.count !== 1) {
+          // 已被并发请求撤销 → 这就是重放。
+          // 撤销该用户全部活跃会话，强制重新登录。
+          await tx.refreshToken.updateMany({
+            where: { userId: user.id, revokedAt: null },
+            data: { revokedAt: new Date() },
+          });
+          await tx.auditLog.create({
+            data: {
+              actorId: user.id,
+              requestId: ctx.requestId,
+              action: 'auth.refresh.reuse_detected',
+              entityType: 'user',
+              entityId: user.id,
+              beforeJson: null,
+              afterJson: null,
+              ipHash: ctx.ip === null ? null : hashIp(ctx.ip),
+            },
+          });
+          throw new AuthError('TOKEN_REVOKED', 'refresh token 已失效，请重新登录');
+        }
       }
       await tx.refreshToken.create({
         data: {
@@ -288,7 +326,22 @@ export class AuthService {
     };
   }
 
-  /** 审计写入（SQLite 下 JSON 列为 TEXT）。 */
+  /**
+ * 匿名化标识符。
+ *
+ * 用于审计日志里"用户还没登录，但我们知道是谁尝试登录"的场景。
+ * 与 `hashIp` 同理：用 secret 做 HMAC 而不是裸 sha256，
+ * 否则攻击者拿常见邮箱列表就能离线比对反查。
+ * 域前缀区分用途，避免同一个值在不同语义间被关联。
+ */
+export function hashIdentifier(value: string): string {
+  return createHmac('sha256', env.AUTH_ACCESS_SECRET)
+    .update('identifier:')
+    .update(value)
+    .digest('hex');
+}
+
+/** 审计写入（SQLite 下 JSON 列为 TEXT）。 */
   private async writeAudit(entry: {
     actorId: string | null;
     requestId: string;

@@ -42,7 +42,10 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['src/**/*.integration.spec.ts'],
+    // 集成测试放在 apps/api/test/integration/ 而不是 src/ 下 ——
+    // 放在 src/ 会被 tsconfig.build.json 的 include 捕获，导致
+    // `nest build` 因 rootDir 越界（TS6059）失败。
+    include: ['test/integration/**/*.integration.spec.ts'],
     globalSetup: ['./test/global-setup.ts'],
     fileParallelism: false,
     testTimeout: 30_000,

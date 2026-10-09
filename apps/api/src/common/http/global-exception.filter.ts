@@ -18,8 +18,13 @@ import {
   ContentVersionConflictError,
   PublicationNotReadyError,
 } from '../../modules/contents/content.service.js';
-import { UserNotFoundError, InvalidRoleError } from '../../modules/users/users.service.js';
 import { PublicContentNotFoundError } from '../../modules/homepage/public-content.controller.js';
+import {
+  QueryValidationError,
+  RouteNotFoundError,
+} from '../../modules/places/places-search.controller.js';
+import { UserNotFoundError, InvalidRoleError } from '../../modules/users/users.service.js';
+import { PasswordPolicyError } from '../../lib/password.js';
 import { UnauthorizedError } from '../auth/auth.guard.js';
 import { ForbiddenError } from '../auth/roles.guard.js';
 
@@ -110,6 +115,18 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         body: wrap('VALIDATION_FAILED', exception.message, requestId),
       };
     }
+    // ---- 地图 / 搜索查询（P3）----
+    if (exception instanceof QueryValidationError) {
+      return {
+        status: HttpStatus.BAD_REQUEST,
+        body: wrap('VALIDATION_FAILED', '查询参数校验失败', requestId, {
+          issues: exception.issues,
+        }),
+      };
+    }
+    if (exception instanceof RouteNotFoundError) {
+      return { status: HttpStatus.NOT_FOUND, body: wrap('NOT_FOUND', '路线不存在', requestId) };
+    }
 
     // ---- 乐观锁冲突（AGENTS.md §5.5：版本冲突返回 409，禁止静默覆盖）----
     if (exception instanceof ContentVersionConflictError) {
@@ -145,6 +162,16 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       };
     }
 
+    // ---- 密码强度（P1-02）----
+    // 密码太短是**用户输入问题**（400），不是服务端故障（500）。
+    // 不映射的话会被记成 5xx，污染告警并让前端无法区分原因。
+    if (exception instanceof PasswordPolicyError) {
+      return {
+        status: HttpStatus.BAD_REQUEST,
+        body: wrap('VALIDATION_FAILED', exception.message, requestId),
+      };
+    }
+
     // ---- Tiptap 文档白名单（P1-06）----
     // 客户端提交了 script / javascript: 等被禁内容 —— 这是**用户的输入错误**
     // 不是服务端故障，所以映射成 400 并回传具体路径，便于编辑器高亮问题节点。
@@ -169,6 +196,17 @@ export class GlobalExceptionFilter implements ExceptionFilter {
           ? String(raw.message)
           : exception.message;
       return { status, body: wrap(httpStatusToCode(status), message, requestId) };
+    }
+
+    // ---- body-parser 的 PayloadTooLargeError ----
+    // 它来自 http-errors 而不是 @nestjs/common，`instanceof HttpException` 抓不到，
+    // 会一路掉进下面的兜底分支变成 500 —— 客户端发了个超大 body 却被记成服务端
+    // 故障，污染 5xx 告警与错误率。按 http-errors 的契约字段识别并归到 413。
+    if (isPayloadTooLarge(exception)) {
+      return {
+        status: HttpStatus.PAYLOAD_TOO_LARGE,
+        body: wrap('PAYLOAD_TOO_LARGE', '请求体过大，请减小提交内容后重试', requestId),
+      };
     }
 
     // ---- 未知异常：不泄露细节 ----
@@ -234,6 +272,8 @@ function httpStatusToCode(status: number): string {
       return 'NOT_FOUND';
     case 409:
       return 'CONFLICT';
+    case 413:
+      return 'PAYLOAD_TOO_LARGE';
     case 422:
       return 'UNPROCESSABLE_ENTITY';
     case 429:
@@ -243,4 +283,25 @@ function httpStatusToCode(status: number): string {
     default:
       return status >= 500 ? 'INTERNAL_ERROR' : 'REQUEST_FAILED';
   }
+}
+
+/**
+ * 是否是 body-parser 抛出的"请求体过大"。
+ *
+ * 两种判据都指向同一件事：
+ *   - `type === 'entity.too.large'`：http-errors 的标准类型标识
+ *   - `status` / `statusCode === 413`：语义等价，兜住 http-errors 字段变动
+ *
+ * 不用 `instanceof`：body-parser 与 @nestjs/common 各带一份 http-errors 实例，
+ * instanceof 跨包不可靠。
+ */
+function isPayloadTooLarge(exception: unknown): boolean {
+  if (typeof exception !== 'object' || exception === null) {
+    return false;
+  }
+  const record = exception as { type?: unknown; status?: unknown; statusCode?: unknown };
+  if (record.type === 'entity.too.large') {
+    return true;
+  }
+  return record.status === 413 || record.statusCode === 413;
 }

@@ -92,13 +92,27 @@ describe('媒体准入（版权与可访问性）', () => {
 });
 
 describe('坐标展示规则', () => {
-  it('allows precise coordinates only for EXACT and APPROXIMATE', () => {
+  it('allows precise coordinates only for EXACT + VERIFIED', () => {
+    expect(canShowExactCoordinates('EXACT', 'VERIFIED')).toBe(true);
+    // APPROXIMATE 只是"近似值"，尚未核验完成 → 不展示精确点
+    expect(canShowExactCoordinates('APPROXIMATE', 'VERIFIED')).toBe(false);
+    expect(canShowExactCoordinates('AREA_ONLY', 'VERIFIED')).toBe(false);
+    expect(canShowExactCoordinates('UNKNOWN', 'VERIFIED')).toBe(false);
+    expect(canShowExactCoordinates(null, 'VERIFIED')).toBe(false);
+    expect(canShowExactCoordinates(undefined, 'VERIFIED')).toBe(false);
+  });
+
+  it('requires VERIFIED even when accuracy is EXACT', () => {
+    for (const status of ['UNVERIFIED', 'PARTIAL', 'DISPUTED'] as const) {
+      expect(canShowExactCoordinates('EXACT', status)).toBe(false);
+    }
+  });
+
+  it('falls back to accuracy-only when verification status is absent', () => {
     expect(canShowExactCoordinates('EXACT')).toBe(true);
-    expect(canShowExactCoordinates('APPROXIMATE')).toBe(true);
-    expect(canShowExactCoordinates('AREA_ONLY')).toBe(false);
+    expect(canShowExactCoordinates('APPROXIMATE')).toBe(false);
     expect(canShowExactCoordinates('UNKNOWN')).toBe(false);
-    expect(canShowExactCoordinates(null)).toBe(false);
-    expect(canShowExactCoordinates(undefined)).toBe(false);
+    expect(canShowExactCoordinates(null, null)).toBe(false);
   });
 
   it('formats valid coordinates and rejects unusable ones', () => {
@@ -111,10 +125,9 @@ describe('坐标展示规则', () => {
 
 describe('buildTypeFacts', () => {
   it('shows coordinates only when the accuracy supports them', () => {
-    const facts = buildTypeFacts(
-      content({ type: 'PLACE' }),
-      { place: { lon: 118.78, lat: 32.06, accuracy: 'EXACT', verificationStatus: 'VERIFIED' } },
-    );
+    const facts = buildTypeFacts(content({ type: 'PLACE' }), {
+      place: { lon: 118.78, lat: 32.06, accuracy: 'EXACT', verificationStatus: 'VERIFIED' },
+    });
     expect(facts.find((fact) => fact.label === '经纬度')?.value).toBe(
       '32.06000, 118.78000（纬度, 经度）',
     );
@@ -122,10 +135,9 @@ describe('buildTypeFacts', () => {
 
   it('suppresses precise coordinates for UNKNOWN and AREA_ONLY', () => {
     for (const accuracy of ['UNKNOWN', 'AREA_ONLY'] as const) {
-      const facts = buildTypeFacts(
-        content({ type: 'PLACE' }),
-        { place: { lon: 118.78, lat: 32.06, accuracy } },
-      );
+      const facts = buildTypeFacts(content({ type: 'PLACE' }), {
+        place: { lon: 118.78, lat: 32.06, accuracy },
+      });
       expect(facts.find((fact) => fact.label === '经纬度')?.value).toBe('暂不展示');
     }
   });
@@ -142,10 +154,9 @@ describe('buildTypeFacts', () => {
   });
 
   it('formats route duration, distance and stop count', () => {
-    const facts = buildTypeFacts(
-      content({ type: 'ROUTE' }),
-      { route: { durationMinutes: 75, distanceMeters: 2500, stops: [{ position: 0 }] } },
-    );
+    const facts = buildTypeFacts(content({ type: 'ROUTE' }), {
+      route: { durationMinutes: 75, distanceMeters: 2500, stops: [{ position: 0 }] },
+    });
     expect(facts.find((fact) => fact.label === '建议时长')?.value).toBe('75 分钟');
     expect(facts.find((fact) => fact.label === '路线长度')?.value).toBe('2.5 公里');
     expect(facts.find((fact) => fact.label === '站点数量')?.value).toBe('1 站');
@@ -163,9 +174,9 @@ describe('buildTypeFacts', () => {
       )?.value,
     ).toBe('YEAR');
     expect(
-      buildTypeFacts(content({ type: 'ARCHITECTURE' }), { architecture: { heritageLevel: '市级' } }).find(
-        (fact) => fact.label === '保护级别',
-      )?.value,
+      buildTypeFacts(content({ type: 'ARCHITECTURE' }), {
+        architecture: { heritageLevel: '市级' },
+      }).find((fact) => fact.label === '保护级别')?.value,
     ).toBe('市级');
     expect(
       buildTypeFacts(content({ type: 'TRADITION' }), { tradition: { traditionType: '节令' } }).find(

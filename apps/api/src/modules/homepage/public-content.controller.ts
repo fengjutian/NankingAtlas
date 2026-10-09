@@ -2,10 +2,10 @@ import { Body, Controller, Get, Inject, Param, Patch, Req } from '@nestjs/common
 import { type Request } from 'express';
 import { z } from 'zod';
 
-import { Public, RequireRoles } from '../../common/auth/roles.decorator.js';
-import { requireUser } from '../../common/auth/auth.guard.js';
-import { prisma } from '../../lib/prisma.js';
 import { HOMEPAGE_SLOT_KEYS, HomepageService } from './homepage.service.js';
+import { requireUser } from '../../common/auth/auth.guard.js';
+import { Public, RequireRoles } from '../../common/auth/roles.decorator.js';
+import { prisma } from '../../lib/prisma.js';
 
 /**
  * 公开读接口与首页槽位配置（P2-01 / P2-02）。
@@ -110,7 +110,7 @@ export class PublicContentController {
       where: { slug },
       select: PUBLIC_DETAIL_SELECT,
     });
-    if (content === null || content.status !== 'PUBLISHED' || content.archivedAt !== null) {
+    if (content?.status !== 'PUBLISHED' || content.archivedAt !== null) {
       // 未发布/不存在统一 404，不泄露"存在但未发布"
       throw new PublicContentNotFoundError(slug);
     }

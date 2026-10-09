@@ -13,7 +13,12 @@
  * 3. 域名未配置时不编造 canonical 主机名（PRD §19「P2 前：正式域名」仍是未决项）。
  */
 
-import { extractPlainText, parseTiptapDocument, renderTiptapToSafeHtml } from '@nanking-atlas/validation';
+import {
+  extractPlainText,
+  parseTiptapDocument,
+  renderTiptapToSafeHtml,
+} from '@nanking-atlas/validation';
+import type { TiptapDocument, TiptapNode } from '@nanking-atlas/validation';
 
 import {
   buildExcerpt,
@@ -27,7 +32,6 @@ import {
 } from './types';
 
 import type { Metadata } from 'next';
-import type { TiptapDocument, TiptapNode } from '@nanking-atlas/validation';
 
 export const SITE_NAME = '金陵风物志';
 export const SITE_LANG = 'zh-CN';
@@ -40,7 +44,7 @@ const DESCRIPTION_MAX = 150;
 
 /** 站点主机名：仅在显式配置后使用，未配置返回 null（不编造域名）。 */
 export function siteOrigin(): string | null {
-  const raw = process.env['NEXT_PUBLIC_SITE_URL'];
+  const raw = process.env.NEXT_PUBLIC_SITE_URL;
   if (typeof raw !== 'string' || raw === '') return null;
   return raw.replace(/\/+$/, '');
 }
@@ -178,15 +182,16 @@ export function slugifyHeading(text: string): string {
 const SAFE_ID = /^[a-z0-9一-鿿-]+$/;
 
 function headingLevel(node: TiptapNode): number {
-  const level = node.attrs?.['level'];
-  if (typeof level === 'number' && Number.isInteger(level) && level >= 1 && level <= 6) return level;
+  const level = node.attrs?.level;
+  if (typeof level === 'number' && Number.isInteger(level) && level >= 1 && level <= 6)
+    return level;
   return 2;
 }
 
 function nodeText(node: TiptapNode): string {
   if (node.text !== undefined) return node.text;
   if (node.type === 'image') {
-    const alt = node.attrs?.['alt'];
+    const alt = node.attrs?.alt;
     return typeof alt === 'string' ? alt : '';
   }
   return (node.content ?? []).map(nodeText).join('');
@@ -370,9 +375,7 @@ function buildPlaceJsonLd(
     inLanguage: content.language === 'EN' ? 'en' : SITE_LANG,
     ...(address !== null ? { address } : {}),
     // 未核验 / 仅区域级 / 未通过核验的坐标一律不进入结构化数据。
-    ...(showGeo
-      ? { geo: { '@type': 'GeoCoordinates', longitude: lon, latitude: lat } }
-      : {}),
+    ...(showGeo ? { geo: { '@type': 'GeoCoordinates', longitude: lon, latitude: lat } } : {}),
     ...(isValidIsoDate(content.publishedAt) ? { datePublished: content.publishedAt } : {}),
   };
 }

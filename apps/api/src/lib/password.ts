@@ -38,6 +38,20 @@ const MAX_PASSWORD_BYTES = 1024;
 const MIN_PASSWORD_LENGTH = 12;
 
 /**
+ * 密码不符合强度要求。
+ *
+ * 独立错误类而非裸 `Error`：裸 Error 会落进全局 filter 的兜底分支 →
+ * 500 INTERNAL_ERROR。密码太短是**用户输入问题**（400），不是服务端故障。
+ * `POST /admin/users` 与 `PATCH /admin/users/:id` 都能触发。
+ */
+export class PasswordPolicyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PasswordPolicyError';
+  }
+}
+
+/**
  * 密码复杂度校验。
  *
  * 明确不强制"必须混合大小写+数字+符号"这类组合规则（现代指南倾向长度优先），
@@ -45,13 +59,13 @@ const MIN_PASSWORD_LENGTH = 12;
  */
 export function assertPasswordAcceptable(password: string): void {
   if (password.length < MIN_PASSWORD_LENGTH) {
-    throw new Error(`密码至少需要 ${String(MIN_PASSWORD_LENGTH)} 个字符`);
+    throw new PasswordPolicyError(`密码至少需要 ${String(MIN_PASSWORD_LENGTH)} 个字符`);
   }
   if (password.trim().length === 0) {
-    throw new Error('密码不能为空白');
+    throw new PasswordPolicyError('密码不能为空白');
   }
   if (Buffer.byteLength(password, 'utf8') > MAX_PASSWORD_BYTES) {
-    throw new Error(`密码不能超过 ${String(MAX_PASSWORD_BYTES)} 字节`);
+    throw new PasswordPolicyError(`密码不能超过 ${String(MAX_PASSWORD_BYTES)} 字节`);
   }
 }
 

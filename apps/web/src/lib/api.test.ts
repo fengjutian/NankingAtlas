@@ -73,7 +73,14 @@ describe('失败映射', () => {
 
   it('exposes a message for every failure reason', async () => {
     const { failureMessage } = await loadApi('http://localhost:4000');
-    for (const reason of ['unconfigured', 'network', 'not_found', 'forbidden', 'http_error', 'invalid_payload'] as const) {
+    for (const reason of [
+      'unconfigured',
+      'network',
+      'not_found',
+      'forbidden',
+      'http_error',
+      'invalid_payload',
+    ] as const) {
       expect(failureMessage(reason)).not.toBe('');
     }
   });
@@ -92,7 +99,7 @@ describe('失败映射', () => {
     const api = await loadApi('http://localhost:4000');
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () =>
+      vi.fn(() =>
         jsonResponse(
           { error: { code: 'CONTENT_NOT_FOUND', message: 'x', requestId: 'req-1' } },
           404,
@@ -111,7 +118,7 @@ describe('失败映射', () => {
     const api = await loadApi('http://localhost:4000');
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => {
+      vi.fn(() => {
         throw new Error('ECONNREFUSED');
       }),
     );
@@ -122,7 +129,10 @@ describe('失败映射', () => {
 
   it('rejects a payload that violates the public contract', async () => {
     const api = await loadApi('http://localhost:4000');
-    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ data: [{ id: 1 }] })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => jsonResponse({ data: [{ id: 1 }] })),
+    );
     const result = await api.getPublishedContentBySlug('x');
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.reason).toBe('invalid_payload');
@@ -141,7 +151,10 @@ describe('失败映射', () => {
       language: 'ZH',
       publishedAt: '2026-10-09T00:00:00.000Z',
     };
-    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ data: [row] })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => jsonResponse({ data: [row] })),
+    );
     const result = await api.listPublishedContents({ limit: 1 });
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -169,7 +182,10 @@ describe('失败映射', () => {
       verificationStatus: 'PARTIAL',
       internalNote: '不得外泄',
     };
-    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ data: row })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => jsonResponse({ data: row })),
+    );
     const result = await api.getPlaceBySlug('a-slug');
     expect(result.ok).toBe(true);
     if (result.ok) {
@@ -193,7 +209,10 @@ describe('失败映射', () => {
       lon: '118.78',
       accuracy: 'SUPER_EXACT',
     };
-    vi.stubGlobal('fetch', vi.fn(async () => jsonResponse({ data: row })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => jsonResponse({ data: row })),
+    );
     const result = await api.getPlaceBySlug('a-slug');
     // 契约违例不做"猜测式"降级：整条载荷判为无效，避免字符串坐标进入展示路径。
     expect(result.ok).toBe(false);
@@ -255,7 +274,9 @@ describe('筛选 / 分页的 URL 序列化', () => {
 
   it('builds a shareable path', async () => {
     const { withListQuery, serializeListQuery } = await loadApi(null);
-    expect(withListQuery('/chronicle', { type: null, q: '', page: 1, pageSize: 20 })).toBe('/chronicle');
+    expect(withListQuery('/chronicle', { type: null, q: '', page: 1, pageSize: 20 })).toBe(
+      '/chronicle',
+    );
     expect(withListQuery('/living', { type: 'PLACE', q: '', page: 1, pageSize: 20 })).toBe(
       `/living?${serializeListQuery({ type: 'PLACE', q: '', page: 1, pageSize: 20 })}`,
     );
@@ -267,7 +288,12 @@ describe('筛选 / 分页的 URL 序列化', () => {
     expect(toggleType(current, 'PLACE').page).toBe(1);
     expect(toggleType(current, 'PLACE').type).toBe('PLACE');
     expect(toggleType({ ...current, type: 'PLACE' }, 'PLACE').type).toBeNull();
-    expect(setKeyword(current, '  秦淮  ')).toEqual({ type: null, q: '秦淮', page: 1, pageSize: 20 });
+    expect(setKeyword(current, '  秦淮  ')).toEqual({
+      type: null,
+      q: '秦淮',
+      page: 1,
+      pageSize: 20,
+    });
     expect(setPageSize(current, 50).pageSize).toBe(50);
     expect(setPage(current, 0).page).toBe(1);
   });
@@ -321,9 +347,9 @@ describe('签名 revalidation', () => {
     const { signRevalidationPayload, verifyRevalidationSignature } = await loadApi(null);
     const timestamp = String(now);
     const signature = signRevalidationPayload(timestamp, body, secret);
-    expect(
-      verifyRevalidationSignature({ timestamp, signature, body, secret, nowMs: now }),
-    ).toEqual({ ok: true });
+    expect(verifyRevalidationSignature({ timestamp, signature, body, secret, nowMs: now })).toEqual(
+      { ok: true },
+    );
   });
 
   it('rejects a missing signature or timestamp', async () => {
@@ -412,9 +438,9 @@ describe('签名 revalidation', () => {
     const { signRevalidationPayload, verifyRevalidationSignature } = await loadApi(null);
     const timestamp = String(now);
     const signature = signRevalidationPayload(timestamp, body, 'another-secret');
-    expect(
-      verifyRevalidationSignature({ timestamp, signature, body, secret, nowMs: now }),
-    ).toEqual({ ok: false, reason: 'mismatch' });
+    expect(verifyRevalidationSignature({ timestamp, signature, body, secret, nowMs: now })).toEqual(
+      { ok: false, reason: 'mismatch' },
+    );
   });
 
   it('honours a custom tolerance window', async () => {
@@ -422,10 +448,24 @@ describe('签名 revalidation', () => {
     const timestamp = String(now - 5_000);
     const signature = signRevalidationPayload(timestamp, body, secret);
     expect(
-      verifyRevalidationSignature({ timestamp, signature, body, secret, nowMs: now, toleranceMs: 10_000 }),
+      verifyRevalidationSignature({
+        timestamp,
+        signature,
+        body,
+        secret,
+        nowMs: now,
+        toleranceMs: 10_000,
+      }),
     ).toEqual({ ok: true });
     expect(
-      verifyRevalidationSignature({ timestamp, signature, body, secret, nowMs: now, toleranceMs: 1_000 }),
+      verifyRevalidationSignature({
+        timestamp,
+        signature,
+        body,
+        secret,
+        nowMs: now,
+        toleranceMs: 1_000,
+      }),
     ).toEqual({ ok: false, reason: 'expired' });
   });
 

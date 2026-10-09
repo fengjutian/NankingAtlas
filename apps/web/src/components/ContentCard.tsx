@@ -3,8 +3,6 @@ import Link from 'next/link';
 import { TypeBadge } from '@/components/TypeBadge';
 import { buildExcerpt, detailHref, formatDateZh, type PublicContent } from '@/lib/types';
 
-import type { Route } from 'next';
-
 export interface ContentCardProps {
   readonly content: PublicContent;
   /** 列表页固定 h3（栏目标题为 h2），避免标题层级跳级。 */
@@ -29,7 +27,7 @@ export function ContentCard({ content, headingLevel = 3 }: ContentCardProps) {
         )}
       </p>
       <Heading className="content-card__title">
-        <Link href={href as Route}>{content.title}</Link>
+        <Link href={href}>{content.title}</Link>
       </Heading>
       {content.subtitle !== null && content.subtitle !== '' ? (
         <p className="content-card__subtitle">{content.subtitle}</p>
