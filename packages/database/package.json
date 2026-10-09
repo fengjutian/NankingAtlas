@@ -2,7 +2,7 @@
   "name": "@nanking-atlas/database",
   "version": "0.0.0",
   "private": true,
-  "description": "Prisma schema、迁移、seed 与共享类型（占位，schema 在 P1-01 落地）",
+  "description": "Prisma schema、迁移、seed 与共享 Prisma client 单例。仅 apps/api 可导入；web/admin 禁止直连。",
   "license": "UNLICENSED",
   "type": "module",
   "main": "./src/index.ts",
@@ -14,12 +14,20 @@
     "lint": "eslint . --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "prisma:format": "prisma format",
     "clean": "rimraf dist coverage"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0"
   },
   "devDependencies": {
     "@nanking-atlas/eslint-config": "workspace:*",
     "@nanking-atlas/tsconfig": "workspace:*",
     "eslint": "^9.17.0",
+    "prisma": "^5.22.0",
     "rimraf": "^5.0.10",
     "typescript": "^5.6.3",
     "vitest": "^2.1.8"
