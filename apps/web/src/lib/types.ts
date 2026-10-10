@@ -11,6 +11,8 @@
 
 import { z } from 'zod';
 
+import type { Route } from 'next';
+
 // ---------------------------------------------------------------------------
 // 枚举（技术方案 §5.1）
 // ---------------------------------------------------------------------------
@@ -511,8 +513,19 @@ export const CHRONICLE_TYPES: readonly ContentType[] = [
 /** 生活录收录的类型（当代街巷、饮食与日常记录）。 */
 export const LIVING_TYPES: readonly ContentType[] = ['PLACE', 'TOPIC'];
 
-export function detailHref(content: { type: ContentType; slug: string }): string {
-  return `${DETAIL_PATHS[content.type]}/${content.slug}`;
+/**
+ * 详情页路径。
+ *
+ * 返回 `Route` 而非 `string`：项目开了 `typedRoutes`，`<Link href>` 只接受
+ * 已知路由字面量。返回 `string` 会在**干净构建**时报
+ * `Type 'string' is not assignable to type 'UrlObject | RouteImpl<string>'` ——
+ * 该错误此前被 turbo 的 build 缓存掩盖（缓存命中不会重新做类型检查）。
+ *
+ * 这里是模板字符串（类型 + slug 拼接），TS 无法静态证明它是合法路由，
+ * 因此显式断言为 `Route`。断言点集中在此处，避免每个调用点各写一遍。
+ */
+export function detailHref(content: { type: ContentType; slug: string }): Route {
+  return `${DETAIL_PATHS[content.type]}/${content.slug}` as Route;
 }
 
 /** 关键词匹配（列表本地筛选；服务端搜索在 P3 接入）。 */

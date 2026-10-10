@@ -74,6 +74,10 @@ jobs:
         with:
           path: ~/.local/share/pnpm/store
           key: pnpm-store-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+      # 必须自己装：`needs: install` 只保证 pnpm store 缓存已预热，
+      # GitHub Actions 的 job 各自跑在**全新 runner** 上，node_modules 不会跨 job 传递。
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
       - run: pnpm format:check
 
   # ---- 2. ESLint ----
@@ -96,6 +100,8 @@ jobs:
         with:
           path: ~/.local/share/pnpm/store
           key: pnpm-store-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
       - run: pnpm lint
 
   # ---- 3. TypeScript strict ----
@@ -118,6 +124,8 @@ jobs:
         with:
           path: ~/.local/share/pnpm/store
           key: pnpm-store-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
 
   # ---- 4. Unit / integration tests ----
@@ -145,6 +153,8 @@ jobs:
           key: pnpm-store-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
       # P1-01.b 起：生成 Prisma client 并在临时 test.db 上跑 migrate deploy，
       # 验证迁移可在全新数据库上重放（AGENTS.md §7.5）。
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
       - name: Prisma generate
         run: pnpm --filter @nanking-atlas/database prisma:generate
       - name: Prisma migrate deploy (test.db)
@@ -183,6 +193,8 @@ jobs:
         with:
           path: ~/.local/share/pnpm/store
           key: pnpm-store-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
       - name: Build
         # P0 阶段 web 的 build 需要 .env.production 提供 NEXT_PUBLIC_APP_ENV。
         # 这是 Next.js "Collecting page data" 的强制要求。真实部署必须由部署平台注入。
@@ -209,7 +221,59 @@ jobs:
           path: apps/api/dist
           retention-days: 7
 
-  # ---- 6. Dependency scan (P4-02) ----
+  # ---- 6. E2E (P4-03) ----
+  # 技术方案 §15 把「E2E smoke」列为主分支步骤；这里在 PR 上也跑 ——
+  # 门禁只在合入后生效就太晚了（例如「撤回后仍返回 200」这类缺陷
+  # 本来应该在改动它的那个 PR 就被拦下）。
+  e2e:
+    name: E2E (Playwright / chromium)
+    needs: install
+    runs-on: ubuntu-latest
+    # 比 test/build 都长：globalSetup 会重新构建 web，再起两个服务跑浏览器。
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            pnpm-store-${{ runner.os }}-
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Prisma generate
+        run: pnpm --filter @nanking-atlas/database prisma:generate
+      # --with-deps 装 Chromium 需要的系统库（ubuntu runner 缺 libnss3 等）。
+      # Playwright 浏览器缓存在 ~/.cache/ms-playwright，用 actions/cache 复用，
+      # 否则每个 PR 都要重新下 ~440 MB。
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+      # E2E 用独立库 e2e/e2e.db（由 globalSetup 在空库上跑真实迁移建出），
+      # 不复用 test.db，也不污染 dev.db。
+      - name: Run E2E
+        run: pnpm test:e2e
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
+
+  # ---- 7. Dependency scan (P4-02) ----
   # 技术方案 §15 要求每个 PR 跑 dependency scan。
   #
   # 只卡 **生产依赖**（--prod）：dev 依赖里的高危（@nestjs/cli 链上的 glob/braces/tmp、
@@ -235,10 +299,12 @@ jobs:
         with:
           path: ~/.local/share/pnpm/store
           key: pnpm-store-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
       - name: Audit production dependencies
         run: pnpm audit --prod --audit-level high
 
-  # ---- 7. Secret scan ----
+  # ---- 8. Secret scan ----
   # AGENTS.md §4.6：不得提交真实秘密/密码/token/Cookie/生产 URL 凭据。
   secret-scan:
     name: Secret scan (gitleaks)

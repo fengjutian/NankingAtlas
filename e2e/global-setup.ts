@@ -102,29 +102,11 @@ export default function globalSetup(): void {
     env: { ...process.env, DATABASE_URL: e2eDatabaseUrl() },
   });
 
-  // 重新构建 web，且**必须**在构建期注入 E2E 的 API 地址。
-  //
-  // `NEXT_PUBLIC_*` 被 Next 静态内联进产物：给 `next start` 传这些变量是无效的，
-  // 页面用的仍是上次 build 时的地址。表现是页面走进 `network` 分支渲染
-  // 「内容接口暂时无法连接」，而后端完全正常 —— 极难定位。
-  //
-  // 已实测确认：shell env 的优先级**高于** `apps/web/.env.local`，
-  // 构建产物里只会出现这里传入的 4100，不会出现 .env.local 里的 4000。
-  // 因此必须由 globalSetup 自己 build，不能复用开发机上的旧产物
-  // （旧产物里烘的是 localhost:4000，指向另一个进程）。
-  execFileSync(seedShim, ['--filter', '@nanking-atlas/web', 'build'], {
-    stdio: 'pipe',
-    shell: process.platform === 'win32',
-    cwd: REPO_ROOT,
-    env: {
-      ...process.env,
-      NODE_ENV: 'production',
-      NEXT_PUBLIC_APP_ENV: 'test',
-      NEXT_PUBLIC_API_BASE_URL: 'http://127.0.0.1:4100',
-      // 故意不给底图 Key：/map 会降级为纯列表，E2E 不依赖第三方瓦片。
-      NEXT_PUBLIC_AMAP_KEY: '',
-    },
-  });
+  // 注意：web 的构建**不在这里**做，而是在 playwright 的 webServer 命令里
+  // （`next build && next start`）。实测把 build 放在 globalSetup 会间歇性失败：
+  // `next start` 抢先启动、报「找不到 .next-e2e 里的生产构建」。
+  // 合进同一条命令串行执行后时序问题消失，构建期环境变量也只有一份来源
+  // （playwright.config.ts 的 webServer.env）。
 }
 
 export function globalTeardown(): void {

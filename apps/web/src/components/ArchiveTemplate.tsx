@@ -31,7 +31,14 @@ export interface ArchiveTemplateProps {
   readonly media: readonly PublicMedia[];
   readonly facts: readonly TypeFact[];
   readonly stops?: readonly RouteStop[];
-  readonly backHref: string;
+  /**
+   * 返回链接。必须用 `Route` 而不是 `string`：
+   * `next.config.mjs` 开了 `typedRoutes`，`<Link href>` 只接受已知路由，
+   * 传 `string` 会在**干净构建**时报
+   * `Type 'string' is not assignable to type 'UrlObject | RouteImpl<string>'`。
+   * 之前这个错误被 turbo 的 build 缓存掩盖（缓存命中时不会重新做类型检查）。
+   */
+  readonly backHref: Route;
   readonly backLabel: string;
   readonly jsonLd: Record<string, unknown> | null;
 }

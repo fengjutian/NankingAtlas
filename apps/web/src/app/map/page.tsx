@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 
 import { MapExplorer } from '@/components/map/MapExplorer';
-import { resolveAmapConfig } from '@/lib/amap-config';
 import { env } from '@/lib/env';
 import { requestPlacesInBBox } from '@/lib/map-data';
 import { MAP_RESULT_LIMIT } from '@/lib/map-geo';
@@ -43,9 +42,8 @@ export default async function MapPage({
     limit: MAP_RESULT_LIMIT,
   });
 
-  // 高德配置：Key 或 jscode 缺失时为 null，地图块整体降级为纯列表。
-  const amap = resolveAmapConfig();
-  const amapConfig = amap.ok ? { key: amap.key, securityJsCode: amap.securityJsCode } : null;
+  // 底图已改为 OSM 瓦片（ADR-0003），不再依赖高德 Key；
+  // 高德只用于地址检索，缺 Key 时由 `lib/geocode.ts` 自行降级。
 
   return (
     <div className="shell">
@@ -56,7 +54,7 @@ export default async function MapPage({
 
       <MapExplorer
         baseUrl={env.API_BASE_URL}
-        amap={amapConfig}
+        mapEnabled
         initialBBox={bbox}
         initialQuery={query}
         initialPlaces={result.ok ? result.data : null}

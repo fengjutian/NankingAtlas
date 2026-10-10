@@ -96,10 +96,39 @@ export interface AMapMapInstance {
   destroy(): void;
 }
 
+/**
+ * 高德地理编码器（ADR-0003：改造后高德只提供数据，不做渲染）。
+ */
+export interface AMapGeocoderInstance {
+  /**
+   * 发起地理编码。
+   *
+   * ⚠️ 高���用 `status` 字符串表达结果而非抛异常：只有 `'complete'` 才带 pois，
+   * 其余（`'no_data'` / `'invalid_user_key'` / `'error'`）都要当失败处理。
+   */
+  search(
+    address: string,
+    options: { city?: string | undefined },
+    callback: (
+      status: string,
+      result: { pois?: readonly AMapPoi[] | undefined } | undefined,
+    ) => void,
+  ): void;
+}
+
+/** 地理编码结果中的 POI 最小形状。 */
+export interface AMapPoi {
+  /** 坐标形状与 Leaflet 不同：高德是 `{ lng, lat }`。 */
+  readonly location?: { readonly lng: unknown; readonly lat: unknown } | undefined;
+  readonly address?: unknown;
+}
+
 export interface AMapNamespace {
   Map: new (container: HTMLElement, options?: AMapMapOptions) => AMapMapInstance;
   Marker: new (options: AMapMarkerOptions) => AMapMarkerInstance;
   Pixel: new (x: number, y: number) => AMapPixelPosition;
+  /** 地理编码插件实例化入口。 */
+  Geocoder: new () => AMapGeocoderInstance;
 }
 
 declare global {

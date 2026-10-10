@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { z } from 'zod';
 
 import type { TocEntry } from '@/lib/seo';
-import type { Metadata } from 'next';
+import type { Metadata, Route } from 'next';
 
 import { ArchiveTemplate } from '@/components/ArchiveTemplate';
 import {
@@ -106,7 +106,8 @@ export interface ArchivePageProps {
   readonly slug: string;
   /** 栏目允许的内容类型；命中其他类型时按"类型专属 404"处理（P2-05）。 */
   readonly allowedTypes: readonly ContentType[];
-  readonly backHref: string;
+  /** 返回链接；需为 `Route` 以满足 `typedRoutes`（见 ArchiveTemplate 同名属性的说明）。 */
+  readonly backHref: Route;
   readonly backLabel: string;
 }
 

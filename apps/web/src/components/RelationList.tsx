@@ -1,5 +1,7 @@
 import Link from 'next/link';
 
+import type { Route } from 'next';
+
 import { DETAIL_PATHS, contentTypeLabel, type ContentRelation } from '@/lib/types';
 
 export interface RelationListProps {
@@ -7,7 +9,7 @@ export interface RelationListProps {
   readonly relations: readonly ContentRelation[];
 }
 
-function relationHref(relation: ContentRelation): string | null {
+function relationHref(relation: ContentRelation): Route | null {
   if (
     relation.targetSlug === null ||
     relation.targetSlug === undefined ||
@@ -19,7 +21,7 @@ function relationHref(relation: ContentRelation): string | null {
     relation.targetType === null || relation.targetType === undefined
       ? DETAIL_PATHS.TOPIC
       : DETAIL_PATHS[relation.targetType];
-  return `${base}/${relation.targetSlug}`;
+  return `${base}/${relation.targetSlug}` as Route;
 }
 
 /** 关联内容（P2-04）：接口未开放时说明降级原因。 */

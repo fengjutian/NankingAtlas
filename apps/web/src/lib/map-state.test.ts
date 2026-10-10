@@ -1,9 +1,7 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+﻿import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
-  BASEMAP_LOAD_DEADLINE_MS,
   MAP_MOVE_DEBOUNCE_MS,
-  basemapStatus,
   createDebouncer,
   createLatestRequest,
   escapeHtml,
@@ -352,23 +350,6 @@ describe('地图表面降级（底图 / 脚本失败不隐藏列表）', () => {
   it('SDK 就绪且底图正常 → ready', () => {
     expect(mapSurfaceState({ loaded: true, basemapFailed: false })).toBe('ready');
   });
-
-  it('底图状态：complete 到达即 ok，未到达且未失败是 pending', () => {
-    expect(basemapStatus({ ready: true, failed: false })).toBe('ok');
-    expect(basemapStatus({ ready: false, failed: false })).toBe('pending');
-  });
-
-  it('底图状态：failed 优先于 ready（超时后迟到的 complete 不能把失败翻回成功）', () => {
-    // 超时判定之后高德才姗姗来迟地 complete，必须仍然显示失败。
-    // 反过来写会让"用户看到加载失败、界面又自己好了"这种自相矛盾状态出现。
-    expect(basemapStatus({ ready: true, failed: true })).toBe('failed');
-  });
-
-  it('底图就绪期限是合理量级：明显大于正常首屏，又不至于让用户干等', () => {
-    expect(BASEMAP_LOAD_DEADLINE_MS).toBeGreaterThan(3000);
-    expect(BASEMAP_LOAD_DEADLINE_MS).toBeLessThanOrEqual(15_000);
-  });
-
   it('每种地图状态都有对应提示，且都不要求隐藏列表', () => {
     const states = ['loading', 'ready', 'unavailable', 'basemap_failed'] as const;
     expect(mapSurfaceMessage('ready')).toBe('');

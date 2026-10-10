@@ -283,32 +283,14 @@ export function mapSurfaceState(input: {
   return 'ready';
 }
 
-/** 底图健康度。`failed` 优先于 `ready`：失败必须是"看得见"的状态。 */
-export type BasemapStatus = 'pending' | 'ok' | 'failed';
-
 /**
- * 底图健康度 → 状态。
- *
- * `ready` = 高德 `complete` 事件已到达；`failed` = 脚本加载失败或超时。
- * 两者互斥且都由外部显式给出，本函数不做推断 —— 时序判断留给运行时。
+ * 底图就绪期限、超时兜底、GCJ 视窗换算等原本服务于高德渲染的逻辑，
+ * 在改为 Leaflet + OSM 瓦片后（ADR-0003）已全部删除：
+ *   - 底图失败改用 `tileerror` 逐片计数（见 `lib/leaflet-config.ts`），
+ *     不再需要"到点就当失败"的超时猜测；
+ *   - 视窗 bbox 与数据库同为 WGS-84，不再需要 GCJ ⇄ WGS 换算。
+ * 保留死代码会让后来者以为这些兜底还在生效。
  */
-export function basemapStatus(input: {
-  readonly ready: boolean;
-  readonly failed: boolean;
-}): BasemapStatus {
-  if (input.failed) return 'failed';
-  return input.ready ? 'ok' : 'pending';
-}
-
-/**
- * 底图就绪期限。
- *
- * 高德不提供逐瓦片失败事件，只能给 `complete` 设一个上限：
- * 超过这个时间还没就绪就判定底图不可用（网络受限、Key 域名不匹配、
- * 底图服务故障）。取值要明显大于正常首屏时间（通常 < 2s），
- * 又不能长到让用户干等 —— 8 秒是"用户还在等"与"用户已放弃"的分界。
- */
-export const BASEMAP_LOAD_DEADLINE_MS = 8000;
 
 /** 是否需要跳到"纯列表"降级（无 window / 无地图容器 / 动态 import 失败）。 */
 export function shouldDegradeToList(input: {

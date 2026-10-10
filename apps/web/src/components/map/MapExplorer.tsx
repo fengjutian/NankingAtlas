@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
@@ -10,13 +10,12 @@ import { MapErrorBoundary } from './MapErrorBoundary';
 import { MapToolbar } from './MapToolbar';
 import { PlaceList } from './PlaceList';
 
-import type { ResolvedAmapConfig } from '@/lib/amap-config';
 import type { ApiFailure } from '@/lib/api';
 import type { MapPlaceResult } from '@/lib/map-data';
 import type { BBoxErrorCode, MapBBox } from '@/lib/map-geo';
 import type { MapQuery } from '@/lib/map-url';
 
-import { AMAP_ATTRIBUTION } from '@/lib/amap-config';
+import { OSM_ATTRIBUTION } from '@/lib/leaflet-config';
 import { areaOnlyNote, requestPlacesInBBox } from '@/lib/map-data';
 import { MAP_RESULT_LIMIT, bboxErrorMessage, validateBBox } from '@/lib/map-geo';
 import {
@@ -45,13 +44,18 @@ function css(name: string): string {
  * 因此**列表与筛选在首屏 HTML 里就存在** —— 高德地图是延迟加载的增强块，
  * 地图脚本、底图、容器任一失败都不会影响列表（技术方案 §9.2 前两条）。
  *
- * `baseUrl` / `amap` 由服务端从 `env` 注入：客户端不读 `lib/env.ts`
+ * `baseUrl` / `mapEnabled` 由服务端从 `env` 注入：客户端不读 `lib/env.ts`
  * （它 fail-fast 且依赖 node:crypto），未配置时直接走降级。
  */
 export interface MapExplorerProps {
   readonly baseUrl: string | null;
-  /** 高德接入配置；null 表示 Key 或安全密钥未配置，地图块整体降级。 */
-  readonly amap: ResolvedAmapConfig | null;
+  /**
+   * 底图是否可用（ADR-0003）。
+   *
+   * 底图改为 OSM 瓦片后，地图**不再依赖高德 Key**；该开关表示瓦片源是否被允许使用。
+   * 高德只负责地址检索，缺 Key 不影响地图渲染。
+   */
+  readonly mapEnabled: boolean;
   readonly initialBBox: MapBBox;
   readonly initialQuery: MapQuery;
   readonly initialPlaces: MapPlaceResult | null;
@@ -72,7 +76,7 @@ const MapCanvas = dynamic(() => import('./MapCanvas'), {
 
 export function MapExplorer({
   baseUrl,
-  amap,
+  mapEnabled,
   initialBBox,
   initialQuery,
   initialPlaces,
@@ -202,7 +206,7 @@ export function MapExplorer({
               items={items}
               selected={selected}
               initialBBox={initialBBox}
-              amap={amap}
+              enabled={mapEnabled}
               onViewportChange={(bbox) => void loadBBox(bbox)}
               onSelect={handleSelect}
               onSurfaceState={setSurface}
@@ -222,7 +226,7 @@ export function MapExplorer({
         <MapToolbar basePath="/map" query={initialQuery} allowedTypes={['PLACE']} />
 
         <ul className={css('mapLegend')} role="list">
-          <li>底图：{AMAP_ATTRIBUTION}</li>
+          <li>底图：{OSM_ATTRIBUTION}</li>
           <li>仅核验通过的地点显示精确点位</li>
           <li>仅区域级 / 未核验位置只显示说明</li>
         </ul>

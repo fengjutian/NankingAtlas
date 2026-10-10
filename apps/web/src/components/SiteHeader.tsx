@@ -3,9 +3,11 @@
 import Link from 'next/link';
 import { useState } from 'react';
 
+import type { Route } from 'next';
+
 interface NavItem {
   label: string;
-  href: string;
+  href: Route;
 }
 
 const NAV_ITEMS: readonly NavItem[] = [

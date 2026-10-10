@@ -297,16 +297,23 @@ pnpm exec playwright install chromium
 
 PR 与 push 到 `main` 都会触发 `.github/workflows/ci.yml`：
 
-1. `install` — `pnpm install --frozen-lockfile`
+1. `install` — `pnpm install --frozen-lockfile`（**只用于预热 pnpm store 缓存**）
 2. `format` — `pnpm format:check`
 3. `lint` — `pnpm lint`（含跨包依赖边界 `no-restricted-imports`）
 4. `typecheck` — `pnpm typecheck`
 5. `test` — `pnpm test`（P1-01.a 起：SQLite 方案无需 service container；DATABASE_URL 由 job env 注入 `file:./packages/database/prisma/test.db`），
-   随后 `pnpm test:integration`，再跑 `pnpm test:e2e`（需先 `playwright install chromium`）
+   随后 `pnpm test:integration`
 6. `build` — `pnpm build`，产物上传为 artifact
-7. `dependency-scan` — `pnpm audit --prod --audit-level high`（P4-02：只卡生产依赖；
+7. `e2e` — `pnpm test:e2e`（P4-03；先 `playwright install --with-deps chromium`，
+   浏览器缓存到 `~/.cache/ms-playwright`，失败时上传 HTML report）
+8. `dependency-scan` — `pnpm audit --prod --audit-level high`（P4-02：只卡生产依赖；
    dev 依赖的已知高危记录在 [ADR-0002](docs/adr/0002-dependency-vulnerability-policy.md)）
-8. `secret-scan` — gitleaks（AGENTS.md §4.6：禁止提交真实密钥）
+9. `secret-scan` — gitleaks（AGENTS.md §4.6：禁止提交真实密钥）
 
-合并前 7 步全部必须通过。`dependency-scan` 只拦生产依赖的高危；
+合并前 8 步全部必须通过。`dependency-scan` 只拦生产依赖的高危；
 dev 依赖仍有 3 critical / 7 high 已知未修，**不等于 P4-02 依赖扫描全部通过**。
+
+> **每个 job 都要自己 `pnpm install --frozen-lockfile`**。GitHub Actions 的
+> job 各自跑在全新 runner 上，`needs: install` 只保证 pnpm store 缓存已预热，
+> `node_modules` **不会**跨 job 传递。`install` job 不上传 artifact，
+> 因此它只是缓存预热器，不能替代各 job 自己的安装。

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * 地图几何与 bbox 校验（P3-02 / P3-04）。
  *
  * 事实依据：技术方案 §9.2「只加载当前视口 bbox 数据」。
@@ -14,7 +14,6 @@
 
 // `map-coords` 反过来用 `import type` 引用本文件的 `LonLat`（编译期擦除），
 // 因此这条运行时依赖不会成环。
-import { gcj02ToWgs84 } from './map-coords';
 
 export interface LonLat {
   readonly lon: number;
@@ -197,26 +196,6 @@ export function bboxCenter(bbox: MapBBox): LonLat {
   };
 }
 
-/**
- * 高德视窗（GCJ-02）→ 请求用视窗边界（WGS-84）。
- *
- * 高德的 `getBounds()` 给的是 GCJ-02 坐标，而 `/api/v1/places` 的 bbox
- * 按契约是 WGS-84。**两者在国内差 100~500 米**（南京约 300 米）：不转换就等于
- * 每次平移都拿一个偏 300 米的窗口去查，边界上的地点会被漏掉或凭空出现。
- *
- * 只反演西南、东北两个角即可：bbox 是轴对齐矩形，区域内各点的偏移量在
- * 几百米尺度上可视为常数，逐点反演既昂贵也没有额外精度收益。
- */
-export function gcjViewportToWgsBounds(bounds: ViewportBounds): ViewportBounds {
-  const west = gcj02ToWgs84({ lon: bounds.west, lat: bounds.south });
-  const north = gcj02ToWgs84({ lon: bounds.east, lat: bounds.north });
-  return {
-    west: west.lon,
-    south: west.lat,
-    east: north.lon,
-    north: north.lat,
-  };
-}
 
 /** bbox 签名：用于"视口没真的动就别重复请求"。 */
 export function bboxSignature(bbox: MapBBox, precision = 4): string {

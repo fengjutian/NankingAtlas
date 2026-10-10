@@ -76,17 +76,25 @@ export default defineConfig({
       },
     },
     {
-      // 不能用 `next start --port 3100` 覆盖：web 的 start 脚本已固定
+      // 构建与启动放在**同一条命令**里。
+      //
+      // 原本把 `next build` 放在 globalSetup，实测会间歇性失败：
+      // `next start` 报「找不到 .next-e2e 里的生产构建」。把两步合进同一个
+      // shell 串行执行，就不存在「build 还没落盘 start 就起来了」的时序问题。
+      //
+      // 也不能用 `next start --port 3100` 覆盖：web 的 start 脚本已固定
       // `--port 3000`，playwright 只能校验 `url` 指向的端口。
-      // 因此 E2E 直接用 3000，并要求调用方先腾出该端口。
-      command: 'pnpm --filter @nanking-atlas/web start',
+      command: 'pnpm --filter @nanking-atlas/web build && pnpm --filter @nanking-atlas/web start',
       url: `http://127.0.0.1:${String(WEB_PORT)}`,
-      timeout: 180_000,
+      timeout: 300_000,
       reuseExistingServer: false,
       env: {
         NODE_ENV: 'production',
         NEXT_PUBLIC_APP_ENV: 'test',
+        // 构建期内联：给 `next start` 传是无效的，必须让 build 那一步就带上。
         NEXT_PUBLIC_API_BASE_URL: `http://127.0.0.1:${String(API_PORT)}`,
+        // 故意不给底图 Key：/map 会降级为纯列表，E2E 不依赖第三方瓦片。
+        NEXT_PUBLIC_AMAP_KEY: '',
         REVALIDATION_SECRET,
       },
     },

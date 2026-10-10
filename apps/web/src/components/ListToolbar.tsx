@@ -1,7 +1,5 @@
 import Link from 'next/link';
 
-import type { Route } from 'next';
-
 import { PAGE_SIZE_OPTIONS, toggleType, withListQuery, type ListQuery } from '@/lib/api';
 import { contentTypeLabel, type ContentType } from '@/lib/types';
 
@@ -79,7 +77,7 @@ export function ListToolbar({ basePath, query, allowedTypes }: ListToolbarProps)
           {allowedTypes.map((type) => (
             <li key={type}>
               <Link
-                href={withListQuery(basePath, toggleType(query, type)) as Route}
+                href={withListQuery(basePath, toggleType(query, type))}
                 aria-current={query.type === type ? 'page' : undefined}
                 className="chip"
               >
