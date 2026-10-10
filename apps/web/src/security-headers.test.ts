@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { applySecurityHeaders, cspPolicyForPath } from './security-headers';
+import { applySecurityHeaders, buildCsp, cspPolicyForPath } from './security-headers';
 
 /**
  * CSP 单测。
@@ -18,6 +18,29 @@ function cspFor(policy: 'strict' | 'amap', nonce: string | null = NONCE): string
   if (value === null) throw new Error('CSP header missing');
   return value;
 }
+
+/**
+ * `buildCsp` 是导出给 middleware 用的：Next 渲染层靠**请求头**里的 CSP 解析 nonce。
+ * 这层如果只测「响应头」，就漏掉了线上整站无 JS 的那个故障 —— 本地 `next start`
+ * 会替 middleware 把响应头桥接成请求头，本地永远测不出来，只有部署后才暴露。
+ */
+describe('buildCsp 供 middleware 写入请求头', () => {
+  it('strict 策略的 CSP 里带 nonce，Next 才能据此给 script 打 nonce 属性', () => {
+    const csp = buildCsp({ policy: 'strict', nonce: NONCE });
+    expect(csp).toContain(`'nonce-${NONCE}'`);
+  });
+
+  it('amap 策略不含 nonce，避免让 Next 打一个对不上 unsafe-inline 的 nonce 属性', () => {
+    expect(buildCsp({ policy: 'amap', nonce: null })).not.toContain('nonce-');
+  });
+
+  it('响应头与请求头用的是同一个函数，两份策略不可能漂移', () => {
+    for (const policy of ['strict', 'amap'] as const) {
+      const context = { policy, nonce: policy === 'strict' ? NONCE : null } as const;
+      expect(buildCsp(context)).toBe(cspFor(policy, context.nonce));
+    }
+  });
+});
 
 /** 取某条指令的完整取值（含它后面的多个 source）。 */
 function directive(csp: string, name: string): string {

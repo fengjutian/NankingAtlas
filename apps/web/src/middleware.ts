@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-import { applySecurityHeaders, cspPolicyForPath } from '@/security-headers';
+import { applySecurityHeaders, buildCsp, cspPolicyForPath } from '@/security-headers';
 
 /**
  * 生成 CSP nonce。
@@ -52,23 +52,42 @@ function generateNonce(): string {
  * script 打上一个"对不上任何策略"的 nonce 属性，最终还是靠
  * `'unsafe-inline'` 放行，只是白白多一层误导性的假象。
  *
+ * ## 为什么 CSP 必须同时写进请求头和响应头
+ *
+ * **Next.js 是在渲染时从「请求头」的 `Content-Security-Policy` 里解析 nonce，
+ * 再把它挂到它自己注入的 `<script nonce="...">` 上的。**
+ * `x-nonce` 只是一个便利头，方便我们自己的组件把值读回去，**不是** Next 的接线点。
+ *
+ * 只设响应头的话，本地 `next start` 依然能跑 —— 因为 Next 会把 middleware 的
+ * 响应头内部桥接成 `x-middleware-request-*` 请求头。但**部署到 Netlify 后这个
+ * 桥接不存在**：渲染层读不到 CSP，产出的 HTML 一个 `nonce=` 属性都没有，
+ * 而响应头里的 CSP 带着 `nonce-` + `'strict-dynamic'` →
+ * **整站所有 script（含同源外链）被浏览器拦死，页面无 JS、无水合，且应用层不报错**。
+ *
+ * 官方标准写法两处都设，请求头那份才是让 nonce 生效的关键，见
+ * https://nextjs.org/docs/app/guides/content-security-policy
+ *
  * 匹配范围：排除 `_next/static`、`_next/image`（Next 自己管缓存头）
  * 与静态资源；其余全部路径（含 `/api/revalidate`）都加。
  */
 export function middleware(request: NextRequest): NextResponse {
   const policy = cspPolicyForPath(request.nextUrl.pathname);
   const nonce = policy === 'strict' ? generateNonce() : null;
+  const context = { policy, nonce } as const;
+  const csp = buildCsp(context);
 
   const requestHeaders = new Headers(request.headers);
   if (nonce !== null) {
-    // Next 会读取 `x-nonce` 请求头并把它写进渲染出的 <script nonce="...">。
+    // 便利头：让我们自己的组件能读回 nonce。
     requestHeaders.set('x-nonce', nonce);
   } else {
     requestHeaders.delete('x-nonce');
   }
+  // 关键：Next 渲染层从这里读 nonce。少了这一行，线上 HTML 就没有 nonce 属性。
+  requestHeaders.set('Content-Security-Policy', csp);
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
-  return applySecurityHeaders(response, { policy, nonce }) as NextResponse;
+  return applySecurityHeaders(response, context) as NextResponse;
 }
 
 export const config = {

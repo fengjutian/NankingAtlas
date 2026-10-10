@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+// `./marker` 是 `map.module.css` 的唯一所有者并导出 `css()`：
+// marker 与本组件必须拿到**同一次编译**产出的同一份类名，
+// 各自 import 会引入两个解析入口，混用时样式直接匹配不上。
 import {
   MARKER_HEIGHT,
   MARKER_WIDTH,

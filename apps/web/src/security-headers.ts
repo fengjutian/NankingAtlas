@@ -154,7 +154,7 @@ const AMAP_HOST_SOURCES = [
  * `img-src`；否则对应请求被 CSP 拒掉（表现为"无法连接地点接口"的降级提示，
  * 属于功能回归而非安全增强）。
  */
-function buildCsp(context: SecurityHeadersContext): string {
+export function buildCsp(context: SecurityHeadersContext): string {
   // API 源必须放行：web 与 API 通常不同源（本地 3111 vs 4000），
   // 地图页的 bbox / 搜索请求都是浏览器直接 fetch 绝对地址。
   // 漏掉它 → 浏览器拒连 → 地图降级成"无法连接地点接口"，
