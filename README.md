@@ -9,6 +9,8 @@
 - [开发任务清单](docs/IMPLEMENTATION_BACKLOG.md)：可直接领取、逐项验收的工程任务。
 - [AI 开发约束](AGENTS.md)：MiniMax 及其他编码代理必须遵循的强制规则。
 - [MiniMax 开发执行手册](docs/MINIMAX_IMPLEMENTATION_GUIDE.md)：可直接交给 MiniMax 的执行流程、提示词、门禁和交付模板。
+- [ADR-0001：数据层采用 SQLite，空间索引采用 R\*Tree](docs/adr/0001-sqlite-data-layer.md)：取代原技术方案中的 PostgreSQL/PostGIS 选型。
+- [ADR-0002：依赖漏洞处置策略](docs/adr/0002-dependency-vulnerability-policy.md)：生产依赖强门禁，开发依赖分阶段。
 
 ## 当前状态
 
@@ -40,9 +42,9 @@ P0-01 ~ P0-09 已交付：三应用骨架、共享 strict 配置与依赖边界�
 | P3-06       | `GET /routes/:slug` 有序站点                                      | 按 position 排序；不可信坐标不进连线     |
 
 **P3-02 / P3-03 / P3-04 / P3-07（`/map` 页：高德地图延迟加载、marker/card 联动、请求取消与去抖、键盘与读屏）已实现。**
-底图供应商已由 Leaflet + OpenStreetMap 切换为**高德地图 Web 端 JS API 2.0**（用户批准的架构变更，
-技术方案 §2 的「Leaflet」一项随之作废；`AGENTS.md` §2.1 与 `docs/TECHNICAL_IMPLEMENTATION.md`
-记录的是原始决策，本次变更尚未回写这两份文档）。
+底图供应商已由 Leaflet + OpenStreetMap 切换为**高德地图 Web 端 JS API 2.0**。
+该变更的 ADR **尚未获得批准**，技术方案 §2 的「Leaflet」一项也尚未回写；
+在维护者明确批准前，不得宣称其已批准（见 `docs/adr/0001-sqlite-data-layer.md` §7）。
 下一阶段为 P4（安全审计、E2E、性能、备份恢复、上线 runbook）。
 
 ### 地图与坐标系
@@ -251,10 +253,11 @@ pnpm test:integration    # API 集成测试（真实 SQLite 库 + 全局守卫 +
 应用层通过 `@nanking-atlas/database` 的字面量联合 + zod 校验保证取值范围
 （见 `packages/database/src/enums.ts`）。
 
-**与 PostgreSQL 版本的功能差异**（需要在 P3 任务里补偿）：
+**与 PostgreSQL 版本的功能差异**（已在 P3 任务中完成补偿）：
 
-- 无空间查询：`places.lon / lat` 浮点列；P3 地图的 bbox 检索改用 SQLite R*Tree 虚表（在 P3 子任务里单独写 migration）。
-- 无 pg_trgm 中文相似度：P3 搜索降级为 LIKE + 应用层分词；FTS5 留作 P3 子任务。
+- 无空间扩展：`places.lon / lat` 浮点列 + SQLite R\*Tree 虚表索引（迁移 `20261009130000_place_spatial_index`）。
+  注意：SQLite 触发器不能写虚表，虚表须由应用层 `rebuildIndex()` 重建。
+- 无 pg_trgm 中文相似度：搜索降级为 `LIKE` + 通配符转义；FTS5 未启用。
 - 无 UUID / citext / pgcrypto：id 改 `cuid()`，email 应用层 lowercase。
 
 ## 阶段门禁
@@ -262,7 +265,7 @@ pnpm test:integration    # API 集成测试（真实 SQLite 库 + 全局守卫 +
 - P0 门禁：三个应用可独立运行；根级质量命令通过；开发配置无秘密。
 - P1 门禁：真实数据库和服务端权限有效；审核发布链路通过集成/E2E；审计可追溯。
 - P2 门禁：发布内容从后台到公开站闭环；SEO、撤回和响应式验证通过。
-- P3 门禁：真实 PostGIS bbox 查询；地图/列表联动和失败降级通过。
+- P3 门禁：真实 SQLite R\*Tree bbox 查询；地图/列表联动和失败降级通过。
 - P4 门禁：安全、性能、监控、备份恢复和上线 runbook 有真实证据。
 
 前一阶段未满足时，可以为后续做不破坏兼容性的准备，但不能宣称后续阶段已经交付。
@@ -277,6 +280,9 @@ PR 与 push 到 `main` 都会触发 `.github/workflows/ci.yml`：
 4. `typecheck` — `pnpm typecheck`
 5. `test` — `pnpm test`（P1-01.a 起：SQLite 方案无需 service container；DATABASE_URL 由 job env 注入 `file:./packages/database/prisma/test.db`）
 6. `build` — `pnpm build`，产物上传为 artifact
-7. `secret-scan` — gitleaks（AGENTS.md §4.6：禁止提交真实密钥）
+7. `dependency-scan` — `pnpm audit --prod --audit-level high`（P4-02：只卡生产依赖；
+   dev 依赖的已知高危记录在 [ADR-0002](docs/adr/0002-dependency-vulnerability-policy.md)）
+8. `secret-scan` — gitleaks（AGENTS.md §4.6：禁止提交真实密钥）
 
-合并前 6 步全部必须通过。P0 阶段 `secret-scan` 是只读基线，命中即失败。
+合并前 7 步全部必须通过。`dependency-scan` 只拦生产依赖的高危；
+dev 依赖仍有 3 critical / 7 high 已知未修，**不等于 P4-02 依赖扫描全部通过**。

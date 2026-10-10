@@ -12,7 +12,11 @@
 
 ## 2. 范围与架构纪律
 
-1. 严格使用 pnpm + Turborepo、Next.js Web、React/Vite Admin、NestJS API、PostgreSQL/PostGIS、Prisma、Tailwind/shadcn、Leaflet、Tiptap。
+1. 严格使用 pnpm + Turborepo、Next.js Web、React/Vite Admin、NestJS API、SQLite（R\*Tree 空间索引，见 `docs/adr/0001-sqlite-data-layer.md`）、Prisma、Tailwind/shadcn、Leaflet、Tiptap。
+
+   > 地图 SDK 说明：当前实现已使用高德 JS API，但该变更的 ADR 尚未批准，
+   > 技术方案 §2 的「Leaflet」一项也尚未回写。在维护者明确批准前，
+   > 不得宣称其已获批准，也不得反向改回 Leaflet。
 2. Web、Admin、API 必须可独立构建和部署；Web/Admin 不得直连数据库。
 3. API 是权限、状态流转、审计、发布校验的唯一执行边界。
 4. 未经用户明确批准和 ADR，不得更换技术栈，不得引入微服务、消息队列、Elasticsearch、第二数据库或第二 ORM。
@@ -41,7 +45,7 @@
 ## 5. 数据与迁移硬约束
 
 1. 所有 schema 变更必须有版本化迁移；禁止依靠 `db push` 作为生产迁移。
-2. PostGIS 必须使用真实扩展和空间类型/索引，不能用字符串坐标假装空间实现。
+2. 空间索引必须使用 SQLite 内置 R\*Tree 虚表，不得用普通浮点列的全表扫描假装空间查询；坐标必须以 `lon/lat` REAL 列作为权威值，R\*Tree 只做粗筛。详见 `docs/adr/0001-sqlite-data-layer.md` §2、§3。
 3. 正文保存、状态变更、revision、review action、audit log 必须在事务边界内保持一致。
 4. revision、review action、audit log 只增不改；普通删除不得级联破坏追溯记录。
 5. 更新使用乐观锁，版本冲突返回 409；禁止静默覆盖。
@@ -59,7 +63,7 @@
 
 ## 7. 测试与完成定义
 
-1. 每项业务规则至少有单元测试；API 权限和事务有真实 PostgreSQL/PostGIS 集成测试；关键链路有 E2E。
+1. 每项业务规则至少有单元测试；API 权限和事务有真实 SQLite 数据库集成测试（含 R\*Tree 虚表的真实迁移执行）；关键链路有 E2E。
 2. 修复缺陷时先添加能复现问题的测试，再修复。
 3. 禁止删除、跳过、放宽测试或改变断言来让 CI 变绿，除非需求本身正式变更并记录原因。
 4. 完成前运行受影响范围的 format、lint、typecheck、test、build；失败必须如实报告。

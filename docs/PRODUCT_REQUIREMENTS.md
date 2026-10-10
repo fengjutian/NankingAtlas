@@ -147,6 +147,10 @@ NestJS · REST API · 身份认证 · 内容服务 · 地理空间查询
 
 PostgreSQL + PostGIS
 
+> ⚠️ **实现层已被 ADR 取代**：本文档是用户提供的原始需求基线，上述表述按原文保留。
+> 实际实现为 **SQLite + R\*Tree**（见 [`adr/0001-sqlite-data-layer.md`](adr/0001-sqlite-data-layer.md)）。
+> 下文技术栈表中的 PostgreSQL / PostGIS / pg_trgm 行同理，均已被该 ADR 取代。
+
 内容、关联、地理坐标
 
 对象存储
@@ -425,6 +429,11 @@ Add to Favorites
 | 服务端      | NestJS + TypeScript               | 模块化 API、权限与业务分层 |
 | 数据库      | PostgreSQL                        | 关系型内容数据与事务      |
 | 空间数据     | PostGIS                           | 地理查询、距离筛选、空间索引  |
+
+> ⚠️ 上述两行已被 [`adr/0001-sqlite-data-layer.md`](adr/0001-sqlite-data-layer.md) 取代：
+> 数据层为 **SQLite**，空间索引用 SQLite 内置 **R\*Tree**。
+> 「必须使用真实空间扩展/索引、不能把坐标当普通字符串」这一**约束本身仍然有效**，
+> 只是实现手段从 PostGIS 换成 R\*Tree 虚表。
 | ORM      | Prisma                            | 类型安全的数据访问与迁移    |
 | 文件存储     | S3 兼容对象存储                         | 图片和媒体与应用服务解耦    |
 | 包管理      | pnpm                              | 工作区管理、依赖复用      |
@@ -634,7 +643,10 @@ CREATE INDEX idx_contents_type_status
     ON contents (type, status);
 ```
 
-地点表单独保存地理信息。PostGIS 迁移应使用真实 PostgreSQL 扩展，而不能只在 ORM 中把坐标当普通字符串。
+地点表单独保存地理信息。空间查询应使用数据库真实的空间扩展/索引，而不能只在 ORM 中把坐标当普通字符串做全表扫描。
+
+> ⚠️ 示例 SQL 按原始需求保留（PostGIS）。实际实现改为 SQLite 的 `lon`/`lat` REAL 列
+> + R\*Tree 虚表空间索引，见 [`adr/0001-sqlite-data-layer.md`](adr/0001-sqlite-data-layer.md)。
 
 SQL
 
@@ -920,6 +932,10 @@ MVP 搜索范围包括：
 * 专题标题与标签。
 
 首期优先使用 PostgreSQL 全文检索、`pg_trgm` 模糊匹配和别名字段组合。中文全文检索效果取决于分词策略；如果实测结果不佳，再引入适合中文的搜索方案或独立搜索服务，不应一开始就部署 Elasticsearch 等重型组件。
+
+> ⚠️ 实际实现已改为 SQLite 的 `LIKE` + 通配符转义（无 trigram 相似度），
+> 见 [`adr/0001-sqlite-data-layer.md`](adr/0001-sqlite-data-layer.md)。
+> 本段「效果不佳再升级、不预先部署重型组件」的判断仍然适用。
 
 搜索结果需要区分内容类型，支持筛选、排序和分页。未发布内容不得通过公开搜索接口泄漏。
 
@@ -1345,6 +1361,10 @@ Nanking Atlas 工程开发约定
 * API：NestJS、TypeScript
 
 * Database：PostgreSQL、PostGIS
+
+> ⚠️ 实现层已由 [`adr/0001-sqlite-data-layer.md`](adr/0001-sqlite-data-layer.md) 取代为
+> **SQLite + R\*Tree**。下方 Map 一项的当前实现亦已改为高德 JS API 2.0，
+> 但该变更的 ADR 尚未批准。
 
 * ORM：Prisma
 

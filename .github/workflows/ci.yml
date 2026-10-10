@@ -209,7 +209,36 @@ jobs:
           path: apps/api/dist
           retention-days: 7
 
-  # ---- 6. Secret scan ----
+  # ---- 6. Dependency scan (P4-02) ----
+  # 技术方案 §15 要求每个 PR 跑 dependency scan。
+  #
+  # 只卡 **生产依赖**（--prod）：dev 依赖里的高危（@nestjs/cli 链上的 glob/braces/tmp、
+  # vitest/tinypool/vite）只在本机与 CI 使用，不进入生产运行时，强行清零会
+  # 把 Nest 主版本或测试栈整体抬升，属于架构级变更，需 ADR + 人工批准。
+  # 这些 dev 依赖的处置记录在 docs/adr/0002-dependency-vulnerability-policy.md。
+  dependency-scan:
+    name: Dependency scan (production)
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-store-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level high
+
+  # ---- 7. Secret scan ----
   # AGENTS.md §4.6：不得提交真实秘密/密码/token/Cookie/生产 URL 凭据。
   secret-scan:
     name: Secret scan (gitleaks)

@@ -2,6 +2,10 @@
 
 规则：按依赖顺序实施；每项完成必须附代码、测试和验证结果。`[ ]` 只有在验收条件实际满足后才能改为 `[x]`。
 
+> 数据层相关任务的 PostgreSQL/PostGIS 表述已被
+> [`adr/0001-sqlite-data-layer.md`](adr/0001-sqlite-data-layer.md) 取代为 SQLite + R\*Tree，
+> 下文相关行已同步修订。
+
 ## P0 工程基础
 
 - [ ] P0-01 初始化 pnpm workspace、Turborepo、根脚本和单一 lockfile。
@@ -18,7 +22,7 @@
 
 ## P1 内容与后台
 
-- [ ] P1-01 建立 PostgreSQL/PostGIS 本地环境、Prisma schema 和初始迁移。
+- [ ] P1-01 建立 SQLite 本地环境、Prisma schema 和初始迁移。
 - [ ] P1-02 实现 users、roles、登录、刷新、登出、禁用与限流。
 - [ ] P1-03 实现服务端 RBAC/resource guard 及 401/403 安全测试。
 - [ ] P1-04 实现 contents 与类型扩展 CRUD、slug、乐观锁和软删除。
@@ -47,11 +51,11 @@
 
 ## P3 地图与发现
 
-- [ ] P3-01 实现 PostGIS point、bbox、距离查询与空间索引。
+- [ ] P3-01 实现 SQLite R\*Tree point、bbox、距离查询与空间索引。
 - [ ] P3-02 实现 `/map` 列表优先、Leaflet 延迟加载和底图配置。
 - [ ] P3-03 实现类型筛选、搜索、marker/card 双向联动和 URL 状态。
 - [ ] P3-04 实现地图错误/离线降级、请求取消、视口查询限制。
-- [ ] P3-05 实现 PostgreSQL 搜索索引、相关度、别名和无结果建议。
+- [ ] P3-05 实现 SQLite 搜索索引、相关度、别名和无结果建议。
 - [ ] P3-06 实现路线有序站点与地图展示。
 - [ ] P3-07 完成地图键盘、读屏和移动手势测试。
 

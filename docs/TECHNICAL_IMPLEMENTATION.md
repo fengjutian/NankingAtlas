@@ -1,15 +1,20 @@
 # Nanking Atlas 完整技术实现方案
 
-版本：1.0  
+版本：1.1  
 状态：实施基线  
-日期：2026-10-09  
+日期：2026-10-10  
 需求来源：[`PRODUCT_REQUIREMENTS.md`](PRODUCT_REQUIREMENTS.md)
+
+> **数据层已由 ADR 取代**：本文档原先的 PostgreSQL/PostGIS 选型已被
+> [`adr/0001-sqlite-data-layer.md`](adr/0001-sqlite-data-layer.md) 取代为
+> **SQLite + R\*Tree**。标注「已由 ADR-0001 取代」的行保留原始记录，不再是实施依据。
+> 地图选型（Leaflet / 高德）不在该 ADR 范围内。
 
 ## 1. 实施目标与边界
 
 首期交付一个可持续运营的城市文化内容平台，而不是一次性展示站。系统必须打通“编辑建稿 → 来源与版权补全 → 提交审核 → 审核通过 → 发布 → 公开站点更新 → 可追溯修订”的完整链路，并提供可降级的互动地图。
 
-MVP 包含公开站、独立管理后台、统一 API、PostgreSQL/PostGIS、对象存储、内容审核、审计、搜索、地图、备份和监控。社区、支付、原生 App、自动 AI 发布、大规模知识图谱均不在 MVP 范围。
+MVP 包含公开站、独立管理后台、统一 API、SQLite（空间索引用 R\*Tree）、对象存储、内容审核、审计、搜索、地图、备份和监控。社区、支付、原生 App、自动 AI 发布、大规模知识图谱均不在 MVP 范围。
 
 ## 2. 不可变架构决策
 
@@ -19,12 +24,12 @@ MVP 包含公开站、独立管理后台、统一 API、PostgreSQL/PostGIS、对
 | 公开站 | Next.js、React、TypeScript、Tailwind CSS | App Router；公开内容优先服务端渲染/静态再验证；地图仅客户端加载 |
 | 管理后台 | React、Vite、TypeScript、Tailwind CSS、shadcn/ui | 静态 SPA；所有写入经 API；不得直连数据库 |
 | API | NestJS、TypeScript、REST | `/api/v1`；模块化单体；OpenAPI 为接口事实来源 |
-| 数据库 | PostgreSQL + PostGIS | 权威数据源；事务、约束、空间查询在服务端执行 |
-| ORM | Prisma | 常规 CRUD 与迁移；PostGIS 特性通过经过审查的 SQL migration/query 使用 |
+| 数据库 | **SQLite** | 权威数据源；事务、约束在服务端执行；空间索引用 R\*Tree（见 [ADR-0001](adr/0001-sqlite-data-layer.md)）。~~PostgreSQL + PostGIS~~ 已由 ADR-0001 取代 |
+| ORM | Prisma | 常规 CRUD 与迁移；R\*Tree 虚表经由受审查的 SQL migration 建立、由应用层显式重建（触发器不能写虚表） |
 | 编辑器 | Tiptap | 保存受控 JSON 文档；服务端白名单校验；渲染时二次净化 |
-| 地图 | Leaflet | 底图提供商可配置；底图失败时保留列表和筛选 |
+| 地图 | Leaflet | 底图提供商可配置；底图失败时保留列表和筛选。**注意**：当前实现已改用高德 JS API 2.0，该变更的 ADR 尚未批准，本行尚未回写 |
 | 文件 | S3 兼容对象存储 | 浏览器只使用 API 签发的短期上传凭证；元数据入库 |
-| 搜索 | PostgreSQL + `pg_trgm` | 首期不引入 Elasticsearch；按实测再升级中文分词 |
+| 搜索 | **SQLite `LIKE` + 通配符转义** | 首期不引入 Elasticsearch；无 `pg_trgm` 相似度。~~PostgreSQL + `pg_trgm`~~ 已由 ADR-0001 取代 |
 
 除非 ADR 经维护者批准，不得替换上述技术栈，不得提前拆微服务、引入消息队列或独立搜索集群。
 
@@ -43,7 +48,7 @@ packages/
   ui/                  # 无业务状态的共享视觉组件与 tokens
   validation/          # 可共享的纯校验规则
 docs/
-  adr/                 # 架构决策记录
+  adr/                 # 架构决策记录（ADR-0001：SQLite + R*Tree 数据层）
   runbooks/            # 发布、回滚、备份恢复、事故处理
   PRODUCT_REQUIREMENTS.md
   TECHNICAL_IMPLEMENTATION.md
@@ -56,8 +61,8 @@ docs/
 ## 4. 运行时与请求边界
 
 ```text
-访客 → Netlify/CDN → Web → Public API → PostgreSQL/PostGIS
-编辑人员 → Admin → Authenticated API ─┬→ PostgreSQL/PostGIS
+访客 → Netlify/CDN → Web → Public API → SQLite（R\*Tree 空间索引）
+编辑人员 → Admin → Authenticated API ─┬→ SQLite（需持久卷，见 ADR-0001 §5.2）
                                       └→ S3-compatible storage
 发布事件 → API transaction → cache/revalidation request → Web
 ```
@@ -89,7 +94,7 @@ RightsStatus = UNKNOWN | LICENSED | PUBLIC_DOMAIN | FAIR_USE_REVIEWED | OWNED | 
 | `users` | id、email unique、password_hash、display_name、disabled_at、timestamps |
 | `user_roles` | `(user_id, role)` unique；角色由管理员维护 |
 | `contents` | id UUID、type、slug unique、title、subtitle、summary、body_json、status、language、version、created_by、updated_by、published_at、archived_at、timestamps |
-| `places` | content_id PK/FK、address、geom geography(Point,4326)、accuracy、verification_status；无可靠坐标时 geom 必须为空 |
+| `places` | content_id PK/FK、address、lon REAL、lat REAL、accuracy、verification_status；无可靠坐标时 lon/lat 必须为空。空间索引为独立 R\*Tree 虚表 `places_rtree`（不在 Prisma model 中表达） |
 | `people` | content_id PK/FK、birth_text、death_text、biography_note |
 | `events` | content_id PK/FK、start_date、end_date、date_precision、date_note |
 | `architectures` | content_id PK/FK、built_period、current_condition、heritage_level |
@@ -108,14 +113,14 @@ RightsStatus = UNKNOWN | LICENSED | PUBLIC_DOMAIN | FAIR_USE_REVIEWED | OWNED | 
 | `audit_logs` | actor_id、request_id、action、entity_type、entity_id、before_json、after_json、ip_hash、created_at；只增不改 |
 | `homepage_slots` | slot_key、content_id、position、starts_at、ends_at；由后台配置 |
 
-所有业务表使用 UUID、UTC 时间和 `created_at/updated_at`。显示日期按用户时区格式化。删除默认软删除；revision、review action、audit log 不允许普通业务接口删除。
+所有业务表使用 cuid 主键、UTC 时间和 `created_at/updated_at`。SQLite 无原生 ENUM，enum 列存为 String，取值范围由 `packages/database/src/enums.ts` 的字面量联合 + zod 在应用层保证。显示日期按用户时区格式化。删除默认软删除；revision、review action、audit log 不允许普通业务接口删除。
 
 ### 5.3 数据库强约束
 
 - `slug` 采用小写 ASCII、数字和连字符，并全局唯一；发布后变更必须建立 redirect 记录。
 - `PUBLISHED` 内容必须具备标题、摘要、正文、至少一项来源或明确的原创/采访说明。
 - 使用中的图片必须有 alt、credit line 与 rights status；`UNKNOWN/RESTRICTED` 不得公开发布。
-- `geom` 经纬度范围必须有效；`accuracy=UNKNOWN` 时不得有精确坐标。
+- `lon/lat` 经纬度范围必须有效；`accuracy=UNKNOWN` 时不得有精确坐标。空间查询走 R\*Tree 粗筛 + 应用层浮点精确判定两段式。
 - 关系两端必须存在；关系类型由受控字典校验。
 - 并发更新使用 `version` 乐观锁；冲突返回 409，不得静默覆盖。
 - 所有状态变更与正文保存使用事务，并同步写 revision/review/audit 记录。
@@ -255,7 +260,8 @@ OpenAPI 在 API CI 中生成并做 breaking-change 检查；Web/Admin 使用生�
 ## 11. 搜索实现
 
 - 建立规范化搜索文档：标题、别名、摘要、正文纯文本、标签、地点名。
-- 中文初期使用标题/别名 `pg_trgm`、ILIKE 与受控关键词组合；按命中字段、标题相似度、发布时间排序。
+- 中文初期使用 `LIKE` + 转义通配符（`ESCAPE '\'`）与受控关键词组合；无 trigram 相似度，按命中字段、发布时间排序。~~标题/别名 `pg_trgm`、ILIKE~~ 已由 ADR-0001 取代。
+- 必须转义用户输入的 `%` 与 `_`，否则一次请求可拖回全部已发布内容。
 - 查询长度 2–100；转义通配符；限制耗时；无结果返回推荐标签而不是虚构答案。
 - 记录匿名化查询词、耗时、结果数，用于决定是否引入中文分词或专用搜索服务。
 
@@ -274,7 +280,8 @@ OpenAPI 在 API CI 中生成并做 breaking-change 检查；Web/Admin 使用生�
 - `/health/live` 只检查进程；`/health/ready` 检查数据库和必要依赖，不泄露细节。
 - 结构化 JSON 日志含 timestamp、level、service、environment、requestId、route、status、duration；个人信息脱敏。
 - 指标：请求量、p50/p95/p99、5xx、登录失败、发布失败、DB pool、慢查询、上传失败、revalidation 失败。
-- PostgreSQL 每日备份并启用 PITR（供应商允许时）；对象存储开启版本化/生命周期；配置与迁移纳入版本控制。
+- SQLite 文件级备份，使用 `.backup` 或 `VACUUM INTO`（WAL 模式下直接拷贝 `.db` 会得到不一致快照）；**无 PITR**，RPO = 距上次备份的间隔；对象存储开启版本化/生命周期；配置与迁移纳入版本控制。详见 `docs/RUNBOOK.md`。
+- SQLite 无连接池，`db_pool_*` 类指标不适用；以文件大小增长与慢查询替代（见 `docs/OPERATIONS.md`）。
 - 每季度在隔离环境做恢复演练，记录 RPO/RTO 实测。未做恢复验证不能声称“已备份可恢复”。
 
 ## 14. 环境与配置
@@ -305,7 +312,7 @@ REVALIDATION_SECRET
 
 ## 15. CI/CD 与发布
 
-每个 PR 执行：安装锁定依赖 → format check → lint → TypeScript → unit tests → API integration tests → build → migration lint → dependency/secret scan。主分支额外构建三个部署产物和 E2E smoke。
+每个 PR 执行：安装锁定依赖 → format check → lint → TypeScript → unit tests → API integration tests → build → migration lint → dependency/secret scan。依赖扫描门禁为 `pnpm audit --prod --audit-level high`（只卡生产依赖；dev 依赖处置见 [ADR-0002](adr/0002-dependency-vulnerability-policy.md)）。主分支额外构建三个部署产物和 E2E smoke。
 
 发布顺序：
 
@@ -323,7 +330,7 @@ REVALIDATION_SECRET
 | 层 | 范围 |
 | --- | --- |
 | 单元 | 状态机、RBAC、readiness、slug、日期精度、版权与坐标规则 |
-| 集成 | API + 真实 PostgreSQL/PostGIS；事务、并发、空间查询、审计 |
+| 集成 | API + 真实 SQLite 数据库（迁移 SQL 在空库真实执行，含 R\*Tree 虚表）；事务、并发、空间查询、审计 |
 | 契约 | OpenAPI schema、生成客户端、错误码、分页 |
 | 组件 | 编辑器表单、冲突处理、地图/列表联动、错误状态 |
 | E2E | 登录、建稿、补来源、送审、退回/通过、发布、公开可见、撤回 |
@@ -349,7 +356,7 @@ REVALIDATION_SECRET
 - P0：workspace、三个应用、共享配置、CI、品牌 tokens、静态首页、健康检查；本地一条命令启动。
 - P1：数据库迁移、认证/RBAC、内容/来源/媒体、版本与审核、后台 MVP；完整审核链可测试。
 - P2：公开首页、栏目、详情、专题、SEO、revalidation；发布内容可稳定访问。
-- P3：PostGIS bbox、Leaflet 联动、搜索、路线、降级；地图验收场景通过。
+- P3：SQLite R\*Tree bbox 查询、地图联动、搜索、路线、降级；地图验收场景通过。
 - P4：安全/E2E/性能、备份恢复、监控、staging、生产 runbook、首批核验内容。
 
 每个阶段只有在代码、迁移、测试、文档和验收证据全部存在时才算完成。
@@ -358,7 +365,7 @@ REVALIDATION_SECRET
 
 以下问题不阻塞 P0，但必须在对应阶段开始前由维护者确认并记录 ADR：
 
-- P1 前：API/PostgreSQL/Object storage 实际托管商、邮件/通知供应商、账号初始化流程。
+- P1 前：API/数据库（SQLite 需带持久卷的主机）/Object storage 实际托管商、邮件/通知供应商、账号初始化流程。
 - P2 前：正式域名、纠错入口接收方式、隐私与版权文本负责人。
 - P3 前：合法可用的底图供应商、配额、attribution 与中国大陆坐标/合规策略。
 - P4 前：备份保留周期、RPO/RTO、日志保留期、生产告警接收人、ICP备案/等保等适用性评估。

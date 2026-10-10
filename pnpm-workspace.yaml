@@ -2,6 +2,27 @@ packages:
   - 'apps/*'
   - 'packages/*'
 
+# 传递依赖的安全升级（P4-02 依赖扫描）。
+#
+# multer 被 `@nestjs/platform-express` **精确锁定**在 2.0.2（不是 `^`），因此
+# 无法靠提升 Nest 版本顺带修复。2.0.2 命中多个 high 级公告，其中数个是
+# DoS / 目录穿越类问题，且 multer 是生产依赖（文件上传路径）。
+#
+# 上游 @nestjs/platform-express 10.4.22 的写法：`"multer": "2.0.2"`，
+# 所以必须用 override 强制抬升。2.x → 2.4.0 仍是同一大版本，API 兼容。
+#
+# 注意：本项目代码并未直接使用 multer（无 FileInterceptor / multipart），
+# 但它随 platform-express 一起进入生产依赖树，仍需修复。
+overrides:
+  multer: '2.4.0'
+  # next@15.5.27 把 postcss 精确锁在 8.4.31，该版本命中多个 high 公告
+  # （sourceMappingURL 路径穿越导致 .map 文件泄露）。Next 上游同样以精确
+  # 版本钉住，因此只能 override。8.4 → 8.5 是同一大版本，且 8.5.29 已在
+  # 本仓库的 dev 依赖链（vite）中使用并通过测试与构建。
+  # 风险：Next 的 CSS 管线与 postcss 8.5 的兼容性未经上游背书。
+  # 验证：override 后必须实跑 `pnpm build`，由真实构建结果而非推断决定是否保留。
+  'next>postcss': '8.5.29'
+
 # pnpm 11+ 把 onlyBuiltDependencies 重命名为 allowBuilds（map 形式）。
 # 只允许真正需要构建脚本的包跑 install script，其他全部拒绝执行。
 allowBuilds:

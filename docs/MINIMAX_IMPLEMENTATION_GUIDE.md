@@ -42,12 +42,12 @@ MiniMax 不得自行替换或绕开以下选型：
 | 公开站 | Next.js、React、TypeScript、Tailwind CSS |
 | 管理后台 | React、Vite、TypeScript、shadcn/ui |
 | API | NestJS、REST、OpenAPI |
-| 数据库 | PostgreSQL、PostGIS |
-| ORM | Prisma；PostGIS 特性允许受审查的原生 SQL |
+| 数据库 | SQLite（空间索引用内置 R\*Tree，见 `docs/adr/0001-sqlite-data-layer.md`） |
+| ORM | Prisma；R\*Tree 虚表经受审查的原生 SQL 迁移建立，应用层显式重建 |
 | 富文本 | Tiptap JSON 文档 |
-| 地图 | Leaflet |
+| 地图 | Leaflet（当前实现已改用高德 JS API 2.0，该变更 ADR 尚未批准，不得宣称已批准） |
 | 文件 | S3 兼容对象存储 |
-| 首期搜索 | PostgreSQL、`pg_trgm` |
+| 首期搜索 | SQLite `LIKE` + 通配符转义（无 `pg_trgm` 相似度） |
 | 测试 | Vitest、NestJS integration、Playwright |
 
 未经维护者批准和 ADR，不得引入微服务、消息队列、Elasticsearch、第二数据库、第二 ORM 或另一套身份系统。
@@ -93,7 +93,7 @@ pnpm build
 
 - 空数据库能完整执行迁移。
 - 已有测试数据能升级。
-- 约束、索引和 PostGIS 查询实际有效。
+- 约束、索引和 R\*Tree 空间查询实际有效。
 - 回滚或 expand/contract 方案明确。
 
 涉及核心流程时运行对应 Playwright E2E。无法运行的检查必须写明原因，不能写“理论上可以通过”。
@@ -276,7 +276,7 @@ MiniMax 不得跨过未完成的阶段门禁：
 - P0 门禁：三个应用可独立运行；根级质量命令通过；开发配置无秘密。
 - P1 门禁：真实数据库和服务端权限有效；审核发布链路通过集成/E2E；审计可追溯。
 - P2 门禁：发布内容从后台到公开站闭环；SEO、撤回和响应式验证通过。
-- P3 门禁：真实 PostGIS bbox 查询；地图/列表联动和失败降级通过。
+- P3 门禁：真实 SQLite R\*Tree bbox 查询；地图/列表联动和失败降级通过。
 - P4 门禁：安全、性能、监控、备份恢复和上线 runbook 有真实证据。
 
 前一阶段未满足时，可以为后续做不破坏兼容性的准备，但不能宣称后续阶段已经交付。
@@ -285,7 +285,7 @@ MiniMax 不得跨过未完成的阶段门禁：
 
 遇到以下事项，MiniMax 只能给出选项与影响，不能代替用户决定：
 
-- API、PostgreSQL、对象存储和邮件服务供应商。
+- API、数据库、对象存储和邮件服务供应商。
 - 正式域名、付费套餐与生产部署。
 - 地图供应商、中国大陆地图合规和坐标策略。
 - 版权争议、合理使用判断和正式法律文本。
