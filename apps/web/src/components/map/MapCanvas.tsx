@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import styles from './map.module.css';
+import { MARKER_HEIGHT, MARKER_WIDTH, SLUG_ATTR, css, focusMarkerButton, markerContentHtml } from './marker';
 
 import type { ResolvedAmapConfig } from '@/lib/amap-config';
 import type {
@@ -22,7 +22,6 @@ import {
   MAP_MOVE_DEBOUNCE_MS,
   basemapStatus,
   createDebouncer,
-  escapeHtml,
   mapSurfaceState,
   type MapSurfaceState,
 } from '@/lib/map-state';
@@ -74,56 +73,6 @@ const INITIAL_ZOOM = 12;
 
 /** 缩放范围。高德矢量底图 3~19 之外没有数据，锁住避免出现空白画面。 */
 const ZOOM_RANGE: readonly [number, number] = [3, 19];
-
-/**
- * marker 尺寸（px），必须与 `map.module.css` 里 `.mapMarkerPin` 的 1.5rem × 2.25rem 一致。
- *
- * 之所以写死常量而不是读 DOM：高德在 `add()` 时就据此算 offset，
- * 那时元素还没被测量，读 `getBoundingClientRect()` 只会拿到 0。
- */
-const MARKER_WIDTH = 24;
-const MARKER_HEIGHT = 36;
-
-/** marker 属性名：同时用于事件委托与焦点定位。 */
-const SLUG_ATTR = 'data-map-slug';
-
-/**
- * CSS Module 取值。
- *
- * Next 生成的 `*.module.css` 类型是索引签名，在 `noUncheckedIndexedAccess` 下
- * 取值是 `string | undefined`；这里收口成 `string`，缺失时退回类名本身，
- * 宁可样式退化也不让 marker 渲染中断。
- */
-function css(name: string): string {
-  return styles[name] ?? name;
-}
-
-/**
- * marker 的自定义 HTML。
- *
- * 用原生 `<button>` 而不是 Leaflet `divIcon` 那套：原生按钮**自带**
- * Enter / Space 键盘激活、焦点可见样式、读屏可读名称，不需要手工补
- * `role` / `tabIndex` / `keypress`（少一层就少一处可访问性回归）。
- *
- * 交互走容器上的**事件委托**（见下方 effect），不去摸高德 marker 的内部 DOM。
- *
- * ⚠️ 图钉**必须用纯 CSS 画，不能用内联 SVG**：实测高德 2.0 在渲染 marker
- * `content` 时会剥掉 `<svg>`（同一个 content 里的 `<span>` 能存活）。
- * 结果就是 `<svg>` 整块消失、只剩可访问文本，视觉上退化成高德默认图钉 ——
- * 品牌色和选中态样式全部失效。用 CSS 画则 100% 存活且完全可控。
- *
- * `title` 与 `slug` 来自 API，必须 `escapeHtml`；类名来自本项目的 CSS Module，
- * 是可信字面量，不转义（转义反而会让类名永远匹配不上）。
- */
-function markerContentHtml(title: string, slug: string, selected: boolean): string {
-  return (
-    `<button type="button" class="${css('mapMarker')}" ${SLUG_ATTR}="${escapeHtml(slug)}" ` +
-    `aria-pressed="${selected ? 'true' : 'false'}">` +
-    `<span class="${css('mapMarkerPin')}" aria-hidden="true"></span>` +
-    `<span class="${css('visuallyHidden')}">${escapeHtml(title)}</span>` +
-    '</button>'
-  );
-}
 
 export default function MapCanvas({
   items,
@@ -443,20 +392,4 @@ export default function MapCanvas({
       ) : null}
     </div>
   );
-}
-
-/**
- * 把焦点移到某个 marker 的按钮上。
- *
- * 遍历比对 `getAttribute` 而不是拼 `CSS.escape` 选择器：slug 来自 API，
- * 可能含引号 / 方括号，交给 `CSS.escape` 之外的任何拼接都会变成注入点。
- */
-function focusMarkerButton(container: HTMLElement | null, slug: string): void {
-  if (container === null) return;
-  for (const node of container.querySelectorAll<HTMLElement>(`button[${SLUG_ATTR}]`)) {
-    if (node.getAttribute(SLUG_ATTR) === slug) {
-      node.focus({ preventScroll: true });
-      return;
-    }
-  }
 }
