@@ -11,12 +11,12 @@ import type {
   AMapNamespace,
   AMapPosition,
 } from '@/lib/amap-sdk';
-import type { MapBBox, ViewportBounds } from '@/lib/map-geo';
+import type { MapBBox } from '@/lib/map-geo';
 
 import { loadAmap } from '@/lib/amap-loader';
-import { gcj02ToWgs84, wgs84ToGcj02 } from '@/lib/map-coords';
+import { wgs84ToGcj02 } from '@/lib/map-coords';
 import { accuracyLabel, markerItems, markerPosition, type MapPlaceItem } from '@/lib/map-data';
-import { bboxFromBounds, bboxCenter, validateBBox } from '@/lib/map-geo';
+import { bboxCenter, bboxFromBounds, gcjViewportToWgsBounds, validateBBox } from '@/lib/map-geo';
 import {
   BASEMAP_LOAD_DEADLINE_MS,
   MAP_MOVE_DEBOUNCE_MS,
@@ -181,25 +181,25 @@ export default function MapCanvas({
 
   // 挂载：加载高德脚本 → 建地图。卸载时务必销毁，否则动态切换页面会留下幽灵容器。
   /**
- * 地图实例只认**值**，不认对象身份。
- *
- * `initialBBox` 与 `amap` 都是服务端组件在每次渲染里新建的对象：点一下 marker
- * → `router.replace` 写选中态 → 服务端重渲染 → 两个 prop 引用全变（值却一样）。
- * 若把它们直接放进 `useEffect` 依赖，整张地图会在**每次选中/取消选中时**被
- * 销毁重建：用户刚点中就眼看着底图闪一下，高德还会因为在 destroy 期间仍有
- * 排版任务在跑而抛 `LngLat(NaN, NaN)` / `Pixel(NaN, NaN)`（实测）。
- *
- * 因此 deps 只放**原始值**组成的 key，值本身经 ref 读取 ——
- * hooks 插件未启用 exhaustive-deps，依赖关系靠这里人工守。
- */
-const bboxKey = `${initialBBox.minLon}|${initialBBox.minLat}|${initialBBox.maxLon}|${initialBBox.maxLat}`;
-const amapKey = amap === null ? '' : amap.key;
-const initialBBoxRef = useRef(initialBBox);
-const configRef = useRef(amap);
-initialBBoxRef.current = initialBBox;
-configRef.current = amap;
+   * 地图实例只认**值**，不认对象身份。
+   *
+   * `initialBBox` 与 `amap` 都是服务端组件在每次渲染里新建的对象：点一下 marker
+   * → `router.replace` 写选中态 → 服务端重渲染 → 两个 prop 引用全变（值却一样）。
+   * 若把它们直接放进 `useEffect` 依赖，整张地图会在**每次选中/取消选中时**被
+   * 销毁重建：用户刚点中就眼看着底图闪一下，高德还会因为在 destroy 期间仍有
+   * 排版任务在跑而抛 `LngLat(NaN, NaN)` / `Pixel(NaN, NaN)`（实测）。
+   *
+   * 因此 deps 只放**原始值**组成的 key，值本身经 ref 读取 ——
+   * hooks 插件未启用 exhaustive-deps，依赖关系靠这里人工守。
+   */
+  const bboxKey = `${initialBBox.minLon}|${initialBBox.minLat}|${initialBBox.maxLon}|${initialBBox.maxLat}`;
+  const amapKey = amap === null ? '' : amap.key;
+  const initialBBoxRef = useRef(initialBBox);
+  const configRef = useRef(amap);
+  initialBBoxRef.current = initialBBox;
+  configRef.current = amap;
 
-useEffect(() => {
+  useEffect(() => {
     const container = containerRef.current;
     if (container === null) return undefined;
 
@@ -279,7 +279,14 @@ useEffect(() => {
           debouncer.schedule(() => {
             // 高德返回 GCJ-02，必须转回 WGS-84 才能和接口的 bbox 对齐；
             // 否则每次平移都会带进约 300 米的窗口错位，marker 会被漏在窗口外。
-            const next = bboxFromBounds(gcj02BoundsToWgs84(bounds));
+            const next = bboxFromBounds(
+              gcjViewportToWgsBounds({
+                west: bounds.getSouthWest().lng,
+                south: bounds.getSouthWest().lat,
+                east: bounds.getNorthEast().lng,
+                north: bounds.getNorthEast().lat,
+              }),
+            );
             if (!validateBBox(next).ok) return; // 非法窗口不外抛，交给列表继续显示
             onViewportChangeRef.current(next);
           });
@@ -436,28 +443,6 @@ useEffect(() => {
       ) : null}
     </div>
   );
-}
-
-/**
- * 高德 `getBounds()`（GCJ-02）→ 请求用视窗边界（WGS-84）。
- *
- * 只转四个角即可：bbox 是轴对齐矩形，区域内任一点的偏移量在几百米尺度上
- * 可视为常数，逐点反演既昂贵也没有额外精度收益。
- */
-function gcj02BoundsToWgs84(bounds: {
-  readonly getSouthWest: () => { readonly lng: number; readonly lat: number };
-  readonly getNorthEast: () => { readonly lng: number; readonly lat: number };
-}): ViewportBounds {
-  const sw = bounds.getSouthWest();
-  const ne = bounds.getNorthEast();
-  const west = gcj02ToWgs84({ lon: sw.lng, lat: sw.lat });
-  const north = gcj02ToWgs84({ lon: ne.lng, lat: ne.lat });
-  return {
-    west: west.lon,
-    south: west.lat,
-    east: north.lon,
-    north: north.lat,
-  };
 }
 
 /**

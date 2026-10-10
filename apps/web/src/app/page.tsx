@@ -11,6 +11,21 @@ import { buildPageMetadata } from '@/lib/seo';
 
 const REVALIDATE_SECONDS = 300;
 
+/**
+ * 必须按请求渲染，否则 CSP nonce 对不上。
+ *
+ * 默认的静态预渲染发生在 `next build` 期间 —— 那时还没有请求，
+ * middleware 没有 `x-nonce` 可透传，Next 因此输出**不带 nonce 属性**的
+ * 内联 bootstrap script。运行时 middleware 又发一个每请求随机的 nonce，
+ * 两边对不上：`script-src` 同时含 nonce 与 `strict-dynamic` 时，
+ * 页面上**所有** script（内联的和同源外链的）都会被浏览器拦掉 ——
+ * 表现是 HTML 正常显示但整页无 JS、无水合，且不抛任何应用层异常。
+ *
+ * 数据仍走 `next: { revalidate: REVALIDATE_SECONDS }` 缓存，
+ * 这里只放弃 HTML 本身的静态缓存：每次请求一次 SSR，数据不重复回源。
+ */
+export const dynamic = 'force-dynamic';
+
 export const metadata: Metadata = buildPageMetadata({
   title: '南京城市文化数字档案',
   description:

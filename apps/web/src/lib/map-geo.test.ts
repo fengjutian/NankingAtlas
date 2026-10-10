@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { wgs84ToGcj02 } from './map-coords';
 import {
   DEFAULT_MAP_BBOX,
   MAX_BBOX_SPAN_DEG,
@@ -8,6 +9,7 @@ import {
   bboxErrorMessage,
   bboxSignature,
   formatBBox,
+  gcjViewportToWgsBounds,
   padBBox,
   parseAndValidateBBox,
   parseBBox,
@@ -169,5 +171,65 @@ describe('视口换算', () => {
 
   it('默认视窗自身是合法 bbox（build/首屏请求不会先天非法）', () => {
     expect(validateBBox(DEFAULT_MAP_BBOX).ok).toBe(true);
+  });
+});
+
+describe('高德视窗 → WGS bbox（平移后回查的那一步）', () => {
+  // 南京主城一屏的 GCJ-02 视窗（取自真实高德 getBounds 的量级）。
+  const GCJ_VIEWPORT = {
+    west: 118.7352,
+    south: 32.0288,
+    east: 118.8672,
+    north: 32.1728,
+  };
+
+  it('转换后整体向西北回退（实测：该区域 GCJ-02 偏东南约 490m / 225m）', () => {
+    const wgs = gcjViewportToWgsBounds(GCJ_VIEWPORT);
+    // 经度：GCJ 比 WGS 偏东 → 转回要更小（更西）
+    expect(wgs.west).toBeLessThan(GCJ_VIEWPORT.west);
+    expect(wgs.east).toBeLessThan(GCJ_VIEWPORT.east);
+    // 纬度：GCJ 比 WGS 偏南 → 转回要更大（更北）
+    // ↑ 这里最容易写反：直觉以为"两个坐标系总是南低"，实测是相反的。
+    expect(wgs.south).toBeGreaterThan(GCJ_VIEWPORT.south);
+    expect(wgs.north).toBeGreaterThan(GCJ_VIEWPORT.north);
+  });
+
+  it('偏移量落在国标 GB 20263 的量级区间（几百米，不是几百公里）', () => {
+    const wgs = gcjViewportToWgsBounds(GCJ_VIEWPORT);
+    const metersPerDegLon = 111_320 * Math.cos((GCJ_VIEWPORT.south * Math.PI) / 180);
+    const shiftM = {
+      lon: Math.abs(GCJ_VIEWPORT.west - wgs.west) * metersPerDegLon,
+      lat: Math.abs(wgs.south - GCJ_VIEWPORT.south) * 110_574,
+    };
+    expect(shiftM.lon).toBeGreaterThan(100);
+    expect(shiftM.lon).toBeLessThan(600);
+    expect(shiftM.lat).toBeGreaterThan(100);
+    expect(shiftM.lat).toBeLessThan(600);
+  });
+
+  it('往返一致：GCJ → WGS → GCJ 回到原视窗（容差亚米）', () => {
+    const wgs = gcjViewportToWgsBounds(GCJ_VIEWPORT);
+    const sw = wgs84ToGcj02({ lon: wgs.west, lat: wgs.south });
+    const ne = wgs84ToGcj02({ lon: wgs.east, lat: wgs.north });
+    expect(sw.lon).toBeCloseTo(GCJ_VIEWPORT.west, 6);
+    expect(sw.lat).toBeCloseTo(GCJ_VIEWPORT.south, 6);
+    expect(ne.lon).toBeCloseTo(GCJ_VIEWPORT.east, 6);
+    expect(ne.lat).toBeCloseTo(GCJ_VIEWPORT.north, 6);
+  });
+
+  it('转换结果仍是可直接发请求的合法 bbox（不会打出注定 400 的窗口）', () => {
+    const next = bboxFromBounds(gcjViewportToWgsBounds(GCJ_VIEWPORT));
+    expect(validateBBox(next).ok).toBe(true);
+    expect(next.minLon).toBeLessThan(next.maxLon);
+    expect(next.minLat).toBeLessThan(next.maxLat);
+  });
+
+  it('【回归】忘记转换时窗口会西/南偏约 300 米 —— 这就是本函数存在的理由', () => {
+    // 直接拿 GCJ 当 WGS 用：点正好落在窗口边界上时会被 API 判为"不在范围内"，
+    // 用户表现为"平移后地图上的点自己消失了"。这里把这个失败钉成断言。
+    const wrong = bboxFromBounds(GCJ_VIEWPORT);
+    const right = bboxFromBounds(gcjViewportToWgsBounds(GCJ_VIEWPORT));
+    expect(wrong.minLon - right.minLon).toBeGreaterThan(0.003); // 经度偏东
+    expect(wrong.minLat - right.minLat).toBeLessThan(-0.001); // 纬度偏南
   });
 });

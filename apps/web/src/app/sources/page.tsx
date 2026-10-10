@@ -15,6 +15,20 @@ export const metadata: Metadata = buildPageMetadata({
   path: BASE_PATH,
 });
 
+/**
+ * 必须按请求渲染，否则 CSP nonce 对不上。
+ *
+ * 默认的静态预渲染发生在 `next build` 期间 —— 那时还没有请求，
+ * middleware 没有 `x-nonce` 可透传，Next 因此输出**不带 nonce 属性**的
+ * 内联 bootstrap script。运行时 middleware 又发一个每请求随机的 nonce，
+ * 两边对不上：`script-src` 同时含 nonce 与 `strict-dynamic` 时，
+ * 页面上**所有** script（内联的和同源外链的）都会被浏览器拦掉 ——
+ * 表现是 HTML 正常显示但整页无 JS、无水合，且不抛任何应用层异常。
+ *
+ * 数据仍走 `next: { revalidate }` 缓存，这里只放弃 HTML 的静态缓存。
+ */
+export const dynamic = 'force-dynamic';
+
 const KIND_NOTES: Readonly<Record<SourceKind, string>> = {
   BOOK: '正式出版的著作、方志、别集等。',
   JOURNAL: '期刊论文、学报与研究报告。',

@@ -39,7 +39,7 @@
 /** 配置缺失或不合法的原因。 */
 export type AmapConfigFailure =
   /** 没有配 `NEXT_PUBLIC_AMAP_KEY`：无法加载高德脚本。 */
-  | 'missing_key';
+  'missing_key';
 
 export type AmapConfigResult =
   | {
