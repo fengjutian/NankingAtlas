@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { MARKER_HEIGHT, MARKER_WIDTH, SLUG_ATTR, css, focusMarkerButton, markerContentHtml } from './marker';
+import {
+  MARKER_HEIGHT,
+  MARKER_WIDTH,
+  SLUG_ATTR,
+  css,
+  focusMarkerButton,
+  markerContentHtml,
+} from './marker';
 
 import type { ResolvedAmapConfig } from '@/lib/amap-config';
 import type {
