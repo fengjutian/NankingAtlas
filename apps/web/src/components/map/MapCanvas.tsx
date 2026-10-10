@@ -149,7 +149,6 @@ export default function MapCanvas({
       return undefined;
     }
 
-
     const center = bboxCenter(initialBBoxRef.current);
     const map = L.map(container, {
       // Leaflet 用 [lat, lng]，与本项目对外的 lon/lat 相反。
@@ -189,7 +188,17 @@ export default function MapCanvas({
     // ② 移动停止（去抖后）才回抛 bbox。
     const debouncer = createDebouncer(MAP_MOVE_DEBOUNCE_MS);
     debouncerRef.current = debouncer;
+    // Leaflet 在 `L.map({center, zoom})` 内部会调一次 setView，**建图当场就触发
+    // 一次 moveend**（高德当年不会）。那次视窗就是 initialBBox，回抛它是纯冗余：
+    // 上层会拿着与首屏相同的 bbox 再取一次数、再 router.replace 一次，
+    // 服务端重渲染 → initialBBox 引用变化 → 地图重建 → 又触发 moveend → 死循环。
+    // 实测表现为地图在「加载中」占位与已渲染之间反复横跳。
+    let firstMoveEnd = true;
     const handleMoveEnd = (): void => {
+      if (firstMoveEnd) {
+        firstMoveEnd = false;
+        return;
+      }
       const bounds = map.getBounds();
       debouncer.schedule(() => {
         // OSM 瓦片就是 WGS-84，视窗 bbox 与接口参数同坐标系，**无需转换**。

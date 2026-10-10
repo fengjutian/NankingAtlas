@@ -19,6 +19,8 @@
     "prisma:migrate:deploy": "prisma migrate deploy",
     "prisma:format": "prisma format",
     "seed": "tsx prisma/seed.ts",
+    "backup": "tsx prisma/backup.ts",
+    "restore-drill": "tsx prisma/restore-drill.ts",
     "clean": "rimraf dist coverage"
   },
   "prisma": {

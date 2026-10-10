@@ -62,6 +62,13 @@ apps/api/prisma-test/
 packages/database/prisma/*.db
 packages/database/prisma/*.db-journal
 
+# 数据库备份与恢复演练产物（packages/database/prisma/backup.ts）
+#
+# ⚠️ 这里装的是**整个数据库的副本**（含用户 email、审计日志），
+# 绝不能进版本库。`.gitignore` 的 `*.db` 规则只覆盖 prisma/ 目录，
+# 备份输出到 packages/database/backups/ 时不在其内，必须显式忽略。
+packages/database/backups/
+
 # E2E 的临时库与产物（由 e2e/global-setup.ts 与 playwright 创建）
 packages/database/prisma/e2e/
 packages/database/prisma/e2e.stale-*/

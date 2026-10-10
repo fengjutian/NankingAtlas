@@ -27,7 +27,7 @@ MVP 包含公开站、独立管理后台、统一 API、SQLite（空间索引用
 | 数据库 | **SQLite** | 权威数据源；事务、约束在服务端执行；空间索引用 R\*Tree（见 [ADR-0001](adr/0001-sqlite-data-layer.md)）。~~PostgreSQL + PostGIS~~ 已由 ADR-0001 取代 |
 | ORM | Prisma | 常规 CRUD 与迁移；R\*Tree 虚表经由受审查的 SQL migration 建立、由应用层显式重建（触发器不能写虚表） |
 | 编辑器 | Tiptap | 保存受控 JSON 文档；服务端白名单校验；渲染时二次净化 |
-| 地图 | Leaflet | 底图提供商可配置；底图失败时保留列表和筛选。**注意**：当前实现已改用高德 JS API 2.0，该变更的 ADR 尚未批准，本行尚未回写 |
+| 地图 | **Leaflet**（渲染）+ **高德 JS API 2.0**（数据） | 底图用 OSM 标准瓦片（WGS-84），高德只做地理编码。详见 [ADR-0003](adr/0003-leaflet-render-amap-data.md) |
 | 文件 | S3 兼容对象存储 | 浏览器只使用 API 签发的短期上传凭证；元数据入库 |
 | 搜索 | **SQLite `LIKE` + 通配符转义** | 首期不引入 Elasticsearch；无 `pg_trgm` 相似度。~~PostgreSQL + `pg_trgm`~~ 已由 ADR-0001 取代 |
 

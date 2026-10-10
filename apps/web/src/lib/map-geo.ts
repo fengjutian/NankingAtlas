@@ -196,7 +196,6 @@ export function bboxCenter(bbox: MapBBox): LonLat {
   };
 }
 
-
 /** bbox 签名：用于"视口没真的动就别重复请求"。 */
 export function bboxSignature(bbox: MapBBox, precision = 4): string {
   return formatBBox(bbox, precision);

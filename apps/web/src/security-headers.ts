@@ -120,23 +120,21 @@ export function applySecurityHeaders(
 }
 
 /**
- * 高德地图 JS API 需要的域名。
+ * 底图瓦片与数据源域名（ADR-0003）。
  *
- * 按用途分三类，缺一整块地图就是白屏：
- * - `webapi.amap.com` —— 主脚本（`https://webapi.amap.com/maps?v=2.0&key=…`）
- * - `*.amap.com`    —— 矢量瓦片、样式、自定义图层（`*.is.amap.com`、`vweb.amap.com`…）
- * - `*.autonavi.com`—— 瓦片与数据服务的实际取图域名（`*.is.autonavi.com` 等）
+ * 渲染改用 Leaflet + OSM 瓦片后，取图域名从高德变成 OSM；
+ * 高德只剩「数据」职责（地理编码），仍需放行其脚本与接口域名。
  *
- * ⚠️ 高德没有提供"逐瓦片失败事件"，所以任何一个域名漏掉的表现都是
- * **静默白屏**，只在控制台报错 —— 很难从用户侧定位。这些域名是**照抄官方
- * 加载行为**得到的，不是"图省事放开 https:"；`default-src 'self'` 仍然闭合。
+ * 分开列是因为两者用途不同，混在一起会让"为什么要放行这个域名"无法回答：
+ * - `tile.openstreetmap.org` —— 底图瓦片（Leaflet 用 `<img>` 拉，故走 `img-src`）
+ * - `*.amap.com` / `*.autonavi.com` —— 高德地理编码的脚本与接口
+ *
+ * ⚠️ 漏掉 `img-src` 里的 OSM 域名，底图会**静默空白**：脚本正常、marker 正常、
+ * 地图容器正常，唯独没有瓦片 —— 很容易误判成"坐标错了"或"Leaflet 没生效"。
  */
+const OSM_TILE_SOURCES = ['https://tile.openstreetmap.org', 'https://*.tile.openstreetmap.org'];
 const AMAP_CONNECT_SOURCES = ['https://*.amap.com', 'https://*.autonavi.com'];
-const AMAP_IMG_SOURCES = [
-  'https://*.amap.com',
-  'https://*.autonavi.com',
-  'https://*.is.autonavi.com',
-];
+const AMAP_IMG_SOURCES = ['https://*.amap.com', 'https://*.autonavi.com'];
 const AMAP_HOST_SOURCES = [
   'https://webapi.amap.com',
   'https://*.amap.com',
@@ -161,8 +159,8 @@ export function buildCsp(context: SecurityHeadersContext): string {
   // 平移/缩放/关键词筛选全部失效，只剩首屏 SSR 数据。
   const apiOrigin = safeOrigin(process.env.NEXT_PUBLIC_API_BASE_URL ?? '');
 
-  const imgSources = ["'self'", 'data:', 'blob:', ...AMAP_IMG_SOURCES];
-  const connectSources = ["'self'", ...AMAP_CONNECT_SOURCES];
+  const imgSources = ["'self'", 'data:', 'blob:', ...OSM_TILE_SOURCES, ...AMAP_IMG_SOURCES];
+  const connectSources = ["'self'", ...OSM_TILE_SOURCES, ...AMAP_CONNECT_SOURCES];
 
   if (apiOrigin !== null) {
     // 图片也可能来自 API（媒体 URL），一并放行

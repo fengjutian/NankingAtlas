@@ -12,11 +12,7 @@
 
 ## 2. 范围与架构纪律
 
-1. 严格使用 pnpm + Turborepo、Next.js Web、React/Vite Admin、NestJS API、SQLite（R\*Tree 空间索引，见 `docs/adr/0001-sqlite-data-layer.md`）、Prisma、Tailwind/shadcn、Leaflet、Tiptap。
-
-   > 地图 SDK 说明：当前实现已使用高德 JS API，但该变更的 ADR 尚未批准，
-   > 技术方案 §2 的「Leaflet」一项也尚未回写。在维护者明确批准前，
-   > 不得宣称其已获批准，也不得反向改回 Leaflet。
+1. 严格使用 pnpm + Turborepo、Next.js Web、React/Vite Admin、NestJS API、SQLite（R\*Tree 空间索引，见 `docs/adr/0001-sqlite-data-layer.md`）、Prisma、Tailwind/shadcn、Leaflet（渲染）+ 高德（数据，见 `docs/adr/0003-leaflet-render-amap-data.md`）、Tiptap。
 2. Web、Admin、API 必须可独立构建和部署；Web/Admin 不得直连数据库。
 3. API 是权限、状态流转、审计、发布校验的唯一执行边界。
 4. 未经用户明确批准和 ADR，不得更换技术栈，不得引入微服务、消息队列、Elasticsearch、第二数据库或第二 ORM。

@@ -53,10 +53,7 @@ const AMAP_FAILURE_MESSAGES: Readonly<Record<GeocodeFailure, string>> = {
  * @param address 地址文本（用户输入）
  * @param city    限定城市，避免"南京"外的同名地点被误选
  */
-export async function geocodeAddress(
-  address: string,
-  city: string,
-): Promise<GeocodeResult> {
+export async function geocodeAddress(address: string, city: string): Promise<GeocodeResult> {
   const trimmed = address.trim();
   if (trimmed === '') {
     return { ok: false, reason: 'not_found', message: AMAP_FAILURE_MESSAGES.not_found };

@@ -79,11 +79,12 @@ describe('瓦片坐标换算（Web 墨卡托）', () => {
   });
 
   it('南京主城经纬度落在合理的瓦片范围内（不是 0 也不是 NaN）', () => {
+    // (118.7969+180)/360 * 2^12 = 3399.64；lat 32.0603 对应约 1663。
     const x = lonToTileX(118.7969, 12);
     const y = latToTileY(32.0603, 12);
-    expect(x).toBeGreaterThan(3000);
-    expect(x).toBeLessThan(3100);
-    expect(y).toBeGreaterThan(1600);
-    expect(y).toBeLessThan(1700);
+    expect(x).toBeGreaterThan(3395);
+    expect(x).toBeLessThan(3405);
+    expect(y).toBeGreaterThan(1655);
+    expect(y).toBeLessThan(1670);
   });
 });

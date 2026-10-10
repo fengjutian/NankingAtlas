@@ -245,15 +245,20 @@ SQLite 支持 WAL 模式，此时数据可能部分存在于 `.db`、部分存�
 
 必须使用以下两种方式之一：
 
-**方式 A：`VACUUM INTO`（SQLite 3.27+）**
+**方式 A：`VACUUM INTO`（SQLite 3.27+）—— 本项目脚本采用**
 
 ```bash
-sqlite3 "<db-path>.db" "VACUUM INTO '/backup/dir/nanking-atlas-$(date +%Y%m%d-%H%M%S).db';"
+# packages/database 目录下执行；输出默认到 packages/database/backups/
+DATABASE_URL='file:/abs/path/to/dev.db' pnpm --filter @nanking-atlas/database backup [输出目录]
 ```
 
-优点：产出单一紧凑文件，不含 WAL 附属文件，适合直接归档。
+等价于 `VACUUM INTO '<绝对路径>'`，但通过 Prisma 发同一条 SQL：**零新增依赖**，
+且与应用自身的连接方式完全一致。脚本会额外产出同名 `.json` 清单，记录
+sha256、字节数、journal 模式与各关键表行数 —— 清单是恢复演练能做行数比对的前提。
 
-**方式 B：`.backup` 命令（在线热备，推荐用于运行中的库）**
+**方式 B：`.backup` 命令（在线热备）**
+
+需本机有 `sqlite3` CLI：
 
 ```bash
 sqlite3 "<db-path>.db" ".backup '/backup/dir/nanking-atlas-$(date +%Y%m%d-%H%M%S).db'"
@@ -261,7 +266,12 @@ sqlite3 "<db-path>.db" ".backup '/backup/dir/nanking-atlas-$(date +%Y%m%d-%H%M%S
 
 优点：可在数据库运行时执行，自动处理一致性。
 
-> **前置条件 TODO**：以上命令依赖本机安装 `sqlite3` CLI。**当前仓库没有备份脚本，`sqlite3` 是否可用需人工确认**。若目标环境无 `sqlite3` CLI，需先补一个基于备份的脚本（TODO，见 §7），不得假设命令已可用。
+> ⚠️ **`sqlite3` CLI 在开发机实测不在 PATH 里**。原先本节只记录 sqlite3 命令，
+> 等于「文档里有、跑不通」。现在方式 A 不依赖它，是默认选择；
+> 方式 B 仅在确认有 CLI 的环境使用。
+>
+> 另注意：`packages/database/backups/` 已被 `.gitignore` 排除。
+> 那里是**整个数据库的副本**（含用户 email 与审计日志），绝不能提交进版本库。
 
 ### 3.2 备份频率与保留策略
 
@@ -286,32 +296,58 @@ sqlite3 "<db-path>.db" ".backup '/backup/dir/nanking-atlas-$(date +%Y%m%d-%H%M%S
 
 ### 3.4 恢复演练
 
-**当前状态：未执行过恢复演练。** 以下是应当执行的流程。
+**当前状态：已于 2026-10-10 在本地开发库上实际执行过一次，结论通过。**
+演练命令：
 
-1. 取一份备份，复制到**隔离环境**（绝不在生产库上验证恢复）。
-2. 还原并设置 `DATABASE_URL` 指向还原后的文件。
-3. 生成 client 并执行迁移部署：
+```bash
+DATABASE_URL='file:/abs/path/to/dev.db' \
+  pnpm --filter @nanking-atlas/database restore-drill backups
+```
 
-   ```bash
-   pnpm --filter @nanking-atlas/database prisma:generate
-   pnpm --filter @nanking-atlas/database prisma:migrate:deploy
-   ```
+脚本会：校验备份 sha256 → **复制**到隔离目录 → `PRAGMA integrity_check` →
+逐表比对行数 → 把结果写成 `backups/_drill/drill-result.json`。
 
-4. 检查迁移状态：
+#### 演练记录（2026-10-10，开发库）
 
-   ```bash
-   pnpm --filter @nanking-atlas/database exec prisma migrate status
-   ```
+| 项                | 结果                                                                                             |
+| ----------------- | ------------------------------------------------------------------------------------------------ |
+| 备份              | `nanking-atlas-20261010-075135.db`（356352 字节，journal=delete）                                |
+| sha256 校验       | 一致                                                                                             |
+| `integrity_check` | `ok`                                                                                             |
+| 行数比对          | 全部一致：contents 5、revisions 3、review_actions 10、audit_logs 28、users 3、media 0、sources 4 |
+| **结论**          | **通过**                                                                                         |
+| 记录文件          | `packages/database/backups/_drill/drill-result.json`                                             |
 
-#### 验收标准（全部满足才算演练成功）
+> ⚠️ **演练暴露过一个真实缺陷，值得记住**：脚本第一版**根本没复制备份文件**，
+> 只是让 Prisma 连一个不存在的路径 —— SQLite 会**建出一个空库**并返回。
+> 而空库的 `integrity_check` 同样是 `ok`。
+> 也就是说：**只做完整性检查的恢复演练会给出一个虚假的通过结论。**
+> 必须同时做行数比对，才能发现这种「恢复了个空库」的情况。
+> （本次是被行数比对抓出来的 —— 报错 `no such table: contents`。）
 
-1. `prisma migrate status` 显示数据库 schema **已是最新版本**，无待应用迁移、无失败迁移记录。
+#### 安全护栏
+
+演练目标路径由 `isSafeDrillTarget()` 硬校验：**与线上库同路径直接拒绝执行**。
+一次「演练」若覆盖了生产库、而备份本身不完整，就是数据事故。
+
+#### 尚未覆盖的部分（不能声称已完成）
+
+以上是**本地开发库**的一次演练。以下项仍未验证：
+
+- **生产 / staging 环境的恢复**（需先确定部署形态，见 §3.5 与技术方案 §19）。
+- **对象存储备份与恢复**（§3.3，未接入对象存储）。
+- **RPO / RTO 实测值**：技术方案 §13 要求记录，本次未测量。
+  当前备份频率未定（§3.2 待批准），RPO 无法给出有意义的数字。
+
+#### 完整验收标准（技术方案 §17 第 8 项）
+
+除上述脚本自动完成的项（sha256、完整性、行数）外，还需人工确认：
+
+1. `prisma migrate status` 显示 schema 已是最新版本。
 2. 启动 API 后 `/health/ready` 返回 `"status":"ok"` 且 `checks.database == "ok"`。
-3. 登录成功：用恢复库中的账号通过 `/auth/login` 拿到 access token（验证 Argon2id 哈希与 refresh token 哈希表完整）。
-4. 已发布内容可访问：任取一条 `status == 'PUBLISHED'` 的内容，其公开详情 URL 返回 200。
-5. 数据量核对：关键表行数与备份时点记录一致（特别是 `contents`、`users`、`audit_logs`）。
-6. `PRAGMA integrity_check` 返回 `ok`（见 `OPERATIONS.md` §5）。
-7. **记录演练结果**：时间、执行人、RPO/RTO 实测值、以上各项的通过/失败结论。技术方案 §13 明确要求「未做恢复验证不能声称已备份可恢复」。
+3. 用恢复库中的账号通过 `/auth/login` 拿到 access token
+   （验证 Argon2id 哈希与 refresh token 哈希表完整）。
+4. 已发布内容的公开详情 URL 返回 200。
 
 ## 4. 密钥轮换（P4-06）
 
