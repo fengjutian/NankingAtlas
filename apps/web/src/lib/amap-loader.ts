@@ -78,7 +78,9 @@ function injectScript(config: ResolvedAmapConfig): Promise<AMapNamespace> {
   if (typeof document === 'undefined') return Promise.reject(new AmapLoadError('no_dom'));
 
   // ① 安全配置必须先于脚本存在。
-  if (config.securityJsCode !== '') {
+  // 只在拿到 jscode 时才注入 —— 用空串注入会被高德判为"提供了错误的 jscode"，
+  // 比不注入更糟。未配置时底图仍可正常渲染（实测），只是 Web 服务不可用。
+  if (config.securityJsCode !== null) {
     window._AMapSecurityConfig = { securityJsCode: config.securityJsCode };
   }
 

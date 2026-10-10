@@ -46,7 +46,12 @@ export interface AMapMarkerOptions {
   readonly position: AMapPosition;
   /** 自定义 HTML；高德会把它包进 marker 容器里渲染。 */
   readonly content?: string;
-  readonly offset?: AMapPosition;
+  /**
+   * 像素偏移。必须是 `AMap.Pixel` 实例，不是坐标数组 ——
+   * `AMap.Marker` 会把整个 content 容器的左上角钉在 `position` 上，
+   * 想让图钉**针尖**落在坐标点就得用这里手动补偿。
+   */
+  readonly offset?: AMapPixelPosition;
   readonly zIndex?: number;
   readonly cursor?: string;
   readonly title?: string;

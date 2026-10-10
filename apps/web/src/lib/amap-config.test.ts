@@ -39,14 +39,21 @@ describe('resolveAmapConfig', () => {
     expect(resolveAmapConfig()).toEqual({ ok: false, reason: 'missing_key' });
   });
 
-  it('有 Key 无 jscode → missing_security_code（2.0 缺它会白屏）', () => {
+  it('只有 Key、没 jscode → 仍然 ok，securityJsCode 为 null', () => {
+    // 实测结论：配了 Key 不配 jscode，底图完全正常渲染。
+    // 因此 jscode **不能**成为硬性前置，否则等于白拿一张能用的地图换一张灰屏。
+    // 代价是地理编码/路径规划等 Web 服务不可用 —— 本项目一条都不用。
     process.env.NEXT_PUBLIC_AMAP_KEY = KEY;
-    expect(resolveAmapConfig()).toEqual({ ok: false, reason: 'missing_security_code' });
+    expect(resolveAmapConfig()).toEqual({ ok: true, key: KEY, securityJsCode: null });
   });
 
-  it('有 jscode 无 Key → missing_key（不因为"有一个就当配好了"）', () => {
-    process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE = JSCODE;
-    expect(resolveAmapConfig()).toEqual({ ok: false, reason: 'missing_key' });
+  it('jscode 形状不合法时按"未配置"处理，而不是让整个地图降级', () => {
+    // jscode 是可选增强项，它坏了不该连累底图。
+    for (const bad of ['short', `"${JSCODE}"`, `${JSCODE}\\`]) {
+      process.env.NEXT_PUBLIC_AMAP_KEY = KEY;
+      process.env.NEXT_PUBLIC_AMAP_SECURITY_CODE = bad;
+      expect(resolveAmapConfig()).toEqual({ ok: true, key: KEY, securityJsCode: null });
+    }
   });
 
   it('首尾空白被裁掉，不会变成"看起来配了其实没配"', () => {
@@ -72,11 +79,9 @@ describe('resolveAmapConfig', () => {
   });
 
   it('每种失败原因都有可操作的说明', () => {
-    for (const reason of ['missing_key', 'missing_security_code'] as const) {
+    for (const reason of ['missing_key'] as const) {
       expect(AMAP_CONFIG_HINTS[reason].length).toBeGreaterThan(0);
     }
-    // 漏配 jscode 最容易被误判成"Key 无效"，提示必须点名变量名。
-    expect(AMAP_CONFIG_HINTS.missing_security_code).toContain('NEXT_PUBLIC_AMAP_SECURITY_CODE');
   });
 
   it('脚本地址固定为高德官方域名', () => {

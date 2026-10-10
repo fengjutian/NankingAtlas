@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import styles from './map.module.css';
 
@@ -75,6 +75,15 @@ const INITIAL_ZOOM = 12;
 /** 缩放范围。高德矢量底图 3~19 之外没有数据，锁住避免出现空白画面。 */
 const ZOOM_RANGE: readonly [number, number] = [3, 19];
 
+/**
+ * marker 尺寸（px），必须与 `map.module.css` 里 `.mapMarkerPin` 的 1.5rem × 2.25rem 一致。
+ *
+ * 之所以写死常量而不是读 DOM：高德在 `add()` 时就据此算 offset，
+ * 那时元素还没被测量，读 `getBoundingClientRect()` 只会拿到 0。
+ */
+const MARKER_WIDTH = 24;
+const MARKER_HEIGHT = 36;
+
 /** marker 属性名：同时用于事件委托与焦点定位。 */
 const SLUG_ATTR = 'data-map-slug';
 
@@ -97,20 +106,20 @@ function css(name: string): string {
  * `role` / `tabIndex` / `keypress`（少一层就少一处可访问性回归）。
  *
  * 交互走容器上的**事件委托**（见下方 effect），不去摸高德 marker 的内部 DOM。
+ *
+ * ⚠️ 图钉**必须用纯 CSS 画，不能用内联 SVG**：实测高德 2.0 在渲染 marker
+ * `content` 时会剥掉 `<svg>`（同一个 content 里的 `<span>` 能存活）。
+ * 结果就是 `<svg>` 整块消失、只剩可访问文本，视觉上退化成高德默认图钉 ——
+ * 品牌色和选中态样式全部失效。用 CSS 画则 100% 存活且完全可控。
+ *
  * `title` 与 `slug` 来自 API，必须 `escapeHtml`；类名来自本项目的 CSS Module，
  * 是可信字面量，不转义（转义反而会让类名永远匹配不上）。
  */
 function markerContentHtml(title: string, slug: string, selected: boolean): string {
-  const shapeClass = selected
-    ? `${css('mapMarkerShape')} ${css('mapMarkerShape')}--selected`
-    : css('mapMarkerShape');
   return (
     `<button type="button" class="${css('mapMarker')}" ${SLUG_ATTR}="${escapeHtml(slug)}" ` +
     `aria-pressed="${selected ? 'true' : 'false'}">` +
-    `<svg class="${css('mapMarkerPin')}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">` +
-    `<path class="${shapeClass}" d="M12 2.5c-3.6 0-6.5 2.8-6.5 6.3 0 4.5 5.4 11.3 5.6 11.5.3.3.8.3 1.1 0 .2-.2 5.6-7 5.6-11.5 0-3.5-2.5-6.3-5.8-6.3z"/>` +
-    '<circle cx="12" cy="8.6" r="2.2" fill="#fff"/>' +
-    '</svg>' +
+    `<span class="${css('mapMarkerPin')}" aria-hidden="true"></span>` +
     `<span class="${css('visuallyHidden')}">${escapeHtml(title)}</span>` +
     '</button>'
   );
@@ -139,6 +148,18 @@ export default function MapCanvas({
   /** 去抖器：生命周期跟随地图实例，卸载时必须 cancel。 */
   const debouncerRef = useRef<ReturnType<typeof createDebouncer> | null>(null);
 
+  /**
+   * SDK 是否已就绪（脚本加载完 + Map 实例建好）。
+   *
+   * ⚠️ 这不是可有可无的冗余状态，而是**必需**的：高德脚本走 `<script>` 注入，
+   * 必然异步。而 `useEffect` 只在依赖变化时重跑 —— mount 那一刻 `mapRef.current`
+   * 还是 `null`，建 marker 的 effect 会直接 return；等脚本 resolve 后如果只用
+   * ref 记录就绪状态，**没有任何东西触发重跑**，marker 永远是空的。
+   * 实测踩过：底图正常渲染、`amap-markers` 容器却是空的，且所有单测全绿
+   *（单测只覆盖纯函数，覆盖不到组件接线）。
+   */
+  const [mapReady, setMapReady] = useState(false);
+
   // 回调放进 ref：地图只在挂载时创建一次，不应因父组件重渲染而重建。
   const onViewportChangeRef = useRef(onViewportChange);
   const onSelectRef = useRef(onSelect);
@@ -159,12 +180,33 @@ export default function MapCanvas({
   }, []);
 
   // 挂载：加载高德脚本 → 建地图。卸载时务必销毁，否则动态切换页面会留下幽灵容器。
-  useEffect(() => {
+  /**
+ * 地图实例只认**值**，不认对象身份。
+ *
+ * `initialBBox` 与 `amap` 都是服务端组件在每次渲染里新建的对象：点一下 marker
+ * → `router.replace` 写选中态 → 服务端重渲染 → 两个 prop 引用全变（值却一样）。
+ * 若把它们直接放进 `useEffect` 依赖，整张地图会在**每次选中/取消选中时**被
+ * 销毁重建：用户刚点中就眼看着底图闪一下，高德还会因为在 destroy 期间仍有
+ * 排版任务在跑而抛 `LngLat(NaN, NaN)` / `Pixel(NaN, NaN)`（实测）。
+ *
+ * 因此 deps 只放**原始值**组成的 key，值本身经 ref 读取 ——
+ * hooks 插件未启用 exhaustive-deps，依赖关系靠这里人工守。
+ */
+const bboxKey = `${initialBBox.minLon}|${initialBBox.minLat}|${initialBBox.maxLon}|${initialBBox.maxLat}`;
+const amapKey = amap === null ? '' : amap.key;
+const initialBBoxRef = useRef(initialBBox);
+const configRef = useRef(amap);
+initialBBoxRef.current = initialBBox;
+configRef.current = amap;
+
+useEffect(() => {
     const container = containerRef.current;
     if (container === null) return undefined;
 
+    const config = configRef.current;
+
     // fail-closed：没配置 Key / 安全密钥就不碰网络，直接走纯列表降级。
-    if (amap === null) {
+    if (config === null) {
       readyRef.current = false;
       basemapRef.current = { ready: false, failed: false };
       // 报 `unavailable` 而不是 `loading`：没有 Key 时地图**永远不会**开始加载，
@@ -187,9 +229,9 @@ export default function MapCanvas({
     };
 
     // 初始中心也要转 GCJ-02 —— 否则首屏地图中心与所有 marker 差 300 米。
-    const centerGcj = wgs84ToGcj02(bboxCenter(initialBBox));
+    const centerGcj = wgs84ToGcj02(bboxCenter(initialBBoxRef.current));
 
-    void loadAmap(amap)
+    void loadAmap(config)
       .then((AMap) => {
         if (disposed) return;
 
@@ -206,11 +248,18 @@ export default function MapCanvas({
         amapRef.current = AMap;
         readyRef.current = true;
 
-        // ① 底图就绪：地图资源加载完成。
+        // ① 底图就绪 = 地图资源加载完成。
+        //
+        // ⚠️ `mapReady` **必须等到这里**才能置位，不能在 `new AMap.Map()` 之后立刻置。
+        // 高德的视窗在 `complete` 之前还没有尺寸，`lngLatToContainer()` 会返回
+        // `Pixel(NaN, NaN)`，紧接着 `map.add(marker)` 抛异常，被 MapErrorBoundary
+        // 接住 → 整张地图降级成纯列表（实测踩过：首屏正常，点一次 marker 就挂）。
         map.on('complete', () => {
           if (disposed) return;
           clearDeadline();
           basemapRef.current = { ready: true, failed: false };
+          readyRef.current = true;
+          setMapReady(true);
           reportSurface();
         });
 
@@ -219,7 +268,14 @@ export default function MapCanvas({
         debouncerRef.current = debouncer;
         const handleMoveEnd = (): void => {
           if (map === null) return;
-          const bounds = map.getBounds();
+          // 视窗尚未就绪时 getBounds() 会抛 NaN 相关的错；这里吞掉即可 ——
+          // 移动事件本来就允许丢失（下次移动还会再触发），不值得为此降级整块地图。
+          let bounds: ReturnType<AMapMapInstance['getBounds']>;
+          try {
+            bounds = map.getBounds();
+          } catch {
+            return;
+          }
           debouncer.schedule(() => {
             // 高德返回 GCJ-02，必须转回 WGS-84 才能和接口的 bbox 对齐；
             // 否则每次平移都会带进约 300 米的窗口错位，marker 会被漏在窗口外。
@@ -264,17 +320,21 @@ export default function MapCanvas({
       gcjPositionsRef.current.clear();
       readyRef.current = false;
       basemapRef.current = { ready: false, failed: false };
+      // 必须在 `mapRef.current = null` **之后**再降级：marker effect 重跑时
+      // 靠 `mapRef.current === null` 就能立刻退出，不必等 React 的状态更新。
+      setMapReady(false);
     };
-    // `amap` 是来自服务端 props 的一次性配置对象，按引用稳定；
+    // 只依赖**值**（bboxKey / amapKey）与稳定的 reportSurface 回调；
     // 刻意不依赖 `items`/`selected`，否则每来一次取数就重建整张地图。
-    // deps 由这里显式列出：hooks 插件未启用 exhaustive-deps，依赖关系靠人工守。
-  }, [amap, initialBBox, reportSurface]);
+    // 详见上方 bboxKey 处的说明。
+  }, [amapKey, bboxKey, reportSurface]);
 
   // items / selected 变化 → 同步 marker。hasPoint=false 的条目不进入 markerItems。
   useEffect(() => {
     const map = mapRef.current;
     const AMap = amapRef.current;
-    if (map === null || AMap === null) return undefined;
+    // mapReady 在 deps 里：SDK 到位前这里直接退出，到位后自动补建。
+    if (!mapReady || map === null || AMap === null) return undefined;
 
     const nextMarkers = new Map<string, AMapMarkerInstance>();
     const nextPositions = new Map<string, AMapPosition>();
@@ -285,17 +345,34 @@ export default function MapCanvas({
       const isSelected = item.slug === selected;
 
       // WGS-84 → GCJ-02：高德只认 GCJ-02。
+      //
+      // 实测（A/B，真实浏览器）：去掉这一步，marker 在 zoom 12 下会左移 15.1px、
+      // 上移 7.1px，与"经度 +0.0052°、纬度 −0.0020°"的换算预测值（14.8 / 6.9px）
+      // 吻合到 2% 以内。**别再删这一行** —— 它不会报错，只会让点位静默偏 300 米。
       const gcj = wgs84ToGcj02(position);
       const gcjPosition: AMapPosition = [gcj.lon, gcj.lat];
       const marker = new AMap.Marker({
         position: gcjPosition,
         content: markerContentHtml(item.title, item.slug, isSelected),
         title: `${item.title}（${accuracyLabel(item.accuracy)}）`,
-        // 高德 marker 默认锚点是底部中心，正好对齐 SVG 的针尖，无需 offset。
+        // 针尖对齐：高德把 marker 容器的**左上角**钉在坐标点上
+        // （实测：按"左上角 = 地理像素"反算与理论值亚像素吻合）。
+        // 不给 offset 的话针尖会落在坐标点以南 36px ≈ 1.1 公里处 ——
+        // 对一个"点位地图"来说这是实打实的指错位置。
+        offset: new AMap.Pixel(-MARKER_WIDTH / 2, -MARKER_HEIGHT),
         zIndex: isSelected ? 120 : 110,
         cursor: 'pointer',
       });
-      map.add(marker);
+
+      // 单个 marker 失败**不许拖垮整张地图**：`map.add()` 会经
+      // `lngLatToContainer()` 把地理坐标换算成像素，若此刻视窗尚未就绪就抛
+      // `Pixel(NaN, NaN)`，冒泡到 MapErrorBoundary 会让地图整块降级、
+      // 而地点其实全都在列表里。宁可不画这个点，也不能让用户连地图一起失去。
+      try {
+        map.add(marker);
+      } catch {
+        continue;
+      }
       nextMarkers.set(item.slug, marker);
       nextPositions.set(item.slug, gcjPosition);
     }
@@ -309,7 +386,7 @@ export default function MapCanvas({
         marker.destroy();
       }
     };
-  }, [items, selected]);
+  }, [items, selected, mapReady]);
 
   // 容器事件委托：marker 的 <button data-map-slug> 被点击（含键盘激活）。
   // 不给每个 marker 单独挂监听 —— 事件冒泡一次就够，也不用依赖高德内部 DOM。
@@ -331,11 +408,16 @@ export default function MapCanvas({
   // 选中项（由列表发起）→ 地图平移；由键盘选中时还要把焦点交给 marker（§9.2 第 3 条）。
   useEffect(() => {
     const map = mapRef.current;
-    if (map === null || selected === null) return;
+    if (!mapReady || map === null || selected === null) return;
     const position = gcjPositionsRef.current.get(selected);
     if (position === undefined) return; // 无精确点：列表已显示区域说明，地图不动
 
-    map.panTo(position, { duration: reducedMotion ? 0 : 300 });
+    // 同 add：平移失败不能冒泡到错误边界（那会把整张地图降级掉）。
+    try {
+      map.panTo(position, { duration: reducedMotion ? 0 : 300 });
+    } catch {
+      return;
+    }
 
     // 只在**键盘**操作卡片时把焦点交给 marker：鼠标点击后抢焦点会打断
     // 用户的 Tab 路径，键盘用户才需要"选中卡片 → 焦点落到 marker"（§9.2 第 3 条）。
@@ -343,7 +425,7 @@ export default function MapCanvas({
     if (active instanceof HTMLElement && active.dataset.mapSelect === 'true') {
       focusMarkerButton(containerRef.current, selected);
     }
-  }, [selected, reducedMotion]);
+  }, [selected, reducedMotion, mapReady]);
 
   return (
     <div ref={containerRef} className={css('mapCanvas')} data-testid="map-canvas">

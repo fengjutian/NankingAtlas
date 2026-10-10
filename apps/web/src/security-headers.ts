@@ -124,7 +124,6 @@ function buildCsp(nonce: string): string {
       `'nonce-${nonce}'`,
       "'unsafe-eval'",
       ...AMAP_SCRIPT_SOURCES,
-      isDev() ? "'unsafe-eval'" : '',
     ]
       .filter((part) => part !== '')
       .join(' '),
@@ -138,11 +137,6 @@ function buildCsp(nonce: string): string {
     "form-action 'self'",
     "object-src 'none'",
   ].join('; ');
-}
-
-/** 开发模式需要 eval（React Refresh / HMR）。 */
-function isDev(): boolean {
-  return process.env.NODE_ENV !== 'production';
 }
 
 /** 从 URL 取 origin；解析失败返回 null（而不是把原始字符串塞进 CSP）。 */

@@ -18,6 +18,12 @@ describe('loadAmap', () => {
     securityJsCode: 'b'.repeat(32),
   };
 
+  /** 未配置 jscode 时的配置（jscode 为可选增强项）。 */
+  const CONFIG_NO_JSCODE: ResolvedAmapConfig = {
+    key: 'a'.repeat(32),
+    securityJsCode: null,
+  };
+
   let appended: HTMLScriptElement[] = [];
   let securityAtAppend: (string | undefined)[] = [];
 
@@ -72,6 +78,16 @@ describe('loadAmap', () => {
     window.AMap = { Map: class {}, Marker: class {}, Pixel: class {} } as never;
     appended[0]?.dispatchEvent(new Event('load'));
     await expect(pending).resolves.toBe(window.AMap);
+  });
+
+  it('未配置 jscode 时**不注入** _AMapSecurityConfig（用空串会被判为"错误 jscode"）', async () => {
+    const pending = loadAmap(CONFIG_NO_JSCODE);
+    expect(securityAtAppend[0]).toBeUndefined();
+    expect(window._AMapSecurityConfig).toBeUndefined();
+
+    window.AMap = { Map: class {}, Marker: class {}, Pixel: class {} } as never;
+    appended[0]?.dispatchEvent(new Event('load'));
+    await pending;
   });
 
   it('脚本 error（CSP 拦截 / 断网）→ reject script_error 并移除 script', async () => {
