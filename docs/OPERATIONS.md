@@ -9,16 +9,16 @@
 
 ## 0. 现状总览（先读）
 
-| 能力                             | 状态                                   |
-| -------------------------------- | -------------------------------------- |
-| 结构化日志（`nestjs-pino`）      | **已实现**                             |
-| requestId 串联                   | **已实现**                             |
-| 日志脱敏（pino `redact`）        | **未实现** —— 当前无 `redact` 配置     |
-| Prometheus / OpenTelemetry 指标  | **未接入** —— 无相关依赖               |
-| 告警规则与接收通道               | **未配置**                             |
-| 仪表盘                           | **未配置**                             |
-| 日志聚合与检索后端（ELK / Loki） | **未接入**                             |
-| 对象存储                         | **未接入**（`media.service.ts:17-22`） |
+| 能力                             | 状态                                        |
+| -------------------------------- | ------------------------------------------- |
+| 结构化日志（`nestjs-pino`）      | **已实现**                                  |
+| requestId 串联                   | **已实现**                                  |
+| 日志脱敏（pino `redact`）        | **已实现** —— `apps/api/src/lib/logging.ts` |
+| Prometheus / OpenTelemetry 指标  | **未接入** —— 无相关依赖                    |
+| 告警规则与接收通道               | **未配置**                                  |
+| 仪表盘                           | **未配置**                                  |
+| 日志聚合与检索后端（ELK / Loki） | **未接入**                                  |
+| 对象存储                         | **未接入**（`media.service.ts:17-22`）      |
 
 本文档对「未接入」的部分只给建议，不写不存在的命令或链接。
 
@@ -73,25 +73,25 @@ status >= 400            → warn
 
 生产环境**不返回**堆栈、SQL、文件路径或密钥给客户端：未知异常统一映射为 500 + `INTERNAL_ERROR` + 固定文案「服务器内部错误，请稍后重试」（`global-exception.filter.ts:190-194`）。
 
-### 1.4 日志脱敏要求
+### 1.4 日志脱敏
 
 技术方案 §8 要求：「日志不得记录密码、token、Cookie、对象存储密钥和完整个人信息」。审计日志中的 IP 已做匿名化：`hashIp()` 用 `AUTH_ACCESS_SECRET` 做 HMAC 而非裸哈希（`apps/api/src/lib/token.ts:178-187`），避免 IPv4 的 2^32 取值空间被彩虹表反查。
 
-> **当前实现缺口（TODO）**：`nestjs-pino` 配置（`app.module.ts:18-48`）中**没有设置 `redact`**，全仓库 grep `redact` 无匹配。
->
-> 这意味着 pino 的默认行为会记录完整的请求对象。当前之所以没有泄露密码，是因为登录密码在 `@Body()` DTO 层面就不被回写日志、且 refresh token 只走 HttpOnly Cookie；但**这是一层偶然的保护，不是显式的脱敏配置**。任何新增的、把敏感字段放进请求头的接口（如未来的 API Key、Bearer token 透传）都会立即进入日志。
+**已实现（P4-04）**。配置在 `apps/api/src/lib/logging.ts` 的 `PINO_BASE_OPTIONS.redact`，由 `app.module.ts` 引入。
 
-**建议补齐的脱敏配置（TODO，需人工批准后实现）**：在 `pinoParams.pinoHttp` 中增加 `redact`，至少覆盖：
+此前确实存在真实泄露，且不是理论风险：修复前实测，带 `Authorization: Bearer <token>` 的请求会在 `request completed` 行输出完整 header 明文（密码因 DTO 层不回写日志而侥幸未泄露，但那是偶然保护）。修复后同一探针输出 `"authorization":"[Redacted]"`，`user-agent`、`requestId` 等非敏感字段照常保留。
 
-```text
-req.headers.authorization
-req.headers.cookie
-req.headers['x-nla-signature']
-req.headers['x-revalidate-signature']
-res.headers['set-cookie']
-```
+脱敏路径由 `REDACT_PATHS` 统一维护，分三类：
 
-在补齐之前，运维人员应假定日志中可能出现请求头，对外分享日志片段前必须人工检查。
+- **请求/响应头**：`authorization`、`cookie`、`set-cookie`、`x-api-key`、`x-auth-token`、`proxy-authorization`
+- **业务字段**：`password` / `accessToken` / `refreshToken` / `token` / `secret` / `apiKey`，含一层嵌套（`*.password` 等）
+- **基础设施凭据**：`s3SecretAccessKey`、`passwordHash`、`tokenHash`
+
+`redact` 作用于 pino 的**序列化阶段**，因此业务代码不需要"记得脱敏"——这是它相对"约定不要打日志"的关键优势，后者一定会漏。
+
+**新增凭据字段时必须同步 `REDACT_PATHS`**，否则该字段会直接进日志。回归测试
+`apps/api/test/integration/log-redaction.integration.spec.ts` 覆盖三类路径，
+并用「真实 pino 实例 + 内存流」验证实际输出，而不是断言配置对象里有没有某个字段。
 
 ### 1.5 requestId 串联
 

@@ -245,9 +245,32 @@ seed 是幂等的：`seed-auth.integration.spec.ts` 通过子进程跑真实 see
 ```bash
 pnpm test                # 单元测试
 pnpm test:integration    # API 集成测试（真实 SQLite 库 + 全局守卫 + 异常过滤器）
+pnpm test:e2e            # 端到端测试（真实 API + 真实 web 构建 + Chromium）
 ```
 
 集成测试由 `apps/api/test/global-setup.ts` 在**空库上执行真实迁移 SQL** 建库，验证「迁移可在全新数据库执行」（AGENTS.md §7.5）。
+
+### 端到端测试（P4-03）
+
+`pnpm test:e2e` 覆盖技术方案 §16 要求的链路：登录 → 建稿 → 补来源 → 送审 → 退回/通过 →
+发布 → 公开可见 → 撤回，外加 401/403 与乐观锁 409。
+
+首次运行前需要下载浏览器（一次性，约 440 MB）：
+
+```bash
+pnpm exec playwright install chromium
+```
+
+三个容易踩的坑，都已在 `e2e/global-setup.ts` 与 `playwright.config.ts` 里处理并注释：
+
+1. **`NEXT_PUBLIC_*` 是构建期内联的**。给 `next start` 传这些变量无效；
+   复用旧产物会让页面去连 `localhost:4000`，渲染「内容接口暂时无法连接」，
+   而后端完全正常。所以 globalSetup 必须自己重新 build。
+2. **归档后必须配 `REVALIDATION_URL`**，否则 API 不会回调 web 让缓存失效，
+   详情页会继续命中 300 秒缓存，撤回后仍返回 200（软 404）。
+   该 URL 必须是 `https://` 或 `http://localhost`（`apps/api/src/lib/env.ts:140` 的安全约束）。
+3. **E2E 用独立的 `e2e.db`**，与 `dev.db` / `integration.db` 物理隔离，
+   绝不污染开发库。
 
 应用层 enum：因 SQLite 没有原生 ENUM，所有 enum 列实际存为 String。
 应用层通过 `@nanking-atlas/database` 的字面量联合 + zod 校验保证取值范围
@@ -278,7 +301,8 @@ PR 与 push 到 `main` 都会触发 `.github/workflows/ci.yml`：
 2. `format` — `pnpm format:check`
 3. `lint` — `pnpm lint`（含跨包依赖边界 `no-restricted-imports`）
 4. `typecheck` — `pnpm typecheck`
-5. `test` — `pnpm test`（P1-01.a 起：SQLite 方案无需 service container；DATABASE_URL 由 job env 注入 `file:./packages/database/prisma/test.db`）
+5. `test` — `pnpm test`（P1-01.a 起：SQLite 方案无需 service container；DATABASE_URL 由 job env 注入 `file:./packages/database/prisma/test.db`），
+   随后 `pnpm test:integration`，再跑 `pnpm test:e2e`（需先 `playwright install chromium`）
 6. `build` — `pnpm build`，产物上传为 artifact
 7. `dependency-scan` — `pnpm audit --prod --audit-level high`（P4-02：只卡生产依赖；
    dev 依赖的已知高危记录在 [ADR-0002](docs/adr/0002-dependency-vulnerability-policy.md)）

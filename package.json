@@ -16,11 +16,13 @@
     "typecheck": "turbo run typecheck",
     "test": "turbo run test",
     "test:integration": "pnpm --filter @nanking-atlas/api test:integration",
+    "test:e2e": "playwright test",
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
     "clean": "turbo run clean && rimraf \"**/dist\" \"**/.turbo\" \"**/.next\" \"**/coverage\""
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
     "@types/node": "^20.19.0",
     "prettier": "^3.6.2",
     "rimraf": "^5.0.10",

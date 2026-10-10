@@ -7,46 +7,12 @@ import { HealthController } from './common/health/health.controller.js';
 import { GlobalExceptionFilter } from './common/http/global-exception.filter.js';
 import { securityHeaders } from './common/http/security-headers.middleware.js';
 import { RequestIdMiddleware } from './common/request-id/request-id.middleware.js';
-import { env } from './lib/env.js';
+import { pinoParams } from './lib/logging.js';
 import { ContentModule } from './modules/contents/content.module.js';
 import { HomepageModule } from './modules/homepage/homepage.module.js';
 import { MediaModule } from './modules/media/media.module.js';
 import { PlacesModule } from './modules/places/places.module.js';
 import { UsersAuthModule } from './modules/users/users-auth.module.js';
-
-import type { Params } from 'nestjs-pino';
-
-const pinoParams: Params = {
-  pinoHttp: {
-    level: env.LOG_LEVEL,
-    // 非 production 走 pino-pretty 人类可读；P4 上线时切到 JSON 上 ELK / Loki。
-    //
-    // test 环境例外：pino-pretty 是 worker-thread transport，在 vitest 里
-    // 会抛 `unable to determine transport target`，且日志本来就该被静音。
-    // 所以 test 强制走纯 JSON。
-    ...(env.APP_ENV !== 'production' && env.APP_ENV !== 'test'
-      ? {
-          transport: {
-            target: 'pino-pretty',
-            options: {
-              singleLine: true,
-              translateTime: 'SYS:HH:MM:ss.l',
-              ignore: 'pid,hostname',
-            },
-          },
-        }
-      : {}),
-    customLogLevel: (_req, res, err) => {
-      if (err || res.statusCode >= 500) return 'error';
-      if (res.statusCode >= 400) return 'warn';
-      return 'info';
-    },
-    // 在每行日志带 requestId；res.locals.requestId 由 RequestIdMiddleware 写入
-    customProps: (_req, res) => ({
-      requestId: (res as { locals?: { requestId?: string } }).locals?.requestId,
-    }),
-  },
-};
 
 /**
  * 全局限流（P1-02）。

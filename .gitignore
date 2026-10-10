@@ -61,3 +61,10 @@ apps/api/test/**/*.js.map
 apps/api/prisma-test/
 packages/database/prisma/*.db
 packages/database/prisma/*.db-journal
+
+# E2E 的临时库与产物（由 e2e/global-setup.ts 与 playwright 创建）
+packages/database/prisma/e2e/
+packages/database/prisma/e2e.stale-*/
+test-results/
+playwright-report/
+blob-report/
