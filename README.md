@@ -85,6 +85,34 @@ Key 缺失时地图块整体降级为纯列表，页面不会出现无解释的�
 
 > 上线前仍需维护者确认：技术方案 §19「底图供应商 ADR」（商用授权、配额、attribution 条款）尚未签署。
 
+## 部署所需环境变量（P4-01）
+
+**只部署前端、不部署 API 会让所有内容页显示「内容接口未就绪」**——这是真实踩过的坑：
+Netlify 上只有 Next 前端，`GET /api/v1/places` 返回 404，而前端构建产物里
+**根本没烘进 API 地址**，于是每个数据页都走 `unconfigured` 分支。
+页面不会崩，但拿不到任何内容。
+
+### web（构建时注入，`NEXT_PUBLIC_*` 会被静态内联进产物）
+
+| 变量                             | 必需   | 说明                                                         |
+| -------------------------------- | ------ | ------------------------------------------------------------ |
+| `NEXT_PUBLIC_APP_ENV`            | 是     | `development` / `staging` / `production`                     |
+| `NEXT_PUBLIC_API_BASE_URL`       | **是** | API 的绝对地址，如 `https://api.example.com`（无 `/api/v1`） |
+| `NEXT_PUBLIC_SITE_URL`           | 否     | 站点规范域名；缺失时输出 noindex + 相对 canonical            |
+| `NEXT_PUBLIC_AMAP_KEY`           | 是     | 高德 Web 端(JS API) Key；缺失时地图降级为纯列表              |
+| `NEXT_PUBLIC_AMAP_SECURITY_CODE` | 否     | 见上文「高德接入所需环境变量」                               |
+| `REVALIDATION_SECRET`            | 否     | 发布签名密钥，须与 API 侧一致；缺失时 revalidation 一律 503  |
+
+### api（运行时注入）
+
+`APP_ENV`、`API_PORT`、`WEB_ORIGIN`（须含 web 的真实来源）、`ADMIN_ORIGIN`、
+`DATABASE_URL`、`AUTH_ACCESS_SECRET`、`AUTH_REFRESH_SECRET`、`REVALIDATION_SECRET`、
+`REVALIDATION_URL`。完整清单见 `apps/api/.env.example`。
+
+> ⚠️ **SQLite 与无服务器不兼容**：`DATABASE_URL` 指向本地文件，部署到 serverless
+> 平台会因文件系统临时而丢数据。部署 API 需选用带持久卷的长驻主机，或先更换数据库 ——
+> 后者属架构变更，需 ADR 与人工批准。
+
 ## 仓库结构
 
 ```text
