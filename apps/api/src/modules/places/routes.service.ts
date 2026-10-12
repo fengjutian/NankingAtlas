@@ -115,10 +115,12 @@ export class RoutesService {
     });
 
     const views: RouteStopView[] = stops.map((stop) => {
+      const place = stop.place;
       // 站点引用的地点可能未发布 / 已归档 —— 保留序号并标记，
       // 静默丢弃会让「第 3 站」变成「第 2 站」，破坏策展语义。
-      const place = stop.place;
-      if (place === null || place.status !== 'PUBLISHED' || place.archivedAt !== null) {
+      // 两个判据都写成"取反后再比较"，避免在可选链之后还要重复 `!place`。
+      const unavailable = place?.status !== 'PUBLISHED' || (place?.archivedAt ?? null) !== null;
+      if (place == null || unavailable) {
         return { position: stop.position, note: stop.note, place: null };
       }
       const coords: PointLike = {

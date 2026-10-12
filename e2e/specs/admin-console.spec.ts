@@ -279,7 +279,10 @@ test.describe('管理后台：真实浏览器交互', () => {
 
     await expect(page.getByRole('heading', { name: '路线站点' })).toBeVisible();
 
-    const rows = page.locator('table', { hasText: '站点' }).locator('tbody tr');
+    // 用表格的**可访问名称**定位，而不是 `hasText: '站点'`。
+    // 后者会匹配页面上所有含"站点"字样的表格（包括其它区块的说明文字所在区域），
+    // 行索引跨表串掉，表现为"点了下移但顺序没变"的假象。
+    const rows = page.getByRole('table', { name: '路线站点列表' }).locator('tbody tr');
     await expect(rows).toHaveCount(2);
     const firstTitle = `${suffix}-第一站`;
     const secondTitle = `${suffix}-第二站`;
@@ -300,7 +303,7 @@ test.describe('管理后台：真实浏览器交互', () => {
     // 刷新后顺序保持 → 真的写进了服务端
     await page.reload();
     await expect(page.getByRole('heading', { name: '路线站点' })).toBeVisible();
-    const reloadedRows = page.locator('table', { hasText: '站点' }).locator('tbody tr');
+    const reloadedRows = page.getByRole('table', { name: '路线站点列表' }).locator('tbody tr');
     await expect(reloadedRows.nth(0)).toContainText(secondTitle);
     await expect(reloadedRows.nth(1)).toContainText(firstTitle);
   });

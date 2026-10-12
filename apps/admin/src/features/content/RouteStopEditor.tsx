@@ -174,7 +174,7 @@ export function RouteStopEditor({ routeId, user }: RouteStopEditorProps) {
           description="用上方内容检索选择地点，按期望顺序加入。空站点的路线页会正常打开，只是不显示任何站点。"
         />
       ) : (
-        <table style={tableStyle}>
+        <table style={tableStyle} aria-label="路线站点列表">
           <caption style={srOnlyCaption}>路线站点顺序，可用上移下移按钮调整</caption>
           <thead>
             <tr>
