@@ -32,7 +32,8 @@ const NAV_SECTIONS: readonly { title: string; items: readonly NavItem[] }[] = [
     title: '审核',
     items: [
       { label: '审核队列', href: '#review', disabled: true },
-      { label: '审计日志', href: '#audit', disabled: true },
+      // FD-006：审计日志查询（只读）
+      { label: '审计日志', href: '/audit' },
     ],
   },
   {

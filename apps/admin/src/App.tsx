@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 import { authApi, clearAccessToken, getAccessToken } from './api/client';
 import { AdminShell } from './components/AdminShell';
+import { AuditLogPage } from './features/audit/AuditLogPage';
 import { LoginPage } from './features/auth/LoginPage';
 import { ContentListPage } from './features/content/ContentListPage';
 import { EditorPage } from './features/content/EditorPage';
@@ -117,6 +118,7 @@ export function App() {
         />
       ) : null}
       {route.name === 'users' ? <UserManagementPage user={user} onUnauthorized={signOut} /> : null}
+      {route.name === 'audit' ? <AuditLogPage user={user} onUnauthorized={signOut} /> : null}
     </AdminShell>
   );
 }

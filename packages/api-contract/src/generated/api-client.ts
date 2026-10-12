@@ -40,6 +40,7 @@ export const NLA_API_PATHS = {
   '/api/v1/admin/media/{id}/complete': ['POST'] as const,
   '/api/v1/admin/users': ['GET', 'POST'] as const,
   '/api/v1/admin/users/{id}': ['PATCH'] as const,
+  '/api/v1/admin/audit-logs': ['GET'] as const,
 } as const satisfies { readonly [P in NlaPath]: readonly NlaMethod[] };
 
 export type ErrorResponse = {
@@ -127,6 +128,27 @@ export type UserListPage = {
 };
 
 export type UserListResponse = { readonly data: UserListPage };
+
+export type AuditLogEntry = {
+  readonly id: string;
+  readonly actorId: string | null | null;
+  readonly actorDisplayName: string | null | null;
+  readonly requestId: string | null | null;
+  readonly action: string;
+  readonly entityType: string;
+  readonly entityId: string;
+  readonly before: unknown;
+  readonly after: unknown;
+  readonly createdAt: string;
+};
+
+export type AuditLogPage = {
+  readonly items: readonly AuditLogEntry[];
+  readonly nextCursor: string | null | null;
+  readonly hasMore: boolean;
+};
+
+export type AuditLogListResponse = { readonly data: AuditLogPage };
 
 export type ContentType =
   'PLACE' | 'PERSON' | 'EVENT' | 'ARCHITECTURE' | 'TRADITION' | 'TOPIC' | 'ROUTE';
@@ -1357,6 +1379,71 @@ export interface NlaOperationMap {
       readonly '404': ErrorResponse;
       readonly '422': ErrorResponse;
       readonly '429': ErrorResponse;
+      readonly '500': ErrorResponse;
+    };
+  };
+  /** GET /api/v1/admin/audit-logs */
+  searchAuditLogs: {
+    readonly method: 'GET';
+    readonly path: '/api/v1/admin/audit-logs';
+    readonly tags: readonly ['audit'];
+    readonly security: 'bearer';
+    readonly parameters: readonly [
+      | {
+          readonly name: 'actorId';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: string;
+        }
+      | {
+          readonly name: 'action';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: string;
+        }
+      | {
+          readonly name: 'entityType';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: string;
+        }
+      | {
+          readonly name: 'entityId';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: string;
+        }
+      | {
+          readonly name: 'from';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: string;
+        }
+      | {
+          readonly name: 'to';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: string;
+        }
+      | {
+          readonly name: 'limit';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: number;
+        }
+      | {
+          readonly name: 'cursor';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: string;
+        },
+    ];
+    readonly requestBody: undefined | undefined;
+    readonly response: AuditLogListResponse;
+    readonly errorResponses: {
+      readonly '400': ErrorResponse;
+      readonly '401': ErrorResponse;
+      readonly '403': ErrorResponse;
       readonly '500': ErrorResponse;
     };
   };

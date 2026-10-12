@@ -14,7 +14,8 @@ export type Route =
   | { name: 'login' }
   | { name: 'contents' }
   | { name: 'editor'; contentId: string }
-  | { name: 'users' };
+  | { name: 'users' }
+  | { name: 'audit' };
 
 const listeners = new Set<() => void>();
 
@@ -53,6 +54,10 @@ export function parseRoute(pathname: string): Route {
   // 用户与角色管理（FD-005）；服务端仍会独立校验 ADMIN，前端隐藏入口只是体验优化。
   if (path === '/users') {
     return { name: 'users' };
+  }
+  // 审计日志查询（FD-006）
+  if (path === '/audit') {
+    return { name: 'audit' };
   }
   const editorMatch = /^\/contents\/([^/]+)$/.exec(path);
   const contentId = editorMatch?.[1];

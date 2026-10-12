@@ -1,6 +1,13 @@
 import type { RevisionPage, ReviewActionPage, SourceSearchPage } from '@nanking-atlas/api-contract';
 
-import type { AdminUserDto, CreateUserInput, PatchUserInput, UserListPage } from './types';
+import type {
+  AdminUserDto,
+  AuditLogPage,
+  AuditSearchQuery,
+  CreateUserInput,
+  PatchUserInput,
+  UserListPage,
+} from './types';
 import type {
   AdminContentDto,
   AdminContentPatch,
@@ -582,6 +589,34 @@ export const adminApi = {
   /** 改角色 / 启禁 / 重置密码。服务端会拒绝"最后一个管理员"类操作。 */
   updateUser(id: string, patch: PatchUserInput): Promise<AdminUserDto> {
     return request<AdminUserDto>(`/admin/users/${id}`, { method: 'PATCH', body: patch });
+  },
+};
+
+export const auditApi = {
+  /** 审计日志检索（FD-006）。仅 ADMIN；游标原样回传。 */
+  list(query: AuditSearchQuery, signal?: AbortSignal): Promise<AuditLogPage> {
+    const search = new URLSearchParams();
+    for (const key of [
+      'q',
+      'action',
+      'entityType',
+      'entityId',
+      'actorId',
+      'from',
+      'to',
+      'cursor',
+      'limit',
+    ] as const) {
+      const value = key === 'q' ? undefined : query[key];
+      if (value !== undefined) {
+        search.set(key, String(value));
+      }
+    }
+    const suffix = search.toString();
+    return request<AuditLogPage>(
+      `/admin/audit-logs${suffix === '' ? '' : `?${suffix}`}`,
+      signal === undefined ? {} : { signal },
+    );
   },
 };
 

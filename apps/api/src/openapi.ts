@@ -1121,6 +1121,53 @@ const SCHEMAS: Readonly<Record<string, SchemaObject>> = {
   },
   UserListResponse: dataEnvelope(ref('UserListPage'), '用户检索分页响应。'),
 
+  // 审计日志（FD-006）
+  AuditLogEntry: {
+    type: 'object',
+    description:
+      '一条审计记录。**只增不改**：没有修改或删除端点。`before` / `after` 是已解析的对象；敏感字段的**值**在写入前已被替换为 `[REDACTED]`（字段名保留，便于看出原本存在该字段）。',
+    required: [
+      'id',
+      'actorId',
+      'actorDisplayName',
+      'requestId',
+      'action',
+      'entityType',
+      'entityId',
+      'before',
+      'after',
+      'createdAt',
+    ],
+    additionalProperties: false,
+    properties: {
+      id: stringSchema('审计记录 ID。'),
+      actorId: { type: ['string', 'null'], description: '操作人 ID；账号被删则为 null。' },
+      actorDisplayName: {
+        type: ['string', 'null'],
+        description: '操作人展示名。**不给 email** —— 审计界面不需要邮箱。',
+      },
+      requestId: { type: ['string', 'null'], description: '关联的请求 ID，用于串联整条链路。' },
+      action: stringSchema('动作，如 content.publish / admin.user.update。', { maxLength: 200 }),
+      entityType: stringSchema('实体类型，如 content / user / source。', { maxLength: 64 }),
+      entityId: stringSchema('实体 ID。', { maxLength: 64 }),
+      before: { description: '变更前的结构化快照；无变更则为 null。' },
+      after: { description: '变更后的结构化快照；无变更则为 null。' },
+      createdAt: { type: 'string', format: 'date-time' },
+    },
+  },
+  AuditLogPage: {
+    type: 'object',
+    description: '游标分页的审计检索结果，按时间倒序。',
+    required: ['items', 'nextCursor', 'hasMore'],
+    additionalProperties: false,
+    properties: {
+      items: { type: 'array', items: ref('AuditLogEntry') },
+      nextCursor: { type: ['string', 'null'], maxLength: 512 },
+      hasMore: { type: 'boolean' },
+    },
+  },
+  AuditLogListResponse: dataEnvelope(ref('AuditLogPage'), '审计检索分页响应。'),
+
   // 内容
   ContentType: ContentTypeSchema,
   ContentStatus: ContentStatusSchema,
@@ -2251,7 +2298,57 @@ const PATHS: Readonly<Record<string, PathItemObject>> = {
       },
     },
   },
+
+  // ---- 审计日志（FD-006，只读）----
+  '/api/v1/admin/audit-logs': {
+    get: {
+      operationId: 'searchAuditLogs',
+      summary: '检索审计日志',
+      description:
+        '仅 Admin 可见的**只读**追溯接口。按操作人 / 动作 / 实体类型 / 实体 ID / 时间范围筛选，游标分页。' +
+        '审计记录只增不改，本文档中**没有**对应的修改或删除端点。' +
+        '敏感字段（密码、token、Cookie、secret 等）的值在写入时即被替换为 `[REDACTED]`，' +
+        '字段名保留 —— 不是查询或展示时才隐藏。',
+      tags: ['audit'],
+      security: BEARER_SECURITY,
+      parameters: [
+        auditFilterParameter('actorId', '操作人 ID。', 'string', 64),
+        auditFilterParameter('action', '动作精确匹配，如 content.publish。', 'string', 200),
+        auditFilterParameter('entityType', '实体类型精确匹配，如 content。', 'string', 64),
+        auditFilterParameter('entityId', '实体 ID 精确匹配。', 'string', 64),
+        auditFilterParameter('from', '起始时间（含），ISO 8601 带时区。', 'date-time', null),
+        auditFilterParameter('to', '结束时间（含），ISO 8601 带时区。', 'date-time', null),
+        LIMIT_QUERY_PARAMETER,
+        CURSOR_QUERY_PARAMETER,
+      ],
+      responses: {
+        '200': okResponse('AuditLogListResponse', '审计检索结果分页。'),
+        ...AUTH_ERRORS,
+        '400': errorResponse('筛选参数或游标不合法。'),
+        '500': errorResponse('服务内部错误。'),
+      },
+    },
+  },
 };
+
+/** 审计筛选参数：全部可选、全部白名单。 */
+function auditFilterParameter(
+  name: string,
+  description: string,
+  type: 'string' | 'date-time',
+  maxLength: number | null,
+): ParameterObject {
+  return {
+    name,
+    in: 'query',
+    description,
+    required: false,
+    schema:
+      type === 'date-time'
+        ? { type: 'string', format: 'date-time' }
+        : { type: 'string', minLength: 1, ...(maxLength === null ? {} : { maxLength }) },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // 文档
@@ -2294,6 +2391,7 @@ export const openApiDocument: OpenApiDocument = {
     { name: 'relations', description: '内容关联。' },
     { name: 'media', description: '图片上传与版权元数据。' },
     { name: 'users', description: '后台用户与角色管理。' },
+    { name: 'audit', description: '审计日志查询（只读）。' },
   ],
   paths: PATHS,
   components: {

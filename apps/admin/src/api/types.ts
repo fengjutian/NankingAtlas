@@ -210,6 +210,49 @@ export interface PatchUserInput {
 }
 
 // ---------------------------------------------------------------------------
+// 审计日志（FD-006）
+// ---------------------------------------------------------------------------
+
+/**
+ * 审计记录。
+ *
+ * `before` / `after` 是**已解析的对象**（服务端返回时解析好了），敏感字段
+ * 的**值**在写入前已被替换成 `[REDACTED]` —— 字段名保留，便于看出"原本有"。
+ */
+export interface AuditLogEntry {
+  id: string;
+  actorId: string | null;
+  /** 只给展示名，不给 email。 */
+  actorDisplayName: string | null;
+  requestId: string | null;
+  action: string;
+  entityType: string;
+  entityId: string;
+  before: unknown;
+  after: unknown;
+  createdAt: string;
+}
+
+export interface AuditLogPage {
+  items: AuditLogEntry[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+export interface AuditSearchQuery {
+  actorId?: string;
+  action?: string;
+  entityType?: string;
+  entityId?: string;
+  /** ISO 8601。 */
+  from?: string;
+  /** ISO 8601。 */
+  to?: string;
+  cursor?: string;
+  limit?: number;
+}
+
+// ---------------------------------------------------------------------------
 // 内容
 // ---------------------------------------------------------------------------
 

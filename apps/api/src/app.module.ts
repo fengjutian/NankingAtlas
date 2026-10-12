@@ -8,6 +8,7 @@ import { GlobalExceptionFilter } from './common/http/global-exception.filter.js'
 import { securityHeaders } from './common/http/security-headers.middleware.js';
 import { RequestIdMiddleware } from './common/request-id/request-id.middleware.js';
 import { pinoParams } from './lib/logging.js';
+import { AuditLogModule } from './modules/audit/audit-log.module.js';
 import { ContentModule } from './modules/contents/content.module.js';
 import { HomepageModule } from './modules/homepage/homepage.module.js';
 import { MediaModule } from './modules/media/media.module.js';
@@ -42,6 +43,7 @@ const throttlerModuleOptions = {
     HomepageModule,
     PlacesModule,
     MediaModule,
+    AuditLogModule,
   ],
   controllers: [HealthController],
   providers: [

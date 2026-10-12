@@ -55,6 +55,10 @@
     {
       "name": "users",
       "description": "后台用户与角色管理。"
+    },
+    {
+      "name": "audit",
+      "description": "审计日志查询（只读）。"
     }
   ],
   "paths": {
@@ -4957,6 +4961,215 @@
           }
         }
       }
+    },
+    "/api/v1/admin/audit-logs": {
+      "get": {
+        "operationId": "searchAuditLogs",
+        "summary": "检索审计日志",
+        "description": "仅 Admin 可见的**只读**追溯接口。按操作人 / 动作 / 实体类型 / 实体 ID / 时间范围筛选，游标分页。审计记录只增不改，本文档中**没有**对应的修改或删除端点。敏感字段（密码、token、Cookie、secret 等）的值在写入时即被替换为 `[REDACTED]`，字段名保留 —— 不是查询或展示时才隐藏。",
+        "tags": ["audit"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "actorId",
+            "in": "query",
+            "description": "操作人 ID。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "description": "动作精确匹配，如 content.publish。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "entityType",
+            "in": "query",
+            "description": "实体类型精确匹配，如 content。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "entityId",
+            "in": "query",
+            "description": "实体 ID 精确匹配。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "起始时间（含），ISO 8601 带时区。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "结束时间（含），ISO 8601 带时区。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回条数上限，默认 20，最大 100。",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "上一页返回的 nextCursor，原样回传以取下一页。省略则从第一页开始。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "审计检索结果分页。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditLogListResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "筛选参数或游标不合法。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或无法证明身份（凭据错误、token 过期或吊销）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "身份已知但无权（角色不足或账号被停用）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务内部错误。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5283,6 +5496,98 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/UserListPage"
+          }
+        }
+      },
+      "AuditLogEntry": {
+        "type": "object",
+        "description": "一条审计记录。**只增不改**：没有修改或删除端点。`before` / `after` 是已解析的对象；敏感字段的**值**在写入前已被替换为 `[REDACTED]`（字段名保留，便于看出原本存在该字段）。",
+        "required": [
+          "id",
+          "actorId",
+          "actorDisplayName",
+          "requestId",
+          "action",
+          "entityType",
+          "entityId",
+          "before",
+          "after",
+          "createdAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "审计记录 ID。"
+          },
+          "actorId": {
+            "type": ["string", "null"],
+            "description": "操作人 ID；账号被删则为 null。"
+          },
+          "actorDisplayName": {
+            "type": ["string", "null"],
+            "description": "操作人展示名。**不给 email** —— 审计界面不需要邮箱。"
+          },
+          "requestId": {
+            "type": ["string", "null"],
+            "description": "关联的请求 ID，用于串联整条链路。"
+          },
+          "action": {
+            "type": "string",
+            "description": "动作，如 content.publish / admin.user.update。",
+            "maxLength": 200
+          },
+          "entityType": {
+            "type": "string",
+            "description": "实体类型，如 content / user / source。",
+            "maxLength": 64
+          },
+          "entityId": {
+            "type": "string",
+            "description": "实体 ID。",
+            "maxLength": 64
+          },
+          "before": {
+            "description": "变更前的结构化快照；无变更则为 null。"
+          },
+          "after": {
+            "description": "变更后的结构化快照；无变更则为 null。"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AuditLogPage": {
+        "type": "object",
+        "description": "游标分页的审计检索结果，按时间倒序。",
+        "required": ["items", "nextCursor", "hasMore"],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditLogEntry"
+            }
+          },
+          "nextCursor": {
+            "type": ["string", "null"],
+            "maxLength": 512
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AuditLogListResponse": {
+        "type": "object",
+        "description": "审计检索分页响应。",
+        "required": ["data"],
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AuditLogPage"
           }
         }
       },
