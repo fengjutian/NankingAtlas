@@ -64,7 +64,6 @@ test.describe('地图渲染（Leaflet + OSM）', () => {
   });
 
   test('底图不可用时，地点列表与筛选仍然可用（§9.2 降级契约）', async ({ page }) => {
-    // 掐断瓦片域名，模拟底图整体不可用。
     await page.route('**://*.openstreetmap.org/**', (route) => route.abort());
     await page.goto('/map');
 
@@ -79,5 +78,25 @@ test.describe('地图渲染（Leaflet + OSM）', () => {
     // 关键：列表区块仍在。
     const listHeading = page.getByRole('heading', { level: 2 }).first();
     await expect(listHeading).toBeVisible();
+  });
+
+  test('地址检索输入框存在，且未配置高德 Key 时给出说明而不是静默失败', async ({ page }) => {
+    await page.goto('/map');
+
+    // 输入框必须在首屏可见（列表优先，地图是增强 —— 但检索框属于列表区）。
+    const input = page.getByRole('searchbox', { name: '按地址定位' });
+    await expect(input).toBeVisible();
+
+    // 未配置 NEXT_PUBLIC_AMAP_KEY（E2E 明确不给）时，提交应得到明确说明，
+    // 而不是永远转圈或静默无反应。
+    await input.fill('夫子庙');
+    await page.getByRole('button', { name: '定位' }).click();
+
+    const status = page.locator('#\\:r0\\:-status, [role="status"]').filter({ hasText: '高德' });
+    await expect(status.first()).toBeVisible({ timeout: 20_000 });
+
+    // ⚠️ 关键：地图与列表不能因为检索失败而消失。
+    await expect(page.locator('.leaflet-container')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole('heading', { level: 2 }).first()).toBeVisible();
   });
 });

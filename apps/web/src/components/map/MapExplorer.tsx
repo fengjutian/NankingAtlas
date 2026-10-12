@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { AddressSearch } from './AddressSearch';
 import styles from './map.module.css';
 import { MapErrorBoundary } from './MapErrorBoundary';
 import { MapToolbar } from './MapToolbar';
@@ -73,6 +74,17 @@ const MapCanvas = dynamic(() => import('./MapCanvas'), {
     </div>
   ),
 });
+
+/** 地理编码限定城市。本项目只做南京一城，限定后可避免全国同名地点被误选。 */
+const GEOCODE_CITY = '南京';
+
+/**
+ * 地址定位后的取数窗口半宽（度）。
+ *
+ * 约 0.02° ≈ 2 km，落在 `MAX_BBOX_SPAN_DEG`(1.5°) 与 `MIN_BBOX_SPAN_DEG`(0.005°)
+ * 之间：足够小到"街区级"，又不会因为太小而查不到任何已发布地点。
+ */
+const GEOCODE_HALF_SPAN_DEG = 0.02;
 
 export function MapExplorer({
   baseUrl,
@@ -173,6 +185,29 @@ export function MapExplorer({
     [baseUrl, initialQuery.type, initialQuery.q],
   );
 
+  /**
+   * 地址检索命中 → 以该点为中心重新取数。
+   *
+   * 高德返回的坐标已在 `geocode.ts` 里转成 WGS-84，因此这里可以直接
+   * 当作地图中心使用，**不需要再做任何坐标系转换**。
+   *
+   * 窗口取一个固定的近距离范围而不是复用当前视窗：用户是在"跳到某地"，
+   * 沿用旧视窗会让新地点落在边缘甚至界外。
+   */
+  const handleLocated = useCallback(
+    (point: { readonly lon: number; readonly lat: number }): void => {
+      const half = GEOCODE_HALF_SPAN_DEG;
+      const next: MapBBox = {
+        minLon: point.lon - half,
+        minLat: point.lat - half,
+        maxLon: point.lon + half,
+        maxLat: point.lat + half,
+      };
+      void loadBBox(next);
+    },
+    [loadBBox],
+  );
+
   const handleSelect = useCallback(
     (slug: string): void => {
       setSelected((current) => {
@@ -223,6 +258,7 @@ export function MapExplorer({
       </section>
 
       <div className={css('mapListRegion')}>
+        <AddressSearch city={GEOCODE_CITY} onLocated={handleLocated} />
         <MapToolbar basePath="/map" query={initialQuery} allowedTypes={['PLACE']} />
 
         <ul className={css('mapLegend')} role="list">

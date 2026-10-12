@@ -3,7 +3,17 @@ import baseConfig from '@nanking-atlas/eslint-config/node';
 export default [
   ...baseConfig,
   {
-    ignores: ['dist/**', 'coverage/**', 'prisma/migrations/**', 'prisma/seed.ts'],
+    ignores: [
+      'dist/**',
+      'coverage/**',
+      'prisma/migrations/**',
+      // prisma/ 下的 CLI 脚本（seed / backup / restore-drill）在 tsconfig 的
+      // include 之外（rootDir 是 src），解析不了就报 "not found by the project service"。
+      // 它们由 tsx 直接执行，类型安全由运行时保证；与 seed.ts 同理排除。
+      'prisma/seed.ts',
+      'prisma/backup.ts',
+      'prisma/restore-drill.ts',
+    ],
   },
   {
     rules: {

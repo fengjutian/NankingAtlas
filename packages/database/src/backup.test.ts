@@ -83,7 +83,7 @@ describe('compareTableCounts', () => {
   it('整表缺失按 0 计入并判不一致（不能当作跳过）', () => {
     // 「表不见了」比「表里数据不对」更严重。
     const actual = { ...full };
-    delete actual['audit_logs'];
+    delete actual.audit_logs;
     const audit = compareTableCounts(full, actual).find((c) => c.table === 'audit_logs');
     expect(audit?.ok).toBe(false);
     expect(audit?.actual).toBe(0);
@@ -116,10 +116,8 @@ describe('isSafeDrillTarget（安全护栏）', () => {
 });
 
 describe('evaluateDrill', () => {
-  const ok = compareTableCounts(
-    Object.fromEntries(DRILL_TABLES.map((t) => [t, 1])) as Record<string, number>,
-    Object.fromEntries(DRILL_TABLES.map((t) => [t, 1])) as Record<string, number>,
-  );
+  const allOnes: Record<string, number> = Object.fromEntries(DRILL_TABLES.map((t) => [t, 1]));
+  const ok = compareTableCounts(allOnes, allOnes);
 
   it('完整性 ok 且行数一致 → 通过', () => {
     expect(evaluateDrill({ integrityCheck: 'ok', comparisons: ok })).toBe(true);

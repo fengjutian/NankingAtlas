@@ -101,6 +101,59 @@
   min-width: 0;
 }
 
+/* 地址检索（高德提供数据，ADR-0003） */
+.addressSearch {
+  display: flex;
+  flex-direction: column;
+  gap: var(--app-space-xs, 0.35rem);
+}
+
+.addressSearchLabel {
+  font-size: 0.9rem;
+  color: var(--app-color-muted, #5a5f5a);
+}
+
+.addressSearchRow {
+  display: flex;
+  gap: var(--app-space-xs, 0.35rem);
+  align-items: stretch;
+}
+
+.addressSearchInput {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--app-color-border, #cfd3cb);
+  border-radius: 4px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+}
+
+/* 键盘焦点必须可见（AGENTS.md §6.4）。 */
+.addressSearchInput:focus-visible {
+  outline: 2px solid var(--app-color-accent, #956b45);
+  outline-offset: 1px;
+}
+
+.addressSearchInput:disabled {
+  background: #f2f3f0;
+}
+
+/*
+  状态区不加 min-height：内容为空时不该占位（否则标签下方凭空多一条空白）。
+  失败文案用 role=status 由组件内设置 aria-live，空内容不播报。
+*/
+.addressSearchStatus {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--app-color-muted, #5a5f5a);
+}
+
+.addressSearchStatus:empty {
+  display: none;
+}
+
 .mapList {
   list-style: none;
   margin: 0;
