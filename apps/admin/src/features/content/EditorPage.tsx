@@ -12,8 +12,10 @@ import type {
   Language,
   MediaCompleteDto,
   ReadinessResult,
+  RelationTargetItem,
   RelationType,
   TagDto,
+  TagWithUsage,
   TypeExtension,
   UploadIntentDto,
 } from '@/api/types';
@@ -180,6 +182,9 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
   const [links, setLinks] = useState<ContentSourceLink[]>([]);
   const [tags, setTags] = useState<TagDto[]>([]);
   const [relations, setRelations] = useState<ContentRelationDto[]>([]);
+  // FD-008：标签库检索结果（带使用次数）与关系目标候选，避免手填 ID。
+  const [availableTags, setAvailableTags] = useState<TagWithUsage[]>([]);
+  const [relationTargets, setRelationTargets] = useState<RelationTargetItem[]>([]);
   const [sideBusy, setSideBusy] = useState(false);
   const [sideError, setSideError] = useState<string | null>(null);
   const [newSource, setNewSource] = useState<NewSourceValue>({
@@ -504,6 +509,26 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
     [onUnauthorized],
   );
 
+  /**
+   * 标签库检索（FD-008）。
+   *
+   * 走 `runSideTask` 让失败统一进 `sideError`，与其它侧栏操作一致的错误呈现。
+   */
+  const searchTags = useCallback(async () => {
+    await runSideTask(async () => {
+      const page = await libraryApi.listAllTags();
+      setAvailableTags(page.items);
+    });
+  }, [runSideTask]);
+
+  /** 关系目标检索（FD-008）：替代手填内容 ID。 */
+  const searchRelationTargets = useCallback(async () => {
+    await runSideTask(async () => {
+      const page = await libraryApi.searchRelationTargets();
+      setRelationTargets(page.items);
+    });
+  }, [runSideTask]);
+
   const createSource = useCallback(
     async (): Promise<string | null> =>
       runSideTask(async () => {
@@ -783,6 +808,9 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
         slug={tagForm.slug}
         displayName={tagForm.displayName}
         onChange={setTagForm}
+        onSearchTags={() => void searchTags()}
+        availableTags={availableTags}
+        searchingTags={sideBusy}
         onAttach={() =>
           void runSideTask(async () => {
             await libraryApi.upsertTag({
@@ -803,6 +831,9 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
         relationType={relationForm.relationType}
         directionNote={relationForm.directionNote}
         onChange={setRelationForm}
+        onSearchTargets={() => void searchRelationTargets()}
+        targets={relationTargets}
+        searchingTargets={sideBusy}
         onCreate={() =>
           void runSideTask(async () => {
             await libraryApi.createRelation(contentId, {

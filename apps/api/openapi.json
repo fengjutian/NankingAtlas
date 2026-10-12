@@ -3235,6 +3235,149 @@
       }
     },
     "/api/v1/admin/tags": {
+      "get": {
+        "operationId": "listAllTags",
+        "summary": "列出全部标签与使用次数",
+        "description": "编辑角色可用（标签是日常操作，不是 ADMIN 专属）。按 slug 升序，返回 `usageCount` 便于判断哪些标签已无人使用。",
+        "tags": ["tags"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "同时匹配 slug 与显示名的关键词。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回条数上限，默认 20，最大 50。",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "标签列表。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagWithUsageListResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "检索参数不合法。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或无法证明身份（凭据错误、token 过期或吊销）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "身份已知但无权（角色不足或账号被停用）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务内部错误。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "operationId": "upsertTag",
         "summary": "创建或更新标签",
@@ -3901,6 +4044,7 @@
       "get": {
         "operationId": "listContentRelations",
         "summary": "列出内容关联",
+        "description": "同时返回**出边与入边**，方向由服务端归一：`otherContentId` 永远是对方，`direction` 说明本内容处于哪一侧。这样前端不需要自己推断方向，也不会把\"被指向的内容\"渲染成指向自己。",
         "tags": ["relations"],
         "security": [
           {
@@ -3926,6 +4070,151 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ContentRelationListResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或无法证明身份（凭据错误、token 过期或吊销）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "身份已知但无权（角色不足或账号被停用）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务内部错误。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/relation-targets": {
+      "get": {
+        "operationId": "searchRelationTargets",
+        "summary": "检索可作为关系目标的内容",
+        "description": "编辑建立关系时按标题 / slug / 摘要检索目标，避免手填内容 ID。**允许**返回草稿 —— 先把两条内容连起来，内容之后再审；status 字段供编辑自行判断。",
+        "tags": ["relations"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "同时匹配标题、slug 与摘要的关键词。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回条数上限，默认 20，最大 50。",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "候选目标内容列表。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelationTargetListResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "检索参数不合法。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -7827,16 +8116,43 @@
       },
       "ContentRelation": {
         "type": "object",
-        "required": ["targetContentId", "relationType", "directionNote"],
+        "description": "一条关联，**方向已由服务端归一**（FD-008）：`otherContentId` 永远是对方，`direction` 说明本内容处于关系的哪一侧。不要用裸的 targetContentId —— 那会让\"被指向的内容\"把���己当成关联对象。",
+        "required": [
+          "otherContentId",
+          "otherTitle",
+          "otherType",
+          "relationType",
+          "direction",
+          "symmetric",
+          "directionNote"
+        ],
         "additionalProperties": false,
         "properties": {
-          "targetContentId": {
+          "otherContentId": {
             "type": "string",
-            "description": "关联到的另一条内容 ID。"
+            "description": "关联到的**对方**内容 ID。"
+          },
+          "otherTitle": {
+            "type": ["string", "null"],
+            "maxLength": 200,
+            "description": "对方标题；对方被删除时为 null。"
+          },
+          "otherType": {
+            "type": ["string", "null"],
+            "description": "对方内容类型；对方被删除时为 null。"
           },
           "relationType": {
             "type": "string",
             "enum": ["RELATED_TO", "PART_OF", "INFLUENCED", "CONTINUES", "REFERENCES", "LOCATED_AT"]
+          },
+          "direction": {
+            "type": "string",
+            "enum": ["OUTGOING", "INCOMING"],
+            "description": "OUTGOING 本内容 → 对方；INCOMING 对方 → 本内容。展示文案由前端按此字段生成。"
+          },
+          "symmetric": {
+            "type": "boolean",
+            "description": "关系是否天然对称（`RELATED_TO`）。对称关系的两端读法相同；非对称关系的入边应读成\"X 指向本内容\"。"
           },
           "directionNote": {
             "type": ["string", "null"],
@@ -7884,6 +8200,107 @@
             "items": {
               "$ref": "#/components/schemas/ContentRelation"
             }
+          }
+        }
+      },
+      "RelationTarget": {
+        "type": "object",
+        "description": "可作为关系目标的内容候选。允许是草稿 —— 先连起来，内容之后再审。",
+        "required": ["id", "type", "slug", "title", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "内容 ID。"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["PLACE", "PERSON", "EVENT", "ARCHITECTURE", "TRADITION", "TOPIC", "ROUTE"]
+          },
+          "slug": {
+            "type": "string",
+            "description": "公开 slug。",
+            "maxLength": 120
+          },
+          "title": {
+            "type": "string",
+            "description": "标题。",
+            "maxLength": 200
+          },
+          "status": {
+            "type": "string",
+            "enum": ["DRAFT", "IN_REVIEW", "APPROVED", "PUBLISHED", "ARCHIVED"]
+          }
+        }
+      },
+      "RelationTargetList": {
+        "type": "object",
+        "required": ["items"],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RelationTarget"
+            }
+          }
+        }
+      },
+      "RelationTargetListResponse": {
+        "type": "object",
+        "description": "候选目标内容列表响应。",
+        "required": ["data"],
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RelationTargetList"
+          }
+        }
+      },
+      "TagWithUsage": {
+        "type": "object",
+        "description": "标签 + 使用次数；使用次数用于判断哪些标签已无人使用。",
+        "required": ["slug", "displayName", "usageCount"],
+        "additionalProperties": false,
+        "properties": {
+          "slug": {
+            "type": "string",
+            "description": "标签 slug（不可变：改了会断掉所有引用）。",
+            "maxLength": 80
+          },
+          "displayName": {
+            "type": "string",
+            "description": "标签显示名（可重命名）。",
+            "maxLength": 100
+          },
+          "usageCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "被多少条内容引用。"
+          }
+        }
+      },
+      "TagWithUsageList": {
+        "type": "object",
+        "required": ["items"],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TagWithUsage"
+            }
+          }
+        }
+      },
+      "TagWithUsageListResponse": {
+        "type": "object",
+        "description": "标签列表响应。",
+        "required": ["data"],
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TagWithUsageList"
           }
         }
       },

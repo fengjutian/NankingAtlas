@@ -86,4 +86,45 @@ export class TagsService {
     });
     return rows.map((row) => ({ slug: row.tag.slug, displayName: row.tag.displayName }));
   }
+
+  /**
+   * 全部标签 + 使用次数（FD-008）。
+   *
+   * `usageCount` 用 groupBy 聚合而不是逐条 count —— 后者会退化成 N+1 查询。
+   *
+   * 排序固定 `slug asc`：标签是受控字典，编辑按 slug 找比按"最近使用"更稳，
+   * 也不需要可变排序（可变排序会让游标必须携带排序键）。
+   */
+  async listAll(input: {
+    q?: string | undefined;
+    limit: number;
+  }): Promise<{ slug: string; displayName: string; usageCount: number }[]> {
+    const trimmed = input.q?.trim();
+    const tags = await prisma.tag.findMany({
+      where:
+        trimmed === undefined || trimmed === ''
+          ? {}
+          : { OR: [{ slug: { contains: trimmed } }, { displayName: { contains: trimmed } }] },
+      orderBy: { slug: 'asc' },
+      take: input.limit,
+      select: { slug: true, displayName: true },
+    });
+
+    if (tags.length === 0) {
+      return [];
+    }
+
+    const usages = await prisma.contentTag.groupBy({
+      by: ['tagSlug'],
+      where: { tagSlug: { in: tags.map((tag) => tag.slug) } },
+      _count: { _all: true },
+    });
+    const countBySlug = new Map(usages.map((row) => [row.tagSlug, row._count._all]));
+
+    return tags.map((tag) => ({
+      slug: tag.slug,
+      displayName: tag.displayName,
+      usageCount: countBySlug.get(tag.slug) ?? 0,
+    }));
+  }
 }

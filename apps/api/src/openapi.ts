@@ -811,11 +811,40 @@ const TagSchema: SchemaObject = {
 
 const ContentRelationSchema: SchemaObject = {
   type: 'object',
-  required: ['targetContentId', 'relationType', 'directionNote'],
+  description:
+    '一条关联，**方向已由服务端归一**（FD-008）：`otherContentId` 永远是对方，' +
+    '`direction` 说明本内容处于关系的哪一侧。不要用裸的 targetContentId —— ' +
+    '那会让"被指向的内容"把���己当成关联对象。',
+  required: [
+    'otherContentId',
+    'otherTitle',
+    'otherType',
+    'relationType',
+    'direction',
+    'symmetric',
+    'directionNote',
+  ],
   additionalProperties: false,
   properties: {
-    targetContentId: stringSchema('关联到的另一条内容 ID。'),
+    otherContentId: stringSchema('关联到的**对方**内容 ID。'),
+    otherTitle: {
+      type: ['string', 'null'],
+      maxLength: 200,
+      description: '对方标题；对方被删除时为 null。',
+    },
+    otherType: { type: ['string', 'null'], description: '对方内容类型；对方被删除时为 null。' },
     relationType: { type: 'string', enum: RELATION_TYPES },
+    direction: {
+      type: 'string',
+      enum: ['OUTGOING', 'INCOMING'],
+      description: 'OUTGOING 本内容 → 对方；INCOMING 对方 → 本内容。展示文案由前端按此字段生成。',
+    },
+    symmetric: {
+      type: 'boolean',
+      description:
+        '关系是否天然对称（`RELATED_TO`）。对称关系的两端读法相同；' +
+        '非对称关系的入边应读成"X 指向本内容"。',
+    },
     directionNote: nullableStringField(500),
   },
 };
@@ -1554,6 +1583,44 @@ const SCHEMAS: Readonly<Record<string, SchemaObject>> = {
   ContentRelation: ContentRelationSchema,
   CreateRelationRequest: CreateRelationRequestSchema,
   ContentRelationListResponse: dataListEnvelope(ref('ContentRelation'), '内容的关联列表响应。'),
+  RelationTarget: {
+    type: 'object',
+    description: '可作为关系目标的内容候选。允许是草稿 —— 先连起来，内容之后再审。',
+    required: ['id', 'type', 'slug', 'title', 'status'],
+    additionalProperties: false,
+    properties: {
+      id: stringSchema('内容 ID。'),
+      type: { type: 'string', enum: CONTENT_TYPES },
+      slug: stringSchema('公开 slug。', { maxLength: 120 }),
+      title: stringSchema('标题。', { maxLength: 200 }),
+      status: { type: 'string', enum: CONTENT_STATUSES },
+    },
+  },
+  RelationTargetList: {
+    type: 'object',
+    required: ['items'],
+    additionalProperties: false,
+    properties: { items: { type: 'array', items: ref('RelationTarget') } },
+  },
+  RelationTargetListResponse: dataEnvelope(ref('RelationTargetList'), '候选目标内容列表响应。'),
+  TagWithUsage: {
+    type: 'object',
+    description: '标签 + 使用次数；使用次数用于判断哪些标签已无人使用。',
+    required: ['slug', 'displayName', 'usageCount'],
+    additionalProperties: false,
+    properties: {
+      slug: stringSchema('标签 slug（不可变：改了会断掉所有引用）。', { maxLength: 80 }),
+      displayName: stringSchema('标签显示名（可重命名）。', { maxLength: 100 }),
+      usageCount: { type: 'integer', minimum: 0, description: '被多少条内容引用。' },
+    },
+  },
+  TagWithUsageList: {
+    type: 'object',
+    required: ['items'],
+    additionalProperties: false,
+    properties: { items: { type: 'array', items: ref('TagWithUsage') } },
+  },
+  TagWithUsageListResponse: dataEnvelope(ref('TagWithUsageList'), '标签列表响应。'),
 
   // 媒体
   UploadIntent: UploadIntentSchema,
@@ -2238,6 +2305,36 @@ const PATHS: Readonly<Record<string, PathItemObject>> = {
 
   // ---- 标签 ----
   '/api/v1/admin/tags': {
+    get: {
+      operationId: 'listAllTags',
+      summary: '列出全部标签与使用次数',
+      description:
+        '编辑角色可用（标签是日常操作，不是 ADMIN 专属）。按 slug 升序，返回 `usageCount` 便于判断哪些标签已无人使用。',
+      tags: ['tags'],
+      security: BEARER_SECURITY,
+      parameters: [
+        {
+          name: 'q',
+          in: 'query',
+          description: '同时匹配 slug 与显示名的关键词。',
+          required: false,
+          schema: { type: 'string', minLength: 1, maxLength: 200 },
+        },
+        {
+          name: 'limit',
+          in: 'query',
+          description: '返回条数上限，默认 20，最大 50。',
+          required: false,
+          schema: { type: 'integer', minimum: 1, maximum: 50, default: 20 },
+        },
+      ],
+      responses: {
+        '200': okResponse('TagWithUsageListResponse', '标签列表。'),
+        ...AUTH_ERRORS,
+        '400': errorResponse('检索参数不合法。'),
+        '500': errorResponse('服务内部错误。'),
+      },
+    },
     post: {
       operationId: 'upsertTag',
       summary: '创建或更新标签',
@@ -2306,6 +2403,9 @@ const PATHS: Readonly<Record<string, PathItemObject>> = {
     get: {
       operationId: 'listContentRelations',
       summary: '列出内容关联',
+      description:
+        '同时返回**出边与入边**，方向由服务端归一：`otherContentId` 永远是对方，`direction` 说明本内容处于哪一侧。' +
+        '这样前端不需要自己推断方向，也不会把"被指向的内容"渲染成指向自己。',
       tags: ['relations'],
       security: BEARER_SECURITY,
       parameters: [ID_PATH_PARAMETER],
@@ -2316,7 +2416,39 @@ const PATHS: Readonly<Record<string, PathItemObject>> = {
       },
     },
   },
-
+  '/api/v1/admin/relation-targets': {
+    get: {
+      operationId: 'searchRelationTargets',
+      summary: '检索可作为关系目标的内容',
+      description:
+        '编辑建立关系时按标题 / slug / 摘要检索目标，避免手填内容 ID。' +
+        '**允许**返回草稿 —— 先把两条内容连起来，内容之后再审；status 字段供编辑自行判断。',
+      tags: ['relations'],
+      security: BEARER_SECURITY,
+      parameters: [
+        {
+          name: 'q',
+          in: 'query',
+          description: '同时匹配标题、slug 与摘要的关键词。',
+          required: false,
+          schema: { type: 'string', minLength: 1, maxLength: 200 },
+        },
+        {
+          name: 'limit',
+          in: 'query',
+          description: '返回条数上限，默认 20，最大 50。',
+          required: false,
+          schema: { type: 'integer', minimum: 1, maximum: 50, default: 20 },
+        },
+      ],
+      responses: {
+        '200': okResponse('RelationTargetListResponse', '候选目标内容列表。'),
+        ...AUTH_ERRORS,
+        '400': errorResponse('检索参数不合法。'),
+        '500': errorResponse('服务内部错误。'),
+      },
+    },
+  },
   // ---- 媒体 ----
   '/api/v1/admin/media/upload-intents': {
     post: {

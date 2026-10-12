@@ -6,6 +6,7 @@ import { parseTiptapDocument } from '@nanking-atlas/validation';
 import { RichTextEditor } from './RichTextEditor';
 import { SourcePicker, type SourceSearchRequest } from './SourcePicker';
 
+import type { RelationTargetItem, TagWithUsage } from '@/api/types';
 import type {
   ContentRelationDto,
   ContentSourceLink,
@@ -1343,6 +1344,9 @@ export function TagsSection({
   displayName,
   onChange,
   onAttach,
+  onSearchTags,
+  availableTags,
+  searchingTags,
   busy,
   error,
 }: {
@@ -1351,6 +1355,10 @@ export function TagsSection({
   displayName: string;
   onChange: (next: { slug: string; displayName: string }) => void;
   onAttach: () => void;
+  /** 标签库检索（FD-008）：避免重复创建同名标签。 */
+  onSearchTags: () => void;
+  availableTags: readonly TagWithUsage[];
+  searchingTags: boolean;
   busy: boolean;
   error: string | null;
 }) {
@@ -1358,7 +1366,7 @@ export function TagsSection({
     <SectionShell
       index={6}
       title="标签"
-      description="标签用于聚合检索；slug 全局唯一，重复添加等同于复用已有标签。"
+      description="标签用于聚合检索；slug 全局唯一且**不可变**（改了会断掉所有引用），只能重命名显示名。"
     >
       {tags.length === 0 ? (
         <EmptyState title="还没有标签" description="添加标签便于在列表与前台按主题聚合内容。" />
@@ -1374,6 +1382,38 @@ export function TagsSection({
         </ul>
       )}
       <div style={stack}>
+        <div style={row}>
+          <Button busy={searchingTags} disabled={busy} onClick={onSearchTags}>
+            检索标签库
+          </Button>
+          <span style={mutedText}>先检索复用，避免创建只差一个字的新标签</span>
+        </div>
+        {availableTags.length === 0 ? (
+          <p style={mutedText}>尚未检索标签库。下方表单可以直接新建。</p>
+        ) : (
+          <ul style={{ ...stack, listStyle: 'none', padding: 0, margin: 0 }}>
+            {availableTags.map((tag) => (
+              <li key={tag.slug} style={row}>
+                <Button
+                  variant={slug === tag.slug ? 'primary' : 'default'}
+                  ariaPressed={slug === tag.slug}
+                  busy={busy}
+                  disabled={busy}
+                  title={`复用「${tag.displayName}」`}
+                  onClick={() => onChange({ slug: tag.slug, displayName: tag.displayName })}
+                >
+                  {slug === tag.slug ? '已选' : '复用'}
+                </Button>
+                <span>{tag.displayName}</span>
+                <code>{tag.slug}</code>
+                <span style={mutedText}>被 {String(tag.usageCount)} 条内容使用</span>
+                {tag.usageCount === 0 ? (
+                  <span style={mutedText}>（暂无引用，可考虑废弃）</span>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        )}
         <div style={gridTwo}>
           <Field label="标签 slug" required error={slug.trim() === '' ? 'slug 不能为空' : null}>
             {({ id, describedBy, invalid }) => (
@@ -1437,6 +1477,9 @@ export function RelationsSection({
   directionNote,
   onChange,
   onCreate,
+  onSearchTargets,
+  targets,
+  searchingTargets,
   busy,
   error,
 }: {
@@ -1450,6 +1493,10 @@ export function RelationsSection({
     directionNote: string;
   }) => void;
   onCreate: () => void;
+  /** 目标内容检索（FD-008）：替代手填内容 ID。 */
+  onSearchTargets: () => void;
+  targets: readonly RelationTargetItem[];
+  searchingTargets: boolean;
   busy: boolean;
   error: string | null;
 }) {
@@ -1457,7 +1504,7 @@ export function RelationsSection({
     <SectionShell
       index={7}
       title="关联内容"
-      description="关联关系由受控字典约束；方向说明用于避免把有向关系读成双向。"
+      description="关联类型由受控字典约束；方向语义由服务端给出，前端只负责按它渲染措辞。"
     >
       {relations.length === 0 ? (
         <EmptyState
@@ -1467,33 +1514,95 @@ export function RelationsSection({
       ) : (
         <ul style={{ ...stack, listStyle: 'none', padding: 0, margin: 0 }}>
           {relations.map((relation) => (
-            <li key={`${relation.targetContentId}-${relation.relationType}`} style={row}>
-              <Badge>
-                {RELATION_TYPE_LABELS[relation.relationType as RelationType] ??
-                  relation.relationType}
-              </Badge>
-              <code>{relation.targetContentId}</code>
-              <span style={mutedText}>{relation.directionNote ?? ''}</span>
+            <li
+              key={`${relation.otherContentId}-${relation.relationType}-${relation.direction}`}
+              style={{ ...row, flexDirection: 'column', alignItems: 'flex-start' }}
+            >
+              <div style={row}>
+                <Badge tone={relation.symmetric ? 'neutral' : 'review'}>
+                  {RELATION_TYPE_LABELS[relation.relationType as RelationType] ??
+                    relation.relationType}
+                </Badge>
+                <span>
+                  {relation.direction === 'OUTGOING' ? '本内容' : '对方'} →{' '}
+                  {relation.direction === 'OUTGOING' ? '对方' : '本内容'}
+                </span>
+                <Badge tone="draft">{relation.otherType ?? '未知类型'}</Badge>
+                <span style={mutedText}>{relation.symmetric ? '双向关系' : '有向关系'}</span>
+              </div>
+              <div style={row}>
+                <code>{relation.otherContentId}</code>
+                <span>{relation.otherTitle ?? '（对方已删除）'}</span>
+                {relation.directionNote === null ? null : (
+                  <span style={mutedText}>说明：{relation.directionNote}</span>
+                )}
+              </div>
             </li>
           ))}
         </ul>
       )}
       <div style={stack}>
+        <Field label="检索目标内容" hint="按标题或 slug 检索，避免手填内容 ID">
+          {({ id, describedBy }) => (
+            <input
+              id={id}
+              aria-describedby={describedBy}
+              type="search"
+              disabled={busy}
+              placeholder="输入关键词后回车检索"
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault();
+                  onSearchTargets();
+                }
+              }}
+              style={inputStyle}
+            />
+          )}
+        </Field>
+        <ButtonRow>
+          <Button busy={searchingTargets} disabled={busy} onClick={onSearchTargets}>
+            检索目标
+          </Button>
+        </ButtonRow>
+        {targets.length === 0 ? (
+          <p style={mutedText}>尚未检索候选内容。草稿也可以关联 —— 先连起来，内容之后再审。</p>
+        ) : (
+          <ul style={{ ...stack, listStyle: 'none', padding: 0, margin: 0 }}>
+            {targets.map((item) => (
+              <li key={item.id} style={row}>
+                <Button
+                  variant={targetContentId === item.id ? 'primary' : 'default'}
+                  ariaPressed={targetContentId === item.id}
+                  busy={busy}
+                  disabled={busy}
+                  title={`选择「${item.title}」作为关联目标`}
+                  onClick={() =>
+                    onChange({ targetContentId: item.id, relationType, directionNote })
+                  }
+                >
+                  {targetContentId === item.id ? '已选' : '选择'}
+                </Button>
+                <span>{item.title}</span>
+                <code>{item.slug}</code>
+                <Badge tone="draft">{item.status}</Badge>
+              </li>
+            ))}
+          </ul>
+        )}
         <Field
-          label="目标内容 ID"
+          label="已选目标 ID"
           required
-          error={targetContentId.trim() === '' ? '目标内容 ID 不能为空' : null}
+          error={targetContentId.trim() === '' ? '请先检索并选择目标内容' : null}
         >
           {({ id, describedBy, invalid }) => (
             <input
               id={id}
               aria-describedby={describedBy}
               aria-invalid={invalid}
+              readOnly
               disabled={busy}
               value={targetContentId}
-              onChange={(event) =>
-                onChange({ targetContentId: event.target.value, relationType, directionNote })
-              }
               style={inputStyle}
             />
           )}

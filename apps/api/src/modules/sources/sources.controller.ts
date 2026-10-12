@@ -103,6 +103,32 @@ const createRelationSchema = z
   })
   .strict();
 
+/** 关键词进 `LIKE '%q%'`，过长会拖慢全表扫描。 */
+const MAX_TAG_QUERY_LENGTH = 200;
+const MAX_TAG_LIMIT = 50;
+const DEFAULT_TAG_LIMIT = 20;
+
+/**
+ * 标签检索（FD-008）。`.strict()`：未知参数一律 400。
+ *
+ * 结果**不带**游标：标签是受控小字典（几十条），一次返回即可；
+ * 真需要分页时再引入 —— 现在加游标只会让调用方多写一套拼接逻辑。
+ */
+const listTagsQuerySchema = z
+  .object({
+    q: z.string().trim().min(1).max(MAX_TAG_QUERY_LENGTH).optional(),
+    limit: z.coerce.number().int().min(1).max(MAX_TAG_LIMIT).default(DEFAULT_TAG_LIMIT),
+  })
+  .strict();
+
+/** 关系目标检索（FD-008）。同样是受控小窗口，不分页。 */
+const relationTargetQuerySchema = z
+  .object({
+    q: z.string().trim().min(1).max(MAX_TAG_QUERY_LENGTH).optional(),
+    limit: z.coerce.number().int().min(1).max(MAX_TAG_LIMIT).default(DEFAULT_TAG_LIMIT),
+  })
+  .strict();
+
 @Controller('admin')
 export class SourcesController {
   /** 显式 @Inject：见 auth.controller.ts 的同款说明（vitest 不产出 paramtypes）。 */
@@ -224,6 +250,12 @@ export class SourcesController {
 
   // ---- relations ----
 
+  /**
+   * POST /admin/contents/:id/relations —— 从**当前内容**出发建立关系。
+   *
+   * sourceContentId 取自路径而不是请求体：让调用方无法"以 A 的身份建一条
+   * 指向 A 的关系"，也省掉一个必填字段。
+   */
   @Post('contents/:id/relations')
   @RequireRoles('EDITOR', 'REVIEWER', 'ADMIN')
   async createRelation(
@@ -244,10 +276,47 @@ export class SourcesController {
     return { data: { ok: true } };
   }
 
+  /** GET /admin/contents/:id/relations —— 关联（含方向语义，FD-008）。 */
   @Get('contents/:id/relations')
   @RequireRoles('EDITOR', 'REVIEWER', 'ADMIN')
   async listRelations(@Param('id') contentId: string): Promise<{ data: unknown }> {
     return { data: await this.relations.listForContent(contentId) };
+  }
+
+  /**
+   * GET /admin/relation-targets —— 关系目标检索（FD-008）。
+   *
+   * 路径刻意**不**是 `contents/relation-targets`：那样会和
+   * `contents/:id/...` 系列产生歧义（`relation-targets` 会被当成 `:id`），
+   * 行为依赖路由声明顺序。用独立前缀就没有这个坑。
+   */
+  @Get('relation-targets')
+  @RequireRoles('EDITOR', 'REVIEWER', 'ADMIN')
+  async searchRelationTargets(@Query() rawQuery: unknown): Promise<{ data: unknown }> {
+    const query = relationTargetQuerySchema.parse(rawQuery);
+    return {
+      data: {
+        items: await this.relations.searchTargets({
+          ...(query.q !== undefined ? { q: query.q } : {}),
+          limit: query.limit,
+        }),
+      },
+    };
+  }
+
+  /** GET /admin/tags —— 标签列表 + 使用次数（FD-008）。 */
+  @Get('tags')
+  @RequireRoles('EDITOR', 'REVIEWER', 'ADMIN')
+  async listAllTags(@Query() rawQuery: unknown): Promise<{ data: unknown }> {
+    const query = listTagsQuerySchema.parse(rawQuery);
+    return {
+      data: {
+        items: await this.tags.listAll({
+          ...(query.q !== undefined ? { q: query.q } : {}),
+          limit: query.limit,
+        }),
+      },
+    };
   }
 }
 

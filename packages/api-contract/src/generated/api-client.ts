@@ -33,9 +33,10 @@ export const NLA_API_PATHS = {
   '/api/v1/admin/contents/{id}/review-actions': ['GET'] as const,
   '/api/v1/admin/sources': ['GET', 'POST'] as const,
   '/api/v1/admin/contents/{id}/sources': ['POST', 'GET'] as const,
-  '/api/v1/admin/tags': ['POST'] as const,
+  '/api/v1/admin/tags': ['GET', 'POST'] as const,
   '/api/v1/admin/contents/{id}/tags': ['POST', 'GET'] as const,
   '/api/v1/admin/contents/{id}/relations': ['POST', 'GET'] as const,
+  '/api/v1/admin/relation-targets': ['GET'] as const,
   '/api/v1/admin/media/upload-intents': ['POST'] as const,
   '/api/v1/admin/media/{id}/complete': ['POST'] as const,
   '/api/v1/admin/users': ['GET', 'POST'] as const,
@@ -546,9 +547,13 @@ export type TagResponse = { readonly data: Tag };
 export type TagListResponse = { readonly data: readonly Tag[] };
 
 export type ContentRelation = {
-  readonly targetContentId: string;
+  readonly otherContentId: string;
+  readonly otherTitle: string | null | null;
+  readonly otherType: string | null | null;
   readonly relationType:
     'RELATED_TO' | 'PART_OF' | 'INFLUENCED' | 'CONTINUES' | 'REFERENCES' | 'LOCATED_AT';
+  readonly direction: 'OUTGOING' | 'INCOMING';
+  readonly symmetric: boolean;
   readonly directionNote: string | null | null;
 };
 
@@ -560,6 +565,28 @@ export type CreateRelationRequest = {
 };
 
 export type ContentRelationListResponse = { readonly data: readonly ContentRelation[] };
+
+export type RelationTarget = {
+  readonly id: string;
+  readonly type: 'PLACE' | 'PERSON' | 'EVENT' | 'ARCHITECTURE' | 'TRADITION' | 'TOPIC' | 'ROUTE';
+  readonly slug: string;
+  readonly title: string;
+  readonly status: 'DRAFT' | 'IN_REVIEW' | 'APPROVED' | 'PUBLISHED' | 'ARCHIVED';
+};
+
+export type RelationTargetList = { readonly items: readonly RelationTarget[] };
+
+export type RelationTargetListResponse = { readonly data: RelationTargetList };
+
+export type TagWithUsage = {
+  readonly slug: string;
+  readonly displayName: string;
+  readonly usageCount: number;
+};
+
+export type TagWithUsageList = { readonly items: readonly TagWithUsage[] };
+
+export type TagWithUsageListResponse = { readonly data: TagWithUsageList };
 
 export type UploadIntent = {
   readonly mediaId: string;
@@ -1184,6 +1211,35 @@ export interface NlaOperationMap {
       readonly '500': ErrorResponse;
     };
   };
+  /** GET /api/v1/admin/tags */
+  listAllTags: {
+    readonly method: 'GET';
+    readonly path: '/api/v1/admin/tags';
+    readonly tags: readonly ['tags'];
+    readonly security: 'bearer';
+    readonly parameters: readonly [
+      | {
+          readonly name: 'q';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: string;
+        }
+      | {
+          readonly name: 'limit';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: number;
+        },
+    ];
+    readonly requestBody: undefined | undefined;
+    readonly response: TagWithUsageListResponse;
+    readonly errorResponses: {
+      readonly '400': ErrorResponse;
+      readonly '401': ErrorResponse;
+      readonly '403': ErrorResponse;
+      readonly '500': ErrorResponse;
+    };
+  };
   /** POST /api/v1/admin/tags */
   upsertTag: {
     readonly method: 'POST';
@@ -1289,6 +1345,35 @@ export interface NlaOperationMap {
     readonly requestBody: undefined | undefined;
     readonly response: ContentRelationListResponse;
     readonly errorResponses: {
+      readonly '401': ErrorResponse;
+      readonly '403': ErrorResponse;
+      readonly '500': ErrorResponse;
+    };
+  };
+  /** GET /api/v1/admin/relation-targets */
+  searchRelationTargets: {
+    readonly method: 'GET';
+    readonly path: '/api/v1/admin/relation-targets';
+    readonly tags: readonly ['relations'];
+    readonly security: 'bearer';
+    readonly parameters: readonly [
+      | {
+          readonly name: 'q';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: string;
+        }
+      | {
+          readonly name: 'limit';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: number;
+        },
+    ];
+    readonly requestBody: undefined | undefined;
+    readonly response: RelationTargetListResponse;
+    readonly errorResponses: {
+      readonly '400': ErrorResponse;
       readonly '401': ErrorResponse;
       readonly '403': ErrorResponse;
       readonly '500': ErrorResponse;

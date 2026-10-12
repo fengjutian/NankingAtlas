@@ -297,6 +297,47 @@ export interface HomepageSlotConfigInput {
 }
 
 // ---------------------------------------------------------------------------
+// 标签与关系（FD-008）
+// ---------------------------------------------------------------------------
+
+/** 标签 + 使用次数。 */
+export interface TagWithUsage {
+  slug: string;
+  displayName: string;
+  usageCount: number;
+}
+
+/** 关系方向：`OUTGOING` 本内容 → 对方；`INCOMING` 对方 → 本内容。 */
+export type RelationDirection = 'OUTGOING' | 'INCOMING';
+
+/**
+ * 关联项（FD-008）。
+ *
+ * `otherContentId` 永远是**对方**，`direction` 说明本内容处于哪一侧 ——
+ * 方向由服务端归一，前端不自己推断（否则"被指向的内容"会把自己当成关联对象）。
+ * 刻意**不保留** `targetContentId`：那个字段名会诱导前端重新推断方向。
+ */
+export interface ContentRelationDto {
+  otherContentId: string;
+  otherTitle: string | null;
+  otherType: string | null;
+  relationType: string;
+  direction: RelationDirection;
+  /** 关系是否天然对称（`RELATED_TO`）。 */
+  symmetric: boolean;
+  directionNote: string | null;
+}
+
+/** 可作为关系目标的内容候选；允许是草稿。 */
+export interface RelationTargetItem {
+  id: string;
+  type: string;
+  slug: string;
+  title: string;
+  status: string;
+}
+
+// ---------------------------------------------------------------------------
 // 内容
 // ---------------------------------------------------------------------------
 
@@ -401,12 +442,6 @@ export interface TagDto {
 export interface UpsertTagInput {
   slug: string;
   displayName: string;
-}
-
-export interface ContentRelationDto {
-  targetContentId: string;
-  relationType: string;
-  directionNote: string | null;
 }
 
 export interface CreateRelationInput {

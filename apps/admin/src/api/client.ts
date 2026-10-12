@@ -9,6 +9,8 @@ import type {
   HomepageCandidate,
   HomepageSlotConfigInput,
   PatchUserInput,
+  RelationTargetItem,
+  TagWithUsage,
   UserListPage,
 } from './types';
 import type {
@@ -701,6 +703,30 @@ export const libraryApi = {
   },
   upsertTag(input: UpsertTagInput): Promise<unknown> {
     return request<unknown>('/admin/tags', { method: 'POST', body: input });
+  },
+  /**
+   * 全部标签 + 使用次数（FD-008）。编辑角色可用。
+   *
+   * 与 `contentApi.listTags(id)`（某内容的标签）是两回事，不要混淆。
+   */
+  listAllTags(query?: { q?: string }): Promise<{ items: TagWithUsage[] }> {
+    const search = new URLSearchParams();
+    if (query?.q !== undefined) {
+      search.set('q', query.q);
+    }
+    const suffix = search.toString();
+    return request<{ items: TagWithUsage[] }>(`/admin/tags${suffix === '' ? '' : `?${suffix}`}`);
+  },
+  /** 关系目标检索（FD-008）：避免手填内容 ID。 */
+  searchRelationTargets(query?: { q?: string }): Promise<{ items: RelationTargetItem[] }> {
+    const search = new URLSearchParams();
+    if (query?.q !== undefined) {
+      search.set('q', query.q);
+    }
+    const suffix = search.toString();
+    return request<{ items: RelationTargetItem[] }>(
+      `/admin/relation-targets${suffix === '' ? '' : `?${suffix}`}`,
+    );
   },
   attachTag(contentId: string, tagSlug: string): Promise<{ ok: true }> {
     return request<{ ok: true }>(`/admin/contents/${contentId}/tags`, {

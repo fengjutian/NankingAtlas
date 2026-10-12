@@ -21,6 +21,10 @@
       "description": "地点空间查询（bbox）与坐标核验状态。"
     },
     {
+      "name": "homepage",
+      "description": "首页聚合与后台槽位配置。"
+    },
+    {
       "name": "routes",
       "description": "路线与有序站点。"
     },
@@ -55,6 +59,10 @@
     {
       "name": "users",
       "description": "后台用户与角色管理。"
+    },
+    {
+      "name": "audit",
+      "description": "审计日志查询（只读）。"
     }
   ],
   "paths": {
@@ -3227,6 +3235,149 @@
       }
     },
     "/api/v1/admin/tags": {
+      "get": {
+        "operationId": "listAllTags",
+        "summary": "列出全部标签与使用次数",
+        "description": "编辑角色可用（标签是日常操作，不是 ADMIN 专属）。按 slug 升序，返回 `usageCount` 便于判断哪些标签已无人使用。",
+        "tags": ["tags"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "同时匹配 slug 与显示名的关键词。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回条数上限，默认 20，最大 50。",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "标签列表。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagWithUsageListResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "检索参数不合法。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或无法证明身份（凭据错误、token 过期或吊销）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "身份已知但无权（角色不足或账号被停用）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务内部错误。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "operationId": "upsertTag",
         "summary": "创建或更新标签",
@@ -3893,6 +4044,7 @@
       "get": {
         "operationId": "listContentRelations",
         "summary": "列出内容关联",
+        "description": "同时返回**出边与入边**，方向由服务端归一：`otherContentId` 永远是对方，`direction` 说明本内容处于哪一侧。这样前端不需要自己推断方向，也不会把\"被指向的内容\"渲染成指向自己。",
         "tags": ["relations"],
         "security": [
           {
@@ -3918,6 +4070,151 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ContentRelationListResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或无法证明身份（凭据错误、token 过期或吊销）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "身份已知但无权（角色不足或账号被停用）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务内部错误。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/relation-targets": {
+      "get": {
+        "operationId": "searchRelationTargets",
+        "summary": "检索可作为关系目标的内容",
+        "description": "编辑建立关系时按标题 / slug / 摘要检索目标，避免手填内容 ID。**允许**返回草稿 —— 先把两条内容连起来，内容之后再审；status 字段供编辑自行判断。",
+        "tags": ["relations"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "同时匹配标题、slug 与摘要的关键词。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回条数上限，默认 20，最大 50。",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "候选目标内容列表。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RelationTargetListResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "检索参数不合法。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -4957,6 +5254,675 @@
           }
         }
       }
+    },
+    "/api/v1/homepage": {
+      "get": {
+        "operationId": "getHomepage",
+        "summary": "首页聚合",
+        "description": "返回当前生效的槽位、精选与最新内容。槽位必须同时满足「在时间窗内」**且**「引用内容仍为 PUBLISHED」——否则该槽位的 content 为 null。公开接口不返回任何未发布内容。",
+        "tags": ["homepage"],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "首页聚合数据。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomepageResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务内部错误。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/homepage-slots": {
+      "get": {
+        "operationId": "listHomepageSlots",
+        "summary": "列出全部首页槽位",
+        "description": "仅 Admin。返回后台视角的全部槽位（含未生效），并解释**为什么首页上可能不显示**：`activeState` 区分未开始 / 生效中 / 已过期，`contentUnavailable` 标出内容已被撤回或归档，`conflictWith` 标出同一内容被挂在多个槽位上。",
+        "tags": ["homepage"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "槽位列表。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminHomepageSlotListResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或无法证明身份（凭据错误、token 过期或吊销）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "身份已知但无权（角色不足或账号被停用）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务内部错误。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "configureHomepageSlot",
+        "summary": "配置单个首页槽位",
+        "description": "仅 Admin。按 slotKey upsert。服务端会独立校验：slotKey 必须在受控字典内；引用内容必须**已发布且未归档**（草稿不能上首页）；时间窗必须 startsAt ≤ endsAt。客户端校验不构成授权。",
+        "tags": ["homepage"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "可选。技术方案 §7.1：写接口支持 Idempotency-Key。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 255,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HomepageSlotConfigRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "配置成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomepageSlotResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或无法证明身份（凭据错误、token 过期或吊销）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "内容未发布 / 已归档，或时间窗不合法。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求格式合法但校验失败（字段级错误见 `error.details`）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "触发限流。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务内部错误；不返回堆栈或 SQL。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/homepage-slots/candidates": {
+      "get": {
+        "operationId": "listHomepageSlotCandidates",
+        "summary": "检索可挂载到首页的内容",
+        "description": "仅 Admin。只返回**已发布且未归档**的内容 —— 与槽位配置的服务端校验同源，避免编辑在选择器里选到一个最终会被服务端拒绝的条目。",
+        "tags": ["homepage"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "同时匹配标题、slug 与摘要的关键词。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回条数上限，默认 20，最大 50。",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "候选内容列表。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HomepageCandidateListResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "检索参数不合法。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或无法证明身份（凭据错误、token 过期或吊销）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "身份已知但无权（角色不足或账号被停用）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务内部错误。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/audit-logs": {
+      "get": {
+        "operationId": "searchAuditLogs",
+        "summary": "检索审计日志",
+        "description": "仅 Admin 可见的**只读**追溯接口。按操作人 / 动作 / 实体类型 / 实体 ID / 时间范围筛选，游标分页。审计记录只增不改，本文档中**没有**对应的修改或删除端点。敏感字段（密码、token、Cookie、secret 等）的值在写入时即被替换为 `[REDACTED]`，字段名保留 —— 不是查询或展示时才隐藏。",
+        "tags": ["audit"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "actorId",
+            "in": "query",
+            "description": "操作人 ID。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "description": "动作精确匹配，如 content.publish。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "entityType",
+            "in": "query",
+            "description": "实体类型精确匹配，如 content。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "entityId",
+            "in": "query",
+            "description": "实体 ID 精确匹配。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "description": "起始时间（含），ISO 8601 带时区。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "description": "结束时间（含），ISO 8601 带时区。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回条数上限，默认 20，最大 100。",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "上一页返回的 nextCursor，原样回传以取下一页。省略则从第一页开始。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "审计检索结果分页。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditLogListResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "筛选参数或游标不合法。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或无法证明身份（凭据错误、token 过期或吊销）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "身份已知但无权（角色不足或账号被停用）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务内部错误。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -5283,6 +6249,370 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/UserListPage"
+          }
+        }
+      },
+      "AuditLogEntry": {
+        "type": "object",
+        "description": "一条审计记录。**只增不改**：没有修改或删除端点。`before` / `after` 是已解析的对象；敏感字段的**值**在写入前已被替换为 `[REDACTED]`（字段名保留，便于看出原本存在该字段）。",
+        "required": [
+          "id",
+          "actorId",
+          "actorDisplayName",
+          "requestId",
+          "action",
+          "entityType",
+          "entityId",
+          "before",
+          "after",
+          "createdAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "审计记录 ID。"
+          },
+          "actorId": {
+            "type": ["string", "null"],
+            "description": "操作人 ID；账号被删则为 null。"
+          },
+          "actorDisplayName": {
+            "type": ["string", "null"],
+            "description": "操作人展示名。**不给 email** —— 审计界面不需要邮箱。"
+          },
+          "requestId": {
+            "type": ["string", "null"],
+            "description": "关联的请求 ID，用于串联整条链路。"
+          },
+          "action": {
+            "type": "string",
+            "description": "动作，如 content.publish / admin.user.update。",
+            "maxLength": 200
+          },
+          "entityType": {
+            "type": "string",
+            "description": "实体类型，如 content / user / source。",
+            "maxLength": 64
+          },
+          "entityId": {
+            "type": "string",
+            "description": "实体 ID。",
+            "maxLength": 64
+          },
+          "before": {
+            "description": "变更前的结构化快照；无变更则为 null。"
+          },
+          "after": {
+            "description": "变更后的结构化快照；无变更则为 null。"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AuditLogPage": {
+        "type": "object",
+        "description": "游标分页的审计检索结果，按时间倒序。",
+        "required": ["items", "nextCursor", "hasMore"],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AuditLogEntry"
+            }
+          },
+          "nextCursor": {
+            "type": ["string", "null"],
+            "maxLength": 512
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AuditLogListResponse": {
+        "type": "object",
+        "description": "审计检索分页响应。",
+        "required": ["data"],
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/AuditLogPage"
+          }
+        }
+      },
+      "PublicSlot": {
+        "type": "object",
+        "description": "首页槽位。`content` 为 null 表示该槽位**当前不显示** —— 要么时间窗未到 / 已过期，要么引用的内容已被撤回或归档。公开接口绝不返回未发布内容。",
+        "required": ["slotKey", "position", "content"],
+        "additionalProperties": false,
+        "properties": {
+          "slotKey": {
+            "type": "string",
+            "description": "槽位键（受控字典）。"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999
+          },
+          "content": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ContentPublic"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "Homepage": {
+        "type": "object",
+        "description": "首页聚合数据；各部分为空时返回空数组而不是 null。",
+        "required": ["slots", "featured", "latest"],
+        "additionalProperties": false,
+        "properties": {
+          "slots": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PublicSlot"
+            }
+          },
+          "featured": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContentPublic"
+            }
+          },
+          "latest": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContentPublic"
+            }
+          }
+        }
+      },
+      "HomepageResponse": {
+        "type": "object",
+        "description": "首页聚合响应。",
+        "required": ["data"],
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/Homepage"
+          }
+        }
+      },
+      "AdminHomepageSlot": {
+        "type": "object",
+        "description": "后台视角的槽位。额外字段解释「为什么首页上不显示」：时间窗（activeState）与内容可用性（contentUnavailable）是**两个独立**原因。",
+        "required": [
+          "slotKey",
+          "contentId",
+          "contentTitle",
+          "contentStatus",
+          "position",
+          "startsAt",
+          "endsAt",
+          "activeState",
+          "contentUnavailable",
+          "conflictWith",
+          "updatedAt"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "slotKey": {
+            "type": "string",
+            "description": "槽位键（受控字典）。"
+          },
+          "contentId": {
+            "type": ["string", "null"],
+            "description": "引用内容 ID；null 表示空槽位。"
+          },
+          "contentTitle": {
+            "type": ["string", "null"],
+            "description": "引用内容标题。"
+          },
+          "contentStatus": {
+            "type": ["string", "null"],
+            "description": "引用内容当前状态；非 PUBLISHED 时 `contentUnavailable` 为 true。"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999
+          },
+          "startsAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "生效开始；null 表示不限。"
+          },
+          "endsAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "生效结束；null 表示不限。"
+          },
+          "activeState": {
+            "type": "string",
+            "enum": ["ACTIVE", "SCHEDULED", "EXPIRED"],
+            "description": "ACTIVE 生效中；SCHEDULED 未开始（排期中）；EXPIRED 已过期（自动下架）。"
+          },
+          "contentUnavailable": {
+            "type": "boolean",
+            "description": "内容已被撤回或归档 —— 即使时间窗有效也不会上首页。"
+          },
+          "conflictWith": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "同一内容还被挂在哪些槽位上（运营冲突提示，可能为空）。"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AdminHomepageSlotListResponse": {
+        "type": "object",
+        "description": "后台槽位列表响应。",
+        "required": ["data"],
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminHomepageSlot"
+            }
+          }
+        }
+      },
+      "HomepageSlot": {
+        "type": "object",
+        "required": ["slotKey", "position", "contentId"],
+        "additionalProperties": false,
+        "properties": {
+          "slotKey": {
+            "type": "string",
+            "description": "槽位键。"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999
+          },
+          "contentId": {
+            "type": ["string", "null"]
+          }
+        }
+      },
+      "HomepageSlotResponse": {
+        "type": "object",
+        "description": "槽位配置响应。",
+        "required": ["data"],
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/HomepageSlot"
+          }
+        }
+      },
+      "HomepageSlotConfigRequest": {
+        "type": "object",
+        "description": "槽位配置请求。服务端会重新校验全部业务规则。",
+        "required": ["slotKey", "contentId"],
+        "additionalProperties": false,
+        "properties": {
+          "slotKey": {
+            "type": "string",
+            "enum": ["hero", "featured", "latest", "places", "routes"],
+            "description": "受控字典 —— 拼错会让首页出现未知区块。"
+          },
+          "contentId": {
+            "type": ["string", "null"],
+            "description": "引用内容；null 表示清空槽位。必须是已发布且未归档的内容。"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999,
+            "default": 0
+          },
+          "startsAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "生效开始；null 表示不限（常驻）。"
+          },
+          "endsAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "生效结束；null 表示不限。"
+          }
+        }
+      },
+      "HomepageCandidate": {
+        "type": "object",
+        "description": "可挂载到首页的内容候选（只含已发布且未归档）。",
+        "required": ["id", "type", "slug", "title", "status", "publishedAt"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "内容 ID。"
+          },
+          "type": {
+            "type": "string",
+            "description": "内容类型。",
+            "enum": ["PLACE", "PERSON", "EVENT", "ARCHITECTURE", "TRADITION", "TOPIC", "ROUTE"]
+          },
+          "slug": {
+            "type": "string",
+            "description": "公开 slug。",
+            "maxLength": 120
+          },
+          "title": {
+            "type": "string",
+            "description": "标题。",
+            "maxLength": 200
+          },
+          "status": {
+            "type": "string",
+            "description": "恒为 PUBLISHED（服务端过滤）。"
+          },
+          "publishedAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "发布时间。"
+          }
+        }
+      },
+      "HomepageCandidateList": {
+        "type": "object",
+        "required": ["items"],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HomepageCandidate"
+            }
+          }
+        }
+      },
+      "HomepageCandidateListResponse": {
+        "type": "object",
+        "description": "候选内容列表响应。",
+        "required": ["data"],
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/HomepageCandidateList"
           }
         }
       },
@@ -6786,16 +8116,43 @@
       },
       "ContentRelation": {
         "type": "object",
-        "required": ["targetContentId", "relationType", "directionNote"],
+        "description": "一条关联，**方向已由服务端归一**（FD-008）：`otherContentId` 永远是对方，`direction` 说明本内容处于关系的哪一侧。不要用裸的 targetContentId —— 那会让\"被指向的内容\"把���己当成关联对象。",
+        "required": [
+          "otherContentId",
+          "otherTitle",
+          "otherType",
+          "relationType",
+          "direction",
+          "symmetric",
+          "directionNote"
+        ],
         "additionalProperties": false,
         "properties": {
-          "targetContentId": {
+          "otherContentId": {
             "type": "string",
-            "description": "关联到的另一条内容 ID。"
+            "description": "关联到的**对方**内容 ID。"
+          },
+          "otherTitle": {
+            "type": ["string", "null"],
+            "maxLength": 200,
+            "description": "对方标题；对方被删除时为 null。"
+          },
+          "otherType": {
+            "type": ["string", "null"],
+            "description": "对方内容类型；对方被删除时为 null。"
           },
           "relationType": {
             "type": "string",
             "enum": ["RELATED_TO", "PART_OF", "INFLUENCED", "CONTINUES", "REFERENCES", "LOCATED_AT"]
+          },
+          "direction": {
+            "type": "string",
+            "enum": ["OUTGOING", "INCOMING"],
+            "description": "OUTGOING 本内容 → 对方；INCOMING 对方 → 本内容。展示文案由前端按此字段生成。"
+          },
+          "symmetric": {
+            "type": "boolean",
+            "description": "关系是否天然对称（`RELATED_TO`）。对称关系的两端读法相同；非对称关系的入边应读成\"X 指向本内容\"。"
           },
           "directionNote": {
             "type": ["string", "null"],
@@ -6843,6 +8200,107 @@
             "items": {
               "$ref": "#/components/schemas/ContentRelation"
             }
+          }
+        }
+      },
+      "RelationTarget": {
+        "type": "object",
+        "description": "可作为关系目标的内容候选。允许是草稿 —— 先连起来，内容之后再审。",
+        "required": ["id", "type", "slug", "title", "status"],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "内容 ID。"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["PLACE", "PERSON", "EVENT", "ARCHITECTURE", "TRADITION", "TOPIC", "ROUTE"]
+          },
+          "slug": {
+            "type": "string",
+            "description": "公开 slug。",
+            "maxLength": 120
+          },
+          "title": {
+            "type": "string",
+            "description": "标题。",
+            "maxLength": 200
+          },
+          "status": {
+            "type": "string",
+            "enum": ["DRAFT", "IN_REVIEW", "APPROVED", "PUBLISHED", "ARCHIVED"]
+          }
+        }
+      },
+      "RelationTargetList": {
+        "type": "object",
+        "required": ["items"],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RelationTarget"
+            }
+          }
+        }
+      },
+      "RelationTargetListResponse": {
+        "type": "object",
+        "description": "候选目标内容列表响应。",
+        "required": ["data"],
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RelationTargetList"
+          }
+        }
+      },
+      "TagWithUsage": {
+        "type": "object",
+        "description": "标签 + 使用次数；使用次数用于判断哪些标签已无人使用。",
+        "required": ["slug", "displayName", "usageCount"],
+        "additionalProperties": false,
+        "properties": {
+          "slug": {
+            "type": "string",
+            "description": "标签 slug（不可变：改了会断掉所有引用）。",
+            "maxLength": 80
+          },
+          "displayName": {
+            "type": "string",
+            "description": "标签显示名（可重命名）。",
+            "maxLength": 100
+          },
+          "usageCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "被多少条内容引用。"
+          }
+        }
+      },
+      "TagWithUsageList": {
+        "type": "object",
+        "required": ["items"],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TagWithUsage"
+            }
+          }
+        }
+      },
+      "TagWithUsageListResponse": {
+        "type": "object",
+        "description": "标签列表响应。",
+        "required": ["data"],
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TagWithUsageList"
           }
         }
       },
