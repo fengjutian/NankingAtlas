@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type {
+  RevisionPage,
+  ReviewActionPage,
+} from '@nanking-atlas/api-contract';
+import type {
   AdminContentDto,
   AdminContentPatch,
   ContentAction,
@@ -26,7 +30,7 @@ import type {
 import type { ReadinessState } from '@/features/review/ReviewPanel';
 import type { SessionUser } from '@/features/shared/session';
 
-import { contentApi, isApiAuthError, isApiError, libraryApi } from '@/api/client';
+import { contentApi, isApiAuthError, isApiError, isAbortError, libraryApi } from '@/api/client';
 import { CONTENT_VERSION_CONFLICT } from '@/api/types';
 import {
   AutosaveStatus,
@@ -34,7 +38,7 @@ import {
   useUnsavedChangesWarning,
 } from '@/features/content/AutosaveStatus';
 import { ConflictDialog, readConflictVersions } from '@/features/content/ConflictDialog';
-import { formatDateTime } from '@/features/content/ContentListPage';
+import { formatDateTime } from '@/features/shared/datetime';
 import {
   BasicsSection,
   BodySection,
@@ -228,6 +232,109 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
   const [readinessState, setReadinessState] = useState<ReadinessState>('idle');
   const [busyAction, setBusyAction] = useState<ContentAction | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // ---- 版本与审核历史（FD-001）----
+  const [revisions, setRevisions] = useState<RevisionPage | null>(null);
+  const [reviewActions, setReviewActions] = useState<ReviewActionPage | null>(null);
+  const [historyState, setHistoryState] = useState<
+    'loading' | 'ready' | 'error' | 'forbidden'
+  >('loading');
+  const [historyError, setHistoryError] = useState<{ message: string; requestId: string | null }>({
+    message: '',
+    requestId: null,
+  });
+  const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
+  // 游标分页的下一页位置；两个端点各自独立翻页。
+  const [nextRevisionCursor, setNextRevisionCursor] = useState<string | null>(null);
+  const [nextReviewCursor, setNextReviewCursor] = useState<string | null>(null);
+  const historyAbortRef = useRef<AbortController | null>(null);
+
+  const loadHistory = useCallback(
+    async (id: string) => {
+      historyAbortRef.current?.abort();
+      const controller = new AbortController();
+      historyAbortRef.current = controller;
+      setHistoryState('loading');
+      setHistoryError({ message: '', requestId: null });
+      try {
+        const [revisionPage, reviewPage] = await Promise.all([
+          contentApi.listRevisions(id, undefined, controller.signal),
+          contentApi.listReviewActions(id, undefined, controller.signal),
+        ]);
+        setRevisions(revisionPage);
+        setReviewActions(reviewPage);
+        setNextRevisionCursor(revisionPage.nextCursor);
+        setNextReviewCursor(reviewPage.nextCursor);
+        setHistoryState('ready');
+      } catch (cause) {
+        if (isAbortError(cause)) {
+          return;
+        }
+        if (isApiAuthError(cause)) {
+          onUnauthorized();
+          return;
+        }
+        if (isApiError(cause) && cause.status === 403) {
+          setHistoryState('forbidden');
+          setHistoryError({ message: cause.message, requestId: cause.requestId });
+          return;
+        }
+        setHistoryState('error');
+        setHistoryError({
+          message: cause instanceof Error ? cause.message : '版本历史加载失败',
+          requestId: isApiError(cause) ? cause.requestId : null,
+        });
+      } finally {
+        if (historyAbortRef.current === controller) {
+          historyAbortRef.current = null;
+        }
+      }
+    },
+    [onUnauthorized],
+  );
+
+  /** 追加下一页：服务端游标是不透明的，原样回传，不在本地拼。 */
+  const loadMoreHistory = useCallback(
+    async (kind: 'revisions' | 'reviewActions') => {
+      const cursor = kind === 'revisions' ? nextRevisionCursor : nextReviewCursor;
+      if (cursor === null) {
+        return;
+      }
+      setHistoryLoadingMore(true);
+      try {
+        if (kind === 'revisions') {
+          const page = await contentApi.listRevisions(contentId, cursor);
+          setRevisions((prev) =>
+            prev === null ? page : { ...page, items: [...prev.items, ...page.items] },
+          );
+          setNextRevisionCursor(page.nextCursor);
+        } else {
+          const page = await contentApi.listReviewActions(contentId, cursor);
+          setReviewActions((prev) =>
+            prev === null ? page : { ...page, items: [...prev.items, ...page.items] },
+          );
+          setNextReviewCursor(page.nextCursor);
+        }
+      } catch (cause) {
+        if (isApiError(cause)) {
+          setHistoryError({ message: cause.message, requestId: cause.requestId });
+          setHistoryState('error');
+        }
+      } finally {
+        setHistoryLoadingMore(false);
+      }
+    },
+    [contentId, nextRevisionCursor, nextReviewCursor],
+  );
+
+  useEffect(() => {
+    if (!isNew) {
+      void loadHistory(contentId);
+    }
+    return () => {
+      historyAbortRef.current?.abort();
+    };
+  }, [contentId, isNew, loadHistory]);
 
   // ---- 冲突 ----
   const [conflict, setConflict] = useState<ConflictVersionInfo | null>(null);
@@ -706,6 +813,23 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
         errorMessage={actionError}
         onCheckReadiness={() => void checkReadiness()}
         onTransition={(action, reason) => void runTransition(action, reason)}
+        history={{
+          revisions,
+          reviewActions,
+          state: historyState,
+          errorMessage: historyError.message,
+          requestId: historyError.requestId,
+          loadingMore: historyLoadingMore,
+          onLoadMore: () => {
+            // 哪一侧还有下一页就先翻哪一侧；两侧都由各自按钮触发。
+            if (nextRevisionCursor !== null) {
+              void loadMoreHistory('revisions');
+            } else if (nextReviewCursor !== null) {
+              void loadMoreHistory('reviewActions');
+            }
+          },
+          onRetry: () => void loadHistory(contentId),
+        }}
       />
 
       <ConflictDialog

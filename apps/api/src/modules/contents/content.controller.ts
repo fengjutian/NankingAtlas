@@ -20,8 +20,16 @@ import { slugSchema } from '@nanking-atlas/validation';
 import { parseTiptapDocument } from '@nanking-atlas/validation';
 
 import { ContentService, ContentNotFoundError, type ContentRecord } from './content.service.js';
+import { listReviewActions, listRevisions } from './revision-history.js';
 import { requireUser } from '../../common/auth/auth.guard.js';
 import { RequireRoles, Public } from '../../common/auth/roles.decorator.js';
+import {
+  DEFAULT_PAGE_SIZE,
+  InvalidCursorError,
+  MAX_PAGE_SIZE,
+  decodeCursor,
+  type CursorPayload,
+} from '../../lib/cursor.js';
 import { prisma } from '../../lib/prisma.js';
 
 import type { TypeExtension } from './content.service.js';
@@ -132,6 +140,37 @@ const listQuerySchema = z.object({
   status: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(100).default(20),
 });
+
+/**
+ * 审核历史查询（FD-001）的 query 白名单。
+ *
+ * 游标在 zod 层解码：非法游标必须变成 400 VALIDATION_FAILED，**不能**让
+ * CursorError 冒泡成 500，也绝不能悄悄退化成第一页（那会让翻页静默出错）。
+ */
+const historyQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
+    cursor: z
+      .string()
+      .min(1)
+      .max(512)
+      .transform((raw, ctx): CursorPayload => {
+        try {
+          return decodeCursor(raw);
+        } catch (error) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message:
+              error instanceof InvalidCursorError
+                ? `游标不合法：${error.code}`
+                : '游标不合法',
+          });
+          return z.NEVER;
+        }
+      })
+      .optional(),
+  })
+  .strict();
 
 const ifMatchPattern = /^W\/"(\d{1,9})"$/;
 
@@ -296,6 +335,35 @@ export class ContentController {
       throw new ContentNotFoundError(id);
     }
     return { data: await this.contents.evaluateReadiness(row) };
+  }
+
+  /**
+   * GET /api/v1/admin/contents/:id/revisions —— 版本历史（FD-001）。
+   *
+   * 只读：这里没有任何写入路径，也不会新增修改 / 删除端点
+   * （AGENTS.md §5.4「revision 只增不改」）。
+   */
+  @Get('admin/contents/:id/revisions')
+  @RequireRoles('EDITOR', 'REVIEWER', 'ADMIN')
+  async listRevisions(@Param('id') id: string, @Query() rawQuery: unknown): Promise<{ data: unknown }> {
+    const query = historyQuerySchema.parse(rawQuery);
+    return { data: await listRevisions(id, query) };
+  }
+
+  /**
+   * GET /api/v1/admin/contents/:id/review-actions —— 审核动作历史（FD-001）。
+   *
+   * 与 revisions 是两条独立序列：状态流转只写 review_action、不产生 revision，
+   * 因此不能把两者合成一个分页，也不编造二者的对应关系。
+   */
+  @Get('admin/contents/:id/review-actions')
+  @RequireRoles('EDITOR', 'REVIEWER', 'ADMIN')
+  async listReviewActions(
+    @Param('id') id: string,
+    @Query() rawQuery: unknown,
+  ): Promise<{ data: unknown }> {
+    const query = historyQuerySchema.parse(rawQuery);
+    return { data: await listReviewActions(id, query) };
   }
 }
 

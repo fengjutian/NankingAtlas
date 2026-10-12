@@ -29,6 +29,8 @@ export const NLA_API_PATHS = {
   '/api/v1/admin/contents/{id}': ['GET', 'PATCH'] as const,
   '/api/v1/admin/contents/{id}/transition': ['POST'] as const,
   '/api/v1/admin/contents/{id}/readiness': ['GET'] as const,
+  '/api/v1/admin/contents/{id}/revisions': ['GET'] as const,
+  '/api/v1/admin/contents/{id}/review-actions': ['GET'] as const,
   '/api/v1/admin/sources': ['POST'] as const,
   '/api/v1/admin/contents/{id}/sources': ['POST', 'GET'] as const,
   '/api/v1/admin/tags': ['POST'] as const,
@@ -327,6 +329,51 @@ export type ReadinessReport = {
 };
 
 export type ReadinessResponse = { readonly data: ReadinessReport };
+
+export type HistoryActor = { readonly id: string; readonly displayName: string };
+
+export type RevisionSnapshot = {
+  readonly title: string;
+  readonly subtitle: string | null | null;
+  readonly summary: string | null | null;
+  readonly slug: string;
+  readonly bodyText: string;
+  readonly bodyTextLength: number;
+  readonly bodyTextTruncated: boolean;
+};
+
+export type Revision = {
+  readonly revisionNo: number;
+  readonly createdAt: string;
+  readonly action: 'CREATE' | 'UPDATE';
+  readonly actor: HistoryActor;
+  readonly snapshot: RevisionSnapshot;
+};
+
+export type RevisionPage = {
+  readonly items: readonly Revision[];
+  readonly nextCursor: string | null | null;
+  readonly hasMore: boolean;
+};
+
+export type ReviewActionRecord = {
+  readonly action: 'EDIT' | 'SUBMIT' | 'APPROVE' | 'REJECT' | 'PUBLISH' | 'ARCHIVE' | 'RESTORE';
+  readonly fromStatus: 'DRAFT' | 'IN_REVIEW' | 'APPROVED' | 'PUBLISHED' | 'ARCHIVED';
+  readonly toStatus: 'DRAFT' | 'IN_REVIEW' | 'APPROVED' | 'PUBLISHED' | 'ARCHIVED';
+  readonly reason: string | null | null;
+  readonly createdAt: string;
+  readonly actor: HistoryActor;
+};
+
+export type ReviewActionPage = {
+  readonly items: readonly ReviewActionRecord[];
+  readonly nextCursor: string | null | null;
+  readonly hasMore: boolean;
+};
+
+export type RevisionPageResponse = { readonly data: RevisionPage };
+
+export type ReviewActionPageResponse = { readonly data: ReviewActionPage };
 
 export type Source = {
   readonly id: string;
@@ -838,6 +885,68 @@ export interface NlaOperationMap {
     readonly requestBody: undefined | undefined;
     readonly response: ReadinessResponse;
     readonly errorResponses: {
+      readonly '401': ErrorResponse;
+      readonly '403': ErrorResponse;
+      readonly '404': ErrorResponse;
+      readonly '500': ErrorResponse;
+    };
+  };
+  /** GET /api/v1/admin/contents/{id}/revisions */
+  listContentRevisions: {
+    readonly method: 'GET';
+    readonly path: '/api/v1/admin/contents/{id}/revisions';
+    readonly tags: readonly ['contents'];
+    readonly security: 'bearer';
+    readonly parameters: readonly [
+      | { readonly name: 'id'; readonly in: 'path'; readonly required: true; readonly type: string }
+      | {
+          readonly name: 'cursor';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: string;
+        }
+      | {
+          readonly name: 'limit';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: number;
+        },
+    ];
+    readonly requestBody: undefined | undefined;
+    readonly response: RevisionPageResponse;
+    readonly errorResponses: {
+      readonly '400': ErrorResponse;
+      readonly '401': ErrorResponse;
+      readonly '403': ErrorResponse;
+      readonly '404': ErrorResponse;
+      readonly '500': ErrorResponse;
+    };
+  };
+  /** GET /api/v1/admin/contents/{id}/review-actions */
+  listContentReviewActions: {
+    readonly method: 'GET';
+    readonly path: '/api/v1/admin/contents/{id}/review-actions';
+    readonly tags: readonly ['contents'];
+    readonly security: 'bearer';
+    readonly parameters: readonly [
+      | { readonly name: 'id'; readonly in: 'path'; readonly required: true; readonly type: string }
+      | {
+          readonly name: 'cursor';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: string;
+        }
+      | {
+          readonly name: 'limit';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: number;
+        },
+    ];
+    readonly requestBody: undefined | undefined;
+    readonly response: ReviewActionPageResponse;
+    readonly errorResponses: {
+      readonly '400': ErrorResponse;
       readonly '401': ErrorResponse;
       readonly '403': ErrorResponse;
       readonly '404': ErrorResponse;

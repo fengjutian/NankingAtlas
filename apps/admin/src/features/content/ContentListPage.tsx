@@ -7,6 +7,7 @@ import { contentApi, isApiAuthError, isApiError } from '@/api/client';
 import { CONTENT_STATUSES, CONTENT_TYPES } from '@/api/types';
 import { StatusBadge } from '@/features/shared/Badge';
 import { Button } from '@/features/shared/Button';
+import { formatDateTime } from '@/features/shared/datetime';
 import { navigate } from '@/features/shared/router';
 import { EmptyState, ErrorState, Loading } from '@/features/shared/States';
 import {
@@ -283,15 +284,4 @@ export function ContentListPage({ user, onUnauthorized }: ContentListPageProps) 
       ) : null}
     </div>
   );
-}
-
-export function formatDateTime(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-  const pad = (input: number): string => String(input).padStart(2, '0');
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(
-    date.getHours(),
-  )}:${pad(date.getMinutes())}`;
 }

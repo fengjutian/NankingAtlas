@@ -8,6 +8,7 @@ import { StatusBadge } from '@/features/shared/Badge';
 import { Button, ButtonRow } from '@/features/shared/Button';
 import { Field } from '@/features/shared/Field';
 import { card, dangerBanner, inputStyle, mutedText, row, stack } from '@/features/shared/styles';
+import { RevisionTimeline, type RevisionTimelineProps } from '@/features/review/RevisionTimeline';
 import {
   ACTION_LABELS,
   availableActions,
@@ -38,6 +39,8 @@ export interface ReviewPanelProps {
   errorMessage: string | null;
   onCheckReadiness: () => void;
   onTransition: (action: ContentAction, reason?: string) => void;
+  /** 版本与审核历史（FD-001）：由编辑页统一取数后传入。 */
+  history: RevisionTimelineProps;
 }
 
 export function ReviewPanel({
@@ -49,6 +52,7 @@ export function ReviewPanel({
   errorMessage,
   onCheckReadiness,
   onTransition,
+  history,
 }: ReviewPanelProps) {
   const [rejectReason, setRejectReason] = useState('');
   const context: ActionContext = { actorId: user.id, authorId: content.createdById };
@@ -179,14 +183,11 @@ export function ReviewPanel({
         </p>
       )}
 
-      {/*
-        版本历史（revision）：P1-02 ~ P1-09 的内容控制器未提供 revisions 读取端点，
-        这里不做假数据；待后端补 `GET /admin/contents/:id/revisions` 后接入。
-        TODO(P2): 渲染 revision 列表（版本号、操作人、动作、时间、reason）。
-      */}
-      <p style={mutedText}>
-        版本历史：后端尚未提供 revisions 读取端点，暂不展示（不填充占位数据）。
-      </p>
+      {/* 版本历史（FD-001）：只读追溯，历史不可编辑或删除。 */}
+      <div style={stack}>
+        <h3 style={{ fontSize: '0.95rem', margin: 0 }}>版本与审核历史</h3>
+        <RevisionTimeline {...history} />
+      </div>
     </section>
   );
 }

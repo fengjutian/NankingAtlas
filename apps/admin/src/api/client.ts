@@ -1,3 +1,5 @@
+import type { RevisionPage, ReviewActionPage } from '@nanking-atlas/api-contract';
+
 import type {
   AdminContentDto,
   AdminContentPatch,
@@ -43,6 +45,14 @@ import { env } from '@/lib/env';
 const API_PREFIX = '/api/v1';
 const DEFAULT_API_BASE_URL = 'http://localhost:4000';
 const ACCESS_TOKEN_KEY = 'nanking-atlas.admin.accessToken';
+
+/**
+ * 审核历史每页条数。
+ *
+ * 取值必须 ≤ 服务端上限（技术方案 §7.1 最大 100）。这里用小页是为了让
+ * 「加载更多」真正可用 —— 版本历史通常是几十条，一次全拉会让时间线没法看。
+ */
+const HISTORY_PAGE_SIZE = 20;
 
 /** base URL 兜底：env.API_BASE_URL 允许为 null（未配置时）。 */
 export const API_BASE_URL = env.API_BASE_URL ?? DEFAULT_API_BASE_URL;
@@ -481,6 +491,45 @@ export const contentApi = {
     return request<ContentSourceLink[]>(
       `/admin/contents/${id}/sources`,
       signal === undefined ? {} : { signal },
+    );
+  },
+  /**
+   * 版本历史（FD-001）。`cursor` 是服务端返回的不透明游标，原样回传。
+   * 游标与 limit 都交给服务端白名单校验 —— 非法值会得到 400，不做本地兜底。
+   */
+  listRevisions(id: string, cursor?: string, signal?: AbortSignal): Promise<RevisionPage> {
+    const search = new URLSearchParams();
+    search.set('limit', String(HISTORY_PAGE_SIZE));
+    if (cursor !== undefined) {
+      search.set('cursor', cursor);
+    }
+    const options: RequestOptions = {};
+    if (signal !== undefined) {
+      options.signal = signal;
+    }
+    return request<RevisionPage>(
+      `/admin/contents/${id}/revisions?${search.toString()}`,
+      options,
+    );
+  },
+  /** 审核动作历史（FD-001）。与版本历史是两条独立序列。 */
+  listReviewActions(
+    id: string,
+    cursor?: string,
+    signal?: AbortSignal,
+  ): Promise<ReviewActionPage> {
+    const search = new URLSearchParams();
+    search.set('limit', String(HISTORY_PAGE_SIZE));
+    if (cursor !== undefined) {
+      search.set('cursor', cursor);
+    }
+    const options: RequestOptions = {};
+    if (signal !== undefined) {
+      options.signal = signal;
+    }
+    return request<ReviewActionPage>(
+      `/admin/contents/${id}/review-actions?${search.toString()}`,
+      options,
     );
   },
   listTags(id: string, signal?: AbortSignal): Promise<TagDto[]> {

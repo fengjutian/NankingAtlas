@@ -14,6 +14,7 @@ import { TiptapDocumentError } from '@nanking-atlas/validation';
 import { PasswordPolicyError } from '../../lib/password.js';
 import { AuthError } from '../../modules/auth/auth.service.js';
 import { IfMatchRequiredError } from '../../modules/contents/content.controller.js';
+import { InvalidHistoryCursorError } from '../../modules/contents/revision-history.js';
 import {
   ContentNotFoundError,
   ContentVersionConflictError,
@@ -110,6 +111,13 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       };
     }
     if (exception instanceof IfMatchRequiredError) {
+      return {
+        status: HttpStatus.BAD_REQUEST,
+        body: wrap('VALIDATION_FAILED', exception.message, requestId),
+      };
+    }
+    // 游标可解码但不适用于该端点：仍是请求不合法，报 400 而不是 403。
+    if (exception instanceof InvalidHistoryCursorError) {
       return {
         status: HttpStatus.BAD_REQUEST,
         body: wrap('VALIDATION_FAILED', exception.message, requestId),

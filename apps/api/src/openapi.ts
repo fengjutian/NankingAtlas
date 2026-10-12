@@ -1152,6 +1152,117 @@ const SCHEMAS: Readonly<Record<string, SchemaObject>> = {
   },
   ReadinessResponse: dataEnvelope(ref('ReadinessReport'), '发布前校验响应。'),
 
+  // 版本 / 审核历史（FD-001）
+  HistoryActor: {
+    type: 'object',
+    description: '历史记录的操作人最小信息。**不含** email、密码哈希与账号状态。',
+    required: ['id', 'displayName'],
+    additionalProperties: false,
+    properties: {
+      id: stringSchema('用户 ID。'),
+      displayName: stringSchema('展示名。', { minLength: 1, maxLength: 200 }),
+    },
+  },
+  RevisionSnapshot: {
+    type: 'object',
+    description:
+      '版本快照的**安全摘要**：正文只给纯文本，不下发 Tiptap 结构；截断由 `bodyTextTruncated` 显式标记。',
+    required: ['title', 'subtitle', 'summary', 'slug', 'bodyText', 'bodyTextLength', 'bodyTextTruncated'],
+    additionalProperties: false,
+    properties: {
+      title: stringSchema('该版本的标题。'),
+      subtitle: { type: ['string', 'null'], maxLength: 300 },
+      summary: { type: ['string', 'null'], maxLength: 1000 },
+      slug: stringSchema('该版本的 slug。', { maxLength: 120 }),
+      bodyText: stringSchema('正文纯文本；已折叠块间空行并去掉结构标记。', {
+        maxLength: 4000,
+      }),
+      bodyTextLength: {
+        type: 'integer',
+        minimum: 0,
+        description: '**未截断**的正文字符数；用于告诉调用方还有多少内容没看到。',
+      },
+      bodyTextTruncated: {
+        type: 'boolean',
+        description: '正文是否因超过上限而被截断（不做静默截断）。',
+      },
+    },
+  },
+  Revision: {
+    type: 'object',
+    description:
+      '内容的一个不可变版本。revision 只增不改，**没有**修改或删除端点。状态流转不产生 revision。',
+    required: ['revisionNo', 'createdAt', 'action', 'actor', 'snapshot'],
+    additionalProperties: false,
+    properties: {
+      revisionNo: { type: 'integer', minimum: 1, description: '内容内单调递增的版本号。' },
+      createdAt: { type: 'string', format: 'date-time', description: '版本写入时间。' },
+      action: {
+        type: 'string',
+        enum: ['CREATE', 'UPDATE'],
+        description:
+          '建稿或编辑。数据模型未记录原始动作名，这里由 revisionNo 推断（v1 = 建稿），不编造更细的语义。',
+      },
+      actor: ref('HistoryActor'),
+      snapshot: ref('RevisionSnapshot'),
+    },
+  },
+  RevisionPage: {
+    type: 'object',
+    description: '游标分页的版本历史。按 `revisionNo` 倒序（全序，分页不重不漏）。',
+    required: ['items', 'nextCursor', 'hasMore'],
+    additionalProperties: false,
+    properties: {
+      items: { type: 'array', items: ref('Revision') },
+      nextCursor: {
+        type: ['string', 'null'],
+        maxLength: 512,
+        description: '不透明游标，原样回传以取下一页；无下一页时为 null。',
+      },
+      hasMore: { type: 'boolean' },
+    },
+  },
+  ReviewActionRecord: {
+    type: 'object',
+    description:
+      '一次状态流转的审核记录。与 revision 是两条独立序列（流转只写审核记录、不产生 revision），因此没有 `revisionNo` 关联。',
+    required: ['action', 'fromStatus', 'toStatus', 'reason', 'createdAt', 'actor'],
+    additionalProperties: false,
+    properties: {
+      action: {
+        type: 'string',
+        enum: ['EDIT', 'SUBMIT', 'APPROVE', 'REJECT', 'PUBLISH', 'ARCHIVE', 'RESTORE'],
+        description: '流转动作；取值与状态机动作枚举一致（写入侧由状态机决定）。',
+      },
+      fromStatus: {
+        type: 'string',
+        enum: CONTENT_STATUSES,
+        description: '流转前状态。',
+      },
+      toStatus: { type: 'string', enum: CONTENT_STATUSES, description: '流转后状态。' },
+      reason: {
+        type: ['string', 'null'],
+        maxLength: 2000,
+        description: '退回理由；其它动作为 null。',
+      },
+      createdAt: { type: 'string', format: 'date-time' },
+      actor: ref('HistoryActor'),
+    },
+  },
+  ReviewActionPage: {
+    type: 'object',
+    description: '游标分页的审核动作历史。按 `createdAt` 倒序、`id` 兜底成全序。',
+    required: ['items', 'nextCursor', 'hasMore'],
+    additionalProperties: false,
+    properties: {
+      items: { type: 'array', items: ref('ReviewActionRecord') },
+      nextCursor: { type: ['string', 'null'], maxLength: 512 },
+      hasMore: { type: 'boolean' },
+    },
+  },
+  RevisionPageResponse: dataEnvelope(ref('RevisionPage'), '版本历史分页响应。'),
+  ReviewActionPageResponse: dataEnvelope(ref('ReviewActionPage'), '审核动作历史分页响应。'),
+
   // 来源 / 标签 / 关联
   Source: SourceSchema,
   CreateSourceRequest: CreateSourceRequestSchema,
@@ -1309,6 +1420,20 @@ const LIMIT_QUERY_PARAMETER: ParameterObject = {
     maximum: MAX_PAGE_SIZE,
     default: DEFAULT_PAGE_SIZE,
   },
+};
+
+/**
+ * 游标分页参数（技术方案 §7.1）。
+ *
+ * 刻意不声明格式细节：游标是**不透明**的，客户端只应原样回传，
+ * 解析它会让服务端后续无法自由升级载荷结构。
+ */
+const CURSOR_QUERY_PARAMETER: ParameterObject = {
+  name: 'cursor',
+  in: 'query',
+  description: '上一页返回的 nextCursor，原样回传以取下一页。省略则从第一页开始。',
+  required: false,
+  schema: { type: 'string', minLength: 1, maxLength: 512 },
 };
 
 /** bbox 查询参数。`required: true` —— 缺它就没有视口可言。 */
@@ -1685,6 +1810,42 @@ const PATHS: Readonly<Record<string, PathItemObject>> = {
       responses: {
         '200': okResponse('ReadinessResponse', '校验结果。'),
         ...AUTH_ERRORS,
+        '404': errorResponse('内容不存在。'),
+        '500': errorResponse('服务内部错误。'),
+      },
+    },
+  },
+  '/api/v1/admin/contents/{id}/revisions': {
+    get: {
+      operationId: 'listContentRevisions',
+      summary: '列出内容版本历史',
+      description:
+        '只读端点：revision 只增不改，没有修改或删除入口。按 revisionNo 倒序返回，游标分页。状态流转不产生 revision，因此审核动作请用 `/review-actions`。',
+      tags: ['contents'],
+      security: BEARER_SECURITY,
+      parameters: [ID_PATH_PARAMETER, CURSOR_QUERY_PARAMETER, LIMIT_QUERY_PARAMETER],
+      responses: {
+        '200': okResponse('RevisionPageResponse', '版本历史分页。'),
+        ...AUTH_ERRORS,
+        '400': errorResponse('分页参数或游标不合法。'),
+        '404': errorResponse('内容不存在。'),
+        '500': errorResponse('服务内部错误。'),
+      },
+    },
+  },
+  '/api/v1/admin/contents/{id}/review-actions': {
+    get: {
+      operationId: 'listContentReviewActions',
+      summary: '列出内容审核动作历史',
+      description:
+        '只读端点：审核记录只增不改。每次状态流转写一条，含退回理由。与版本历史是两条独立序列。',
+      tags: ['contents'],
+      security: BEARER_SECURITY,
+      parameters: [ID_PATH_PARAMETER, CURSOR_QUERY_PARAMETER, LIMIT_QUERY_PARAMETER],
+      responses: {
+        '200': okResponse('ReviewActionPageResponse', '审核动作历史分页。'),
+        ...AUTH_ERRORS,
+        '400': errorResponse('分页参数或游标不合法。'),
         '404': errorResponse('内容不存在。'),
         '500': errorResponse('服务内部错误。'),
       },
