@@ -1168,6 +1168,141 @@ const SCHEMAS: Readonly<Record<string, SchemaObject>> = {
   },
   AuditLogListResponse: dataEnvelope(ref('AuditLogPage'), '审计检索分页响应。'),
 
+  // 首页与槽位（FD-007 补齐契约）
+  PublicSlot: {
+    type: 'object',
+    description:
+      '首页槽位。`content` 为 null 表示该槽位**当前不显示** —— 要么时间窗未到 / 已过期，' +
+      '要么引用的内容已被撤回或归档。公开接口绝不返回未发布内容。',
+    required: ['slotKey', 'position', 'content'],
+    additionalProperties: false,
+    properties: {
+      slotKey: { type: 'string', description: '槽位键（受控字典）。' },
+      position: { type: 'integer', minimum: 0, maximum: 999 },
+      content: { anyOf: [{ $ref: '#/components/schemas/ContentPublic' }, { type: 'null' }] },
+    },
+  },
+  Homepage: {
+    type: 'object',
+    description: '首页聚合数据；各部分为空时返回空数组而不是 null。',
+    required: ['slots', 'featured', 'latest'],
+    additionalProperties: false,
+    properties: {
+      slots: { type: 'array', items: ref('PublicSlot') },
+      featured: { type: 'array', items: ref('ContentPublic') },
+      latest: { type: 'array', items: ref('ContentPublic') },
+    },
+  },
+  HomepageResponse: dataEnvelope(ref('Homepage'), '首页聚合响应。'),
+  AdminHomepageSlot: {
+    type: 'object',
+    description:
+      '后台视角的槽位。额外字段解释「为什么首页上不显示」：时间窗（activeState）' +
+      '与内容可用性（contentUnavailable）是**两个独立**原因。',
+    required: [
+      'slotKey',
+      'contentId',
+      'contentTitle',
+      'contentStatus',
+      'position',
+      'startsAt',
+      'endsAt',
+      'activeState',
+      'contentUnavailable',
+      'conflictWith',
+      'updatedAt',
+    ],
+    additionalProperties: false,
+    properties: {
+      slotKey: { type: 'string', description: '槽位键（受控字典）。' },
+      contentId: { type: ['string', 'null'], description: '引用内容 ID；null 表示空槽位。' },
+      contentTitle: { type: ['string', 'null'], description: '引用内容标题。' },
+      contentStatus: {
+        type: ['string', 'null'],
+        description: '引用内容当前状态；非 PUBLISHED 时 `contentUnavailable` 为 true。',
+      },
+      position: { type: 'integer', minimum: 0, maximum: 999 },
+      startsAt: isoDateTimeField('生效开始；null 表示不限。'),
+      endsAt: isoDateTimeField('生效结束；null 表示不限。'),
+      activeState: {
+        type: 'string',
+        enum: ['ACTIVE', 'SCHEDULED', 'EXPIRED'],
+        description: 'ACTIVE 生效中；SCHEDULED 未开始（排期中）；EXPIRED 已过期（自动下架）。',
+      },
+      contentUnavailable: {
+        type: 'boolean',
+        description: '内容已被撤回或归档 —— 即使时间窗有效也不会上首页。',
+      },
+      conflictWith: {
+        type: 'array',
+        items: { type: 'string' },
+        description: '同一内容还被挂在哪些槽位上（运营冲突提示，可能为空）。',
+      },
+      updatedAt: { type: 'string', format: 'date-time' },
+    },
+  },
+  AdminHomepageSlotListResponse: dataListEnvelope(ref('AdminHomepageSlot'), '后台槽位列表响应。'),
+  HomepageSlot: {
+    type: 'object',
+    required: ['slotKey', 'position', 'contentId'],
+    additionalProperties: false,
+    properties: {
+      slotKey: { type: 'string', description: '槽位键。' },
+      position: { type: 'integer', minimum: 0, maximum: 999 },
+      contentId: { type: ['string', 'null'] },
+    },
+  },
+  HomepageSlotResponse: dataEnvelope(ref('HomepageSlot'), '槽位配置响应。'),
+  HomepageSlotConfigRequest: {
+    type: 'object',
+    description: '槽位配置请求。服务端会重新校验全部业务规则。',
+    required: ['slotKey', 'contentId'],
+    additionalProperties: false,
+    properties: {
+      slotKey: {
+        type: 'string',
+        enum: ['hero', 'featured', 'latest', 'places', 'routes'],
+        description: '受控字典 —— 拼错会让首页出现未知区块。',
+      },
+      contentId: {
+        type: ['string', 'null'],
+        description: '引用内容；null 表示清空槽位。必须是已发布且未归档的内容。',
+      },
+      position: { type: 'integer', minimum: 0, maximum: 999, default: 0 },
+      startsAt: {
+        type: ['string', 'null'],
+        format: 'date-time',
+        description: '生效开始；null 表示不限（常驻）。',
+      },
+      endsAt: {
+        type: ['string', 'null'],
+        format: 'date-time',
+        description: '生效结束；null 表示不限。',
+      },
+    },
+  },
+  HomepageCandidate: {
+    type: 'object',
+    description: '可挂载到首页的内容候选（只含已发布且未归档）。',
+    required: ['id', 'type', 'slug', 'title', 'status', 'publishedAt'],
+    additionalProperties: false,
+    properties: {
+      id: stringSchema('内容 ID。'),
+      type: { type: 'string', description: '内容类型。', enum: CONTENT_TYPES },
+      slug: stringSchema('公开 slug。', { maxLength: 120 }),
+      title: stringSchema('标题。', { maxLength: 200 }),
+      status: { type: 'string', description: '恒为 PUBLISHED（服务端过滤）。' },
+      publishedAt: isoDateTimeField('发布时间。'),
+    },
+  },
+  HomepageCandidateList: {
+    type: 'object',
+    required: ['items'],
+    additionalProperties: false,
+    properties: { items: { type: 'array', items: ref('HomepageCandidate') } },
+  },
+  HomepageCandidateListResponse: dataEnvelope(ref('HomepageCandidateList'), '候选内容列表响应。'),
+
   // 内容
   ContentType: ContentTypeSchema,
   ContentStatus: ContentStatusSchema,
@@ -2299,6 +2434,90 @@ const PATHS: Readonly<Record<string, PathItemObject>> = {
     },
   },
 
+  // ---- 首页与槽位（FD-007 补齐契约；此前端点已实现但未声明）----
+  '/api/v1/homepage': {
+    get: {
+      operationId: 'getHomepage',
+      summary: '首页聚合',
+      description:
+        '返回当前生效的槽位、精选与最新内容。槽位必须同时满足「在时间窗内」**且**「引用内容仍为 PUBLISHED」——' +
+        '否则该槽位的 content 为 null。公开接口不返回任何未发布内容。',
+      tags: ['homepage'],
+      security: [],
+      responses: {
+        '200': okResponse('HomepageResponse', '首页聚合数据。'),
+        '500': errorResponse('服务内部错误。'),
+      },
+    },
+  },
+  '/api/v1/admin/homepage-slots': {
+    get: {
+      operationId: 'listHomepageSlots',
+      summary: '列出全部首页槽位',
+      description:
+        '仅 Admin。返回后台视角的全部槽位（含未生效），并解释**为什么首页上可能不显示**：' +
+        '`activeState` 区分未开始 / 生效中 / 已过期，`contentUnavailable` 标出内容已被撤回或归档，' +
+        '`conflictWith` 标出同一内容被挂在多个槽位上。',
+      tags: ['homepage'],
+      security: BEARER_SECURITY,
+      responses: {
+        '200': okResponse('AdminHomepageSlotListResponse', '槽位列表。'),
+        ...AUTH_ERRORS,
+        '500': errorResponse('服务内部错误。'),
+      },
+    },
+    patch: {
+      operationId: 'configureHomepageSlot',
+      summary: '配置单个首页槽位',
+      description:
+        '仅 Admin。按 slotKey upsert。服务端会独立校验：' +
+        'slotKey 必须在受控字典内；引用内容必须**已发布且未归档**（草稿不能上首页）；' +
+        '时间窗必须 startsAt ≤ endsAt。客户端校验不构成授权。',
+      tags: ['homepage'],
+      security: BEARER_SECURITY,
+      parameters: [idempotencyKeyHeader('可选。技术方案 §7.1：写接口支持 Idempotency-Key。')],
+      requestBody: jsonBody('HomepageSlotConfigRequest', true),
+      responses: {
+        '200': okResponse('HomepageSlotResponse', '配置成功。'),
+        ...WRITE_ERRORS,
+        '403': errorResponse('内容未发布 / 已归档，或时间窗不合法。'),
+      },
+    },
+  },
+  '/api/v1/admin/homepage-slots/candidates': {
+    get: {
+      operationId: 'listHomepageSlotCandidates',
+      summary: '检索可挂载到首页的内容',
+      description:
+        '仅 Admin。只返回**已发布且未归档**的内容 —— 与槽位配置的服务端校验同源，' +
+        '避免编辑在选择器里选到一个最终会被服务端拒绝的条目。',
+      tags: ['homepage'],
+      security: BEARER_SECURITY,
+      parameters: [
+        {
+          name: 'q',
+          in: 'query',
+          description: '同时匹配标题、slug 与摘要的关键词。',
+          required: false,
+          schema: { type: 'string', minLength: 1, maxLength: 200 },
+        },
+        {
+          name: 'limit',
+          in: 'query',
+          description: '返回条数上限，默认 20，最大 50。',
+          required: false,
+          schema: { type: 'integer', minimum: 1, maximum: 50, default: 20 },
+        },
+      ],
+      responses: {
+        '200': okResponse('HomepageCandidateListResponse', '候选内容列表。'),
+        ...AUTH_ERRORS,
+        '400': errorResponse('检索参数不合法。'),
+        '500': errorResponse('服务内部错误。'),
+      },
+    },
+  },
+
   // ---- 审计日志（FD-006，只读）----
   '/api/v1/admin/audit-logs': {
     get: {
@@ -2382,6 +2601,7 @@ export const openApiDocument: OpenApiDocument = {
   tags: [
     { name: 'health', description: '存活与就绪探针。' },
     { name: 'places', description: '地点空间查询（bbox）与坐标核验状态。' },
+    { name: 'homepage', description: '首页聚合与后台槽位配置。' },
     { name: 'routes', description: '路线与有序站点。' },
     { name: 'search', description: '公开关键词检索。' },
     { name: 'auth', description: '后台认证与会话。' },

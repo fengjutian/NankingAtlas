@@ -196,30 +196,121 @@ export class HomepageService {
     });
   }
 
-  /** 后台读取全部槽位（含未生效的），供配置界面展示。 */
-  async listAllSlotsForAdmin(): Promise<
+  /**
+   * 后台读取全部槽位（含未生效的），供配置界面展示。
+   *
+   * 返回值刻意比公开接口**多三组信息**，否则编辑看到"首页没显示"却不知道为什么：
+   *   - `activeState`：槽位自己是否在时间窗内（SCHEDULED 未开始 / EXPIRED 已过期）
+   *   - `contentStatus` + `contentUnavailable`：引用内容是否已被撤回 / 归档
+   *     （这是**独立于时间窗**的另一个原因：窗口没变，但内容被撤回了）
+   *   - `conflictWith`：同一内容被挂在多个槽位上 —— 运营上的冲突，不该被静默接受
+   */
+  async listAllSlotsForAdmin(now: Date = new Date()): Promise<
     {
       slotKey: string;
       contentId: string | null;
       contentTitle: string | null;
+      contentStatus: string | null;
       position: number;
       startsAt: Date | null;
       endsAt: Date | null;
+      activeState: 'ACTIVE' | 'SCHEDULED' | 'EXPIRED';
+      contentUnavailable: boolean;
+      conflictWith: string[];
       updatedAt: Date;
     }[]
   > {
     const rows = await prisma.homepageSlot.findMany({
-      include: { content: { select: { title: true } } },
+      include: {
+        content: { select: { id: true, title: true, status: true, archivedAt: true } },
+      },
       orderBy: [{ slotKey: 'asc' }, { position: 'asc' }],
     });
-    return rows.map((row) => ({
-      slotKey: row.slotKey,
-      contentId: row.contentId,
-      contentTitle: row.content?.title ?? null,
-      position: row.position,
-      startsAt: row.startsAt,
-      endsAt: row.endsAt,
-      updatedAt: row.updatedAt,
-    }));
+
+    // 冲突检测：同一 contentId 出现在多个槽位键上
+    const byContent = new Map<string, string[]>();
+    for (const row of rows) {
+      if (row.contentId === null) {
+        continue;
+      }
+      const list = byContent.get(row.contentId) ?? [];
+      list.push(row.slotKey);
+      byContent.set(row.contentId, list);
+    }
+
+    return rows.map((row) => {
+      const started = row.startsAt === null || row.startsAt.getTime() <= now.getTime();
+      const notEnded = row.endsAt === null || row.endsAt.getTime() >= now.getTime();
+      const activeState: 'ACTIVE' | 'SCHEDULED' | 'EXPIRED' = !started
+        ? 'SCHEDULED'
+        : notEnded
+          ? 'ACTIVE'
+          : 'EXPIRED';
+
+      const contentUnavailable =
+        row.content !== null &&
+        (row.content.status !== 'PUBLISHED' || row.content.archivedAt !== null);
+
+      return {
+        slotKey: row.slotKey,
+        contentId: row.contentId,
+        contentTitle: row.content?.title ?? null,
+        contentStatus: row.content?.status ?? null,
+        position: row.position,
+        startsAt: row.startsAt,
+        endsAt: row.endsAt,
+        activeState,
+        contentUnavailable,
+        conflictWith:
+          row.contentId === null
+            ? []
+            : (byContent.get(row.contentId) ?? []).filter((key) => key !== row.slotKey),
+        updatedAt: row.updatedAt,
+      };
+    });
+  }
+
+  /**
+   * 可挂载到首页的内容候选（FD-007）。
+   *
+   * 只返回**已发布且未归档**的内容 —— 与 `configureSlot` 的服务端校验同源，
+   * 避免编辑在选择器里选到一个最终会被服务端拒绝的条目。
+   */
+  async listCandidates(input: { q?: string | undefined; limit: number }): Promise<
+    {
+      id: string;
+      type: string;
+      slug: string;
+      title: string;
+      status: string;
+      publishedAt: Date | null;
+    }[]
+  > {
+    const trimmed = input.q?.trim();
+    return prisma.content.findMany({
+      where: {
+        status: 'PUBLISHED',
+        archivedAt: null,
+        ...(trimmed === undefined || trimmed === ''
+          ? {}
+          : {
+              OR: [
+                { title: { contains: trimmed } },
+                { slug: { contains: trimmed } },
+                { summary: { contains: trimmed } },
+              ],
+            }),
+      },
+      orderBy: { publishedAt: 'desc' },
+      take: input.limit,
+      select: {
+        id: true,
+        type: true,
+        slug: true,
+        title: true,
+        status: true,
+        publishedAt: true,
+      },
+    });
   }
 }

@@ -257,20 +257,32 @@ describe('FD-006: 查询端点筛选', () => {
       },
     });
 
+    /**
+     * 必须同时按 action 收窄。
+     *
+     * 只按时间范围筛会命中**全库** 2020~2099 的所有审计记录，而返回的是按
+     * createdAt 倒序的第一页 —— 2021 年那条早已被更新的记录挤出第一页。
+     * 这不是实现的 bug，是"未收窄的筛选 + 分页"必然的结果；
+     * 测试若不加 action 就会单跑绿、全量跑红（依赖库里恰好没那么多记录）。
+     */
     const hit = await queryAudit(
       adminId,
-      `?from=${encodeURIComponent(past.toISOString())}&to=${encodeURIComponent(future.toISOString())}`,
+      `?action=filter.marker.time&from=${encodeURIComponent(past.toISOString())}` +
+        `&to=${encodeURIComponent(future.toISOString())}`,
     );
     expect(hit.status).toBe(200);
     const page = (hit.body as { data: AuditPage }).data;
     expect(page.items.some((item) => item.action === 'filter.marker.time')).toBe(true);
 
+    // 范围排除了 2021 年 → 一条都不该命中
     const miss = await queryAudit(
       adminId,
-      `?from=${encodeURIComponent(future.toISOString())}&to=${encodeURIComponent(future.toISOString())}`,
+      `?action=filter.marker.time&from=${encodeURIComponent(future.toISOString())}` +
+        `&to=${encodeURIComponent(future.toISOString())}`,
     );
+    expect(miss.status).toBe(200);
     const missPage = (miss.body as { data: AuditPage }).data;
-    expect(missPage.items.some((item) => item.action === 'filter.marker.time')).toBe(false);
+    expect(missPage.items).toEqual([]);
   });
 
   it('非法参数被拒绝', async () => {

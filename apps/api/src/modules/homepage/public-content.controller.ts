@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Inject, Param, Patch, Req } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Patch, Query, Req } from '@nestjs/common';
 import { type Request } from 'express';
 import { z } from 'zod';
 
@@ -29,6 +29,24 @@ const slotConfigSchema = z
     position: z.number().int().min(0).max(999).default(0),
     startsAt: z.string().datetime().nullable().default(null),
     endsAt: z.string().datetime().nullable().default(null),
+  })
+  .strict();
+
+/**
+ * 检索关键词上限：进 `LIKE '%q%'`，过长会拖慢全表扫描。
+ * 选择器只用来按题名 / slug 找内容，不需要更长的输入。
+ */
+const MAX_CANDIDATE_QUERY_LENGTH = 200;
+
+/** 候选列表是给选择器用的小窗口：足够挑选，又不会把一次请求变成全表导出。 */
+const MAX_CANDIDATE_LIMIT = 50;
+const DEFAULT_CANDIDATE_LIMIT = 20;
+
+/** 可挂载内容检索（FD-007）。`.strict()`：未知参数一律 400。 */
+const candidateQuerySchema = z
+  .object({
+    q: z.string().trim().min(1).max(MAX_CANDIDATE_QUERY_LENGTH).optional(),
+    limit: z.coerce.number().int().min(1).max(MAX_CANDIDATE_LIMIT).default(DEFAULT_CANDIDATE_LIMIT),
   })
   .strict();
 
@@ -157,11 +175,43 @@ export class PublicContentController {
         slotKey: row.slotKey,
         contentId: row.contentId,
         contentTitle: row.contentTitle,
+        contentStatus: row.contentStatus,
         position: row.position,
         startsAt: row.startsAt?.toISOString() ?? null,
         endsAt: row.endsAt?.toISOString() ?? null,
+        activeState: row.activeState,
+        contentUnavailable: row.contentUnavailable,
+        conflictWith: row.conflictWith,
         updatedAt: row.updatedAt.toISOString(),
       })),
+    };
+  }
+
+  /**
+   * GET /admin/homepage-slots/candidates —— 可挂载内容检索（FD-007）。
+   *
+   * 路由顺序要紧挨着 `admin/homepage-slots`：`GET('admin/homepage-slots')` 是
+   * 精确匹配，不会抢走子路径，这里只是让它在文档里读起来是同一个资源组。
+   */
+  @Get('admin/homepage-slots/candidates')
+  @RequireRoles('ADMIN')
+  async listSlotCandidates(@Query() rawQuery: unknown): Promise<{ data: unknown }> {
+    const query = candidateQuerySchema.parse(rawQuery);
+    const items = await this.homepage.listCandidates({
+      ...(query.q !== undefined ? { q: query.q } : {}),
+      limit: query.limit,
+    });
+    return {
+      data: {
+        items: items.map((item) => ({
+          id: item.id,
+          type: item.type,
+          slug: item.slug,
+          title: item.title,
+          status: item.status,
+          publishedAt: item.publishedAt?.toISOString() ?? null,
+        })),
+      },
     };
   }
 

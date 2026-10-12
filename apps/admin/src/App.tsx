@@ -6,6 +6,7 @@ import { AuditLogPage } from './features/audit/AuditLogPage';
 import { LoginPage } from './features/auth/LoginPage';
 import { ContentListPage } from './features/content/ContentListPage';
 import { EditorPage } from './features/content/EditorPage';
+import { HomepageSlotPage } from './features/homepage/HomepageSlotPage';
 import { navigate, useRoute } from './features/shared/router';
 import { clearSessionUser, readSessionUser } from './features/shared/session';
 import { EmptyState, Loading } from './features/shared/States';
@@ -119,6 +120,7 @@ export function App() {
       ) : null}
       {route.name === 'users' ? <UserManagementPage user={user} onUnauthorized={signOut} /> : null}
       {route.name === 'audit' ? <AuditLogPage user={user} onUnauthorized={signOut} /> : null}
+      {route.name === 'homepage' ? <HomepageSlotPage user={user} onUnauthorized={signOut} /> : null}
     </AdminShell>
   );
 }

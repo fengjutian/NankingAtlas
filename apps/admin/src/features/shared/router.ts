@@ -15,7 +15,8 @@ export type Route =
   | { name: 'contents' }
   | { name: 'editor'; contentId: string }
   | { name: 'users' }
-  | { name: 'audit' };
+  | { name: 'audit' }
+  | { name: 'homepage' };
 
 const listeners = new Set<() => void>();
 
@@ -58,6 +59,10 @@ export function parseRoute(pathname: string): Route {
   // 审计日志查询（FD-006）
   if (path === '/audit') {
     return { name: 'audit' };
+  }
+  // 首页槽位配置（FD-007）
+  if (path === '/homepage') {
+    return { name: 'homepage' };
   }
   const editorMatch = /^\/contents\/([^/]+)$/.exec(path);
   const contentId = editorMatch?.[1];

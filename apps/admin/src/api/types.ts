@@ -253,6 +253,50 @@ export interface AuditSearchQuery {
 }
 
 // ---------------------------------------------------------------------------
+// 首页槽位（FD-007）
+// ---------------------------------------------------------------------------
+
+/**
+ * 后台视角的槽位。
+ *
+ * 额外字段解释「为什么首页上不显示」：`activeState`（时间窗）与
+ * `contentUnavailable`（内容状态）是**两个独立**原因，都要能看到。
+ */
+export interface AdminHomepageSlot {
+  slotKey: string;
+  contentId: string | null;
+  contentTitle: string | null;
+  contentStatus: string | null;
+  position: number;
+  startsAt: string | null;
+  endsAt: string | null;
+  activeState: 'ACTIVE' | 'SCHEDULED' | 'EXPIRED';
+  contentUnavailable: boolean;
+  /** 同一内容还被挂在哪些槽位上。 */
+  conflictWith: string[];
+  updatedAt: string;
+}
+
+/** 可挂载到首页的内容候选；服务端只返回已发布且未归档的。 */
+export interface HomepageCandidate {
+  id: string;
+  type: string;
+  slug: string;
+  title: string;
+  status: string;
+  publishedAt: string | null;
+}
+
+export interface HomepageSlotConfigInput {
+  slotKey: string;
+  contentId: string | null;
+  position: number;
+  /** ISO 8601；null 表示不限。 */
+  startsAt: string | null;
+  endsAt: string | null;
+}
+
+// ---------------------------------------------------------------------------
 // 内容
 // ---------------------------------------------------------------------------
 

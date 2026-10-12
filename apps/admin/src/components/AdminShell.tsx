@@ -39,7 +39,8 @@ const NAV_SECTIONS: readonly { title: string; items: readonly NavItem[] }[] = [
   {
     title: '设置',
     items: [
-      { label: '首页槽位', href: '#slots', disabled: true },
+      // FD-007：首页槽位配置（真实路由）
+      { label: '首页槽位', href: '/homepage' },
       // FD-005：真实路由，服务端仍会独立校验 ADMIN。
       { label: '用户与角色', href: '/users' },
     ],

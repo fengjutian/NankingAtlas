@@ -1,10 +1,13 @@
 import type { RevisionPage, ReviewActionPage, SourceSearchPage } from '@nanking-atlas/api-contract';
 
 import type {
+  AdminHomepageSlot,
   AdminUserDto,
   AuditLogPage,
   AuditSearchQuery,
   CreateUserInput,
+  HomepageCandidate,
+  HomepageSlotConfigInput,
   PatchUserInput,
   UserListPage,
 } from './types';
@@ -616,6 +619,33 @@ export const auditApi = {
     return request<AuditLogPage>(
       `/admin/audit-logs${suffix === '' ? '' : `?${suffix}`}`,
       signal === undefined ? {} : { signal },
+    );
+  },
+};
+
+export const homepageApi = {
+  /** 后台槽位列表（含未生效，并带状态说明）。仅 ADMIN。 */
+  listSlots(signal?: AbortSignal): Promise<AdminHomepageSlot[]> {
+    return request<AdminHomepageSlot[]>(
+      '/admin/homepage-slots',
+      signal === undefined ? {} : { signal },
+    );
+  },
+  configureSlot(input: HomepageSlotConfigInput): Promise<{ slotKey: string; position: number }> {
+    return request<{ slotKey: string; position: number }>('/admin/homepage-slots', {
+      method: 'PATCH',
+      body: input,
+    });
+  },
+  /** 可挂载内容检索；服务端只返回已发布且未归档的。 */
+  listCandidates(query?: { q?: string }): Promise<{ items: HomepageCandidate[] }> {
+    const search = new URLSearchParams();
+    if (query?.q !== undefined) {
+      search.set('q', query.q);
+    }
+    const suffix = search.toString();
+    return request<{ items: HomepageCandidate[] }>(
+      `/admin/homepage-slots/candidates${suffix === '' ? '' : `?${suffix}`}`,
     );
   },
 };

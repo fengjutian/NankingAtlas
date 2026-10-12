@@ -40,6 +40,9 @@ export const NLA_API_PATHS = {
   '/api/v1/admin/media/{id}/complete': ['POST'] as const,
   '/api/v1/admin/users': ['GET', 'POST'] as const,
   '/api/v1/admin/users/{id}': ['PATCH'] as const,
+  '/api/v1/homepage': ['GET'] as const,
+  '/api/v1/admin/homepage-slots': ['GET', 'PATCH'] as const,
+  '/api/v1/admin/homepage-slots/candidates': ['GET'] as const,
   '/api/v1/admin/audit-logs': ['GET'] as const,
 } as const satisfies { readonly [P in NlaPath]: readonly NlaMethod[] };
 
@@ -149,6 +152,65 @@ export type AuditLogPage = {
 };
 
 export type AuditLogListResponse = { readonly data: AuditLogPage };
+
+export type PublicSlot = {
+  readonly slotKey: string;
+  readonly position: number;
+  readonly content: unknown;
+};
+
+export type Homepage = {
+  readonly slots: readonly PublicSlot[];
+  readonly featured: readonly ContentPublic[];
+  readonly latest: readonly ContentPublic[];
+};
+
+export type HomepageResponse = { readonly data: Homepage };
+
+export type AdminHomepageSlot = {
+  readonly slotKey: string;
+  readonly contentId: string | null | null;
+  readonly contentTitle: string | null | null;
+  readonly contentStatus: string | null | null;
+  readonly position: number;
+  readonly startsAt: string | null | null;
+  readonly endsAt: string | null | null;
+  readonly activeState: 'ACTIVE' | 'SCHEDULED' | 'EXPIRED';
+  readonly contentUnavailable: boolean;
+  readonly conflictWith: readonly string[];
+  readonly updatedAt: string;
+};
+
+export type AdminHomepageSlotListResponse = { readonly data: readonly AdminHomepageSlot[] };
+
+export type HomepageSlot = {
+  readonly slotKey: string;
+  readonly position: number;
+  readonly contentId: string | null | null;
+};
+
+export type HomepageSlotResponse = { readonly data: HomepageSlot };
+
+export type HomepageSlotConfigRequest = {
+  readonly slotKey: 'hero' | 'featured' | 'latest' | 'places' | 'routes';
+  readonly contentId: string | null | null;
+  readonly position?: number;
+  readonly startsAt?: string | null | null;
+  readonly endsAt?: string | null | null;
+};
+
+export type HomepageCandidate = {
+  readonly id: string;
+  readonly type: 'PLACE' | 'PERSON' | 'EVENT' | 'ARCHITECTURE' | 'TRADITION' | 'TOPIC' | 'ROUTE';
+  readonly slug: string;
+  readonly title: string;
+  readonly status: string;
+  readonly publishedAt: string | null | null;
+};
+
+export type HomepageCandidateList = { readonly items: readonly HomepageCandidate[] };
+
+export type HomepageCandidateListResponse = { readonly data: HomepageCandidateList };
 
 export type ContentType =
   'PLACE' | 'PERSON' | 'EVENT' | 'ARCHITECTURE' | 'TRADITION' | 'TOPIC' | 'ROUTE';
@@ -1379,6 +1441,85 @@ export interface NlaOperationMap {
       readonly '404': ErrorResponse;
       readonly '422': ErrorResponse;
       readonly '429': ErrorResponse;
+      readonly '500': ErrorResponse;
+    };
+  };
+  /** GET /api/v1/homepage */
+  getHomepage: {
+    readonly method: 'GET';
+    readonly path: '/api/v1/homepage';
+    readonly tags: readonly ['homepage'];
+    readonly security: 'public';
+    readonly parameters: readonly [];
+    readonly requestBody: undefined | undefined;
+    readonly response: HomepageResponse;
+    readonly errorResponses: { readonly '500': ErrorResponse };
+  };
+  /** GET /api/v1/admin/homepage-slots */
+  listHomepageSlots: {
+    readonly method: 'GET';
+    readonly path: '/api/v1/admin/homepage-slots';
+    readonly tags: readonly ['homepage'];
+    readonly security: 'bearer';
+    readonly parameters: readonly [];
+    readonly requestBody: undefined | undefined;
+    readonly response: AdminHomepageSlotListResponse;
+    readonly errorResponses: {
+      readonly '401': ErrorResponse;
+      readonly '403': ErrorResponse;
+      readonly '500': ErrorResponse;
+    };
+  };
+  /** PATCH /api/v1/admin/homepage-slots */
+  configureHomepageSlot: {
+    readonly method: 'PATCH';
+    readonly path: '/api/v1/admin/homepage-slots';
+    readonly tags: readonly ['homepage'];
+    readonly security: 'bearer';
+    readonly parameters: readonly [
+      {
+        readonly name: 'Idempotency-Key';
+        readonly in: 'header';
+        readonly required: false;
+        readonly type: string;
+      },
+    ];
+    readonly requestBody: HomepageSlotConfigRequest | undefined;
+    readonly response: HomepageSlotResponse;
+    readonly errorResponses: {
+      readonly '401': ErrorResponse;
+      readonly '403': ErrorResponse;
+      readonly '422': ErrorResponse;
+      readonly '429': ErrorResponse;
+      readonly '500': ErrorResponse;
+    };
+  };
+  /** GET /api/v1/admin/homepage-slots/candidates */
+  listHomepageSlotCandidates: {
+    readonly method: 'GET';
+    readonly path: '/api/v1/admin/homepage-slots/candidates';
+    readonly tags: readonly ['homepage'];
+    readonly security: 'bearer';
+    readonly parameters: readonly [
+      | {
+          readonly name: 'q';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: string;
+        }
+      | {
+          readonly name: 'limit';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: number;
+        },
+    ];
+    readonly requestBody: undefined | undefined;
+    readonly response: HomepageCandidateListResponse;
+    readonly errorResponses: {
+      readonly '400': ErrorResponse;
+      readonly '401': ErrorResponse;
+      readonly '403': ErrorResponse;
       readonly '500': ErrorResponse;
     };
   };
