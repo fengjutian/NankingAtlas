@@ -1,5 +1,6 @@
 import type { RevisionPage, ReviewActionPage, SourceSearchPage } from '@nanking-atlas/api-contract';
 
+import type { AdminUserDto, CreateUserInput, PatchUserInput, UserListPage } from './types';
 import type {
   AdminContentDto,
   AdminContentPatch,
@@ -23,6 +24,7 @@ import type {
   TagDto,
   UploadIntentDto,
   UpsertTagInput,
+  UserRole,
 } from './types';
 
 import { env } from '@/lib/env';
@@ -539,6 +541,49 @@ export const contentApi = {
 // ---------------------------------------------------------------------------
 // 来源 / 标签 / 关联 / 媒体端点
 // ---------------------------------------------------------------------------
+
+export const adminApi = {
+  /** 用户检索（FD-005）。仅 ADMIN 可用；游标原样回传。 */
+  listUsers(
+    query: {
+      q?: string;
+      role?: UserRole;
+      status?: 'enabled' | 'disabled';
+      cursor?: string;
+      limit?: number;
+    },
+    signal?: AbortSignal,
+  ): Promise<UserListPage> {
+    const search = new URLSearchParams();
+    if (query.q !== undefined) {
+      search.set('q', query.q);
+    }
+    if (query.role !== undefined) {
+      search.set('role', query.role);
+    }
+    if (query.status !== undefined) {
+      search.set('status', query.status);
+    }
+    if (query.cursor !== undefined) {
+      search.set('cursor', query.cursor);
+    }
+    if (query.limit !== undefined) {
+      search.set('limit', String(query.limit));
+    }
+    const suffix = search.toString();
+    return request<UserListPage>(
+      `/admin/users${suffix === '' ? '' : `?${suffix}`}`,
+      signal === undefined ? {} : { signal },
+    );
+  },
+  createUser(input: CreateUserInput): Promise<AdminUserDto> {
+    return request<AdminUserDto>('/admin/users', { method: 'POST', body: input });
+  },
+  /** 改角色 / 启禁 / 重置密码。服务端会拒绝"最后一个管理员"类操作。 */
+  updateUser(id: string, patch: PatchUserInput): Promise<AdminUserDto> {
+    return request<AdminUserDto>(`/admin/users/${id}`, { method: 'PATCH', body: patch });
+  },
+};
 
 export const libraryApi = {
   createSource(input: CreateSourceInput): Promise<unknown> {

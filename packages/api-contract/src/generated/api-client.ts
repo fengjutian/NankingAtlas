@@ -120,7 +120,13 @@ export type PatchUserRequest = {
 
 export type UserResponse = { readonly data: User };
 
-export type UserListResponse = { readonly data: readonly User[] };
+export type UserListPage = {
+  readonly items: readonly User[];
+  readonly nextCursor: string | null | null;
+  readonly hasMore: boolean;
+};
+
+export type UserListResponse = { readonly data: UserListPage };
 
 export type ContentType =
   'PLACE' | 'PERSON' | 'EVENT' | 'ARCHITECTURE' | 'TRADITION' | 'TOPIC' | 'ROUTE';
@@ -1262,10 +1268,42 @@ export interface NlaOperationMap {
     readonly path: '/api/v1/admin/users';
     readonly tags: readonly ['users'];
     readonly security: 'bearer';
-    readonly parameters: readonly [];
+    readonly parameters: readonly [
+      | {
+          readonly name: 'q';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: string;
+        }
+      | {
+          readonly name: 'role';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: 'ADMIN' | 'EDITOR' | 'REVIEWER' | 'VIEWER';
+        }
+      | {
+          readonly name: 'status';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: 'enabled' | 'disabled';
+        }
+      | {
+          readonly name: 'limit';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: number;
+        }
+      | {
+          readonly name: 'cursor';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: string;
+        },
+    ];
     readonly requestBody: undefined | undefined;
     readonly response: UserListResponse;
     readonly errorResponses: {
+      readonly '400': ErrorResponse;
       readonly '401': ErrorResponse;
       readonly '403': ErrorResponse;
       readonly '500': ErrorResponse;

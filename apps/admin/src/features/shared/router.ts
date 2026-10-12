@@ -11,7 +11,10 @@ import { useSyncExternalStore } from 'react';
  */
 
 export type Route =
-  { name: 'login' } | { name: 'contents' } | { name: 'editor'; contentId: string };
+  | { name: 'login' }
+  | { name: 'contents' }
+  | { name: 'editor'; contentId: string }
+  | { name: 'users' };
 
 const listeners = new Set<() => void>();
 
@@ -46,6 +49,10 @@ export function parseRoute(pathname: string): Route {
   const path = pathname.replace(/\/+$/, '');
   if (path === '/login') {
     return { name: 'login' };
+  }
+  // 用户与角色管理（FD-005）；服务端仍会独立校验 ADMIN，前端隐藏入口只是体验优化。
+  if (path === '/users') {
+    return { name: 'users' };
   }
   const editorMatch = /^\/contents\/([^/]+)$/.exec(path);
   const contentId = editorMatch?.[1];

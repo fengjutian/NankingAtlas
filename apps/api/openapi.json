@@ -4405,21 +4405,98 @@
     "/api/v1/admin/users": {
       "get": {
         "operationId": "listUsers",
-        "summary": "列出用户",
-        "description": "仅 Admin 可见；当前实现返回前 100 条。",
+        "summary": "检索用户",
+        "description": "仅 Admin 可见。按 email / 显示名检索，可按角色与启用状态过滤；游标分页，排序固定为创建时间倒序。响应**不含**密码或密码哈希。",
         "tags": ["users"],
         "security": [
           {
             "bearerAuth": []
           }
         ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "同时匹配 email 与显示名的关键词。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "description": "按角色过滤。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["ADMIN", "EDITOR", "REVIEWER", "VIEWER"]
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "description": "按启用状态过滤。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["enabled", "disabled"]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回条数上限，默认 20，最大 100。",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "上一页返回的 nextCursor，原样回传以取下一页。省略则从第一页开始。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          }
+        ],
         "responses": {
           "200": {
-            "description": "用户列表。",
+            "description": "用户检索结果分页。",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/UserListResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "检索参数或游标不合法。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             },
@@ -5177,17 +5254,35 @@
           }
         }
       },
-      "UserListResponse": {
+      "UserListPage": {
         "type": "object",
-        "description": "用户列表响应。",
-        "required": ["data"],
+        "description": "游标分页的用户检索结果，按创建时间倒序。",
+        "required": ["items", "nextCursor", "hasMore"],
         "additionalProperties": false,
         "properties": {
-          "data": {
+          "items": {
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/User"
             }
+          },
+          "nextCursor": {
+            "type": ["string", "null"],
+            "maxLength": 512
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "UserListResponse": {
+        "type": "object",
+        "description": "用户检索分页响应。",
+        "required": ["data"],
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/UserListPage"
           }
         }
       },

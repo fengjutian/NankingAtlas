@@ -8,6 +8,7 @@ import { EditorPage } from './features/content/EditorPage';
 import { navigate, useRoute } from './features/shared/router';
 import { clearSessionUser, readSessionUser } from './features/shared/session';
 import { EmptyState, Loading } from './features/shared/States';
+import { UserManagementPage } from './features/users/UserManagementPage';
 
 import type { SessionUser } from './features/shared/session';
 
@@ -115,6 +116,7 @@ export function App() {
           onUnauthorized={signOut}
         />
       ) : null}
+      {route.name === 'users' ? <UserManagementPage user={user} onUnauthorized={signOut} /> : null}
     </AdminShell>
   );
 }

@@ -2,6 +2,12 @@ import { Injectable } from '@nestjs/common';
 
 import { CONTENT_STATUSES, USER_ROLES, type UserRole } from '@nanking-atlas/database';
 
+import {
+  InvalidCursorError,
+  encodeCursor,
+  type CursorPage,
+  type CursorPayload,
+} from '../../lib/cursor.js';
 import { prisma } from '../../lib/prisma.js';
 
 /**
@@ -31,6 +37,9 @@ export interface CreateUserInput {
   passwordHash: string;
   displayName: string;
   roles: readonly UserRole[];
+  /** 操作人；与审计同事务写入（FD-005）。 */
+  actorId: string;
+  requestId: string;
 }
 
 @Injectable()
@@ -59,17 +68,22 @@ export class UsersService {
   /**
    * 创建用户。
    *
-   * 角色写入与用户创建在**同一事务**里，避免出现"用户存在但角色为空"的中间态
-   * （AGENTS.md §5.3 要求状态变更在事务边界内一致）。
+   * 角色写入、用户创建与**审计日志**在**同一事务**里（FD-005）：
+   * 审计是权限变更的追溯依据（AGENTS.md §5.4），"用户已建但没有审计记录"
+   * 意味着事后无法回答"这个管理员是谁、什么时候加的"。
+   *
+   * 审计只记录 email / displayName / roles —— **绝不记录密码或哈希**。
    */
   async create(input: CreateUserInput): Promise<UserWithRoles> {
     const roles = normalizeRoles(input.roles);
+    const email = input.email.trim().toLowerCase();
+    const displayName = input.displayName.trim();
     const row = await prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
         data: {
-          email: input.email.trim().toLowerCase(),
+          email,
           passwordHash: input.passwordHash,
-          displayName: input.displayName.trim(),
+          displayName,
         },
       });
       if (roles.length > 0) {
@@ -77,6 +91,16 @@ export class UsersService {
           data: roles.map((role) => ({ userId: created.id, role })),
         });
       }
+      await tx.auditLog.create({
+        data: {
+          actorId: input.actorId,
+          requestId: input.requestId,
+          action: 'user.create',
+          entityType: 'user',
+          entityId: created.id,
+          afterJson: JSON.stringify({ email, displayName, roles }),
+        },
+      });
       return tx.user.findUniqueOrThrow({
         where: { id: created.id },
         include: { userRoles: true },
@@ -150,14 +174,66 @@ export class UsersService {
     return new Set(rows.map((row) => row.userId)).size;
   }
 
-  /** 列表（后台用户管理用）。 */
-  async list(limit: number): Promise<UserWithRoles[]> {
+  /**
+   * 检索用户（FD-005）。
+   *
+   * 排序固定 `createdAt desc, id desc`：用户列表的排序需求只有"最新优先"，
+   * 不引入可变排序（可变排序会让游标必须携带排序键，见 sources 检索的教训）。
+   *
+   * `q` 同时匹配 email 与 displayName。与来源检索一样是 SQLite 的 LIKE
+   * 全表扫描 —— 用户表是全站最小的一张表，这个代价可以接受。
+   */
+  async search(input: {
+    q?: string | undefined;
+    role?: UserRole | undefined;
+    status?: 'enabled' | 'disabled' | undefined;
+    limit: number;
+    cursor?: CursorPayload | undefined;
+  }): Promise<CursorPage<UserWithRoles>> {
+    const filters: Record<string, unknown>[] = [];
+
+    if (input.q !== undefined) {
+      filters.push({
+        OR: [{ email: { contains: input.q } }, { displayName: { contains: input.q } }],
+      });
+    }
+    if (input.status !== undefined) {
+      filters.push(
+        input.status === 'enabled' ? { disabledAt: null } : { disabledAt: { not: null } },
+      );
+    }
+    if (input.role !== undefined) {
+      filters.push({ userRoles: { some: { role: input.role } } });
+    }
+    if (input.cursor !== undefined) {
+      const createdAt = new Date(input.cursor.createdAt);
+      if (Number.isNaN(createdAt.getTime())) {
+        throw new InvalidCursorError('CURSOR_PAYLOAD_INVALID', '游标时间载荷不合法');
+      }
+      filters.push({
+        OR: [{ createdAt: { lt: createdAt } }, { createdAt, id: { lt: input.cursor.id } }],
+      });
+    }
+
     const rows = await prisma.user.findMany({
-      take: limit,
-      orderBy: { createdAt: 'desc' },
+      where: filters.length === 0 ? {} : { AND: filters },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: input.limit + 1,
       include: { userRoles: true },
     });
-    return rows.map(toUserWithRoles);
+
+    const hasMore = rows.length > input.limit;
+    const page = hasMore ? rows.slice(0, input.limit) : rows;
+    const last = page[page.length - 1];
+
+    return {
+      items: page.map(toUserWithRoles),
+      nextCursor:
+        hasMore && last !== undefined
+          ? encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.id })
+          : null,
+      hasMore,
+    };
   }
 }
 

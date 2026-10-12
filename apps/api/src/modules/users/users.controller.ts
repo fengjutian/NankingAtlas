@@ -1,4 +1,4 @@
-import { Controller, Get, Inject, Patch, Post, Body, Param, Req } from '@nestjs/common';
+import { Controller, Get, Inject, Patch, Post, Body, Param, Query, Req } from '@nestjs/common';
 import { type Request } from 'express';
 import { z } from 'zod';
 
@@ -13,6 +13,13 @@ import {
 import { requireUser } from '../../common/auth/auth.guard.js';
 import { RequireRoles } from '../../common/auth/roles.decorator.js';
 import { ForbiddenError } from '../../common/auth/roles.guard.js';
+import {
+  DEFAULT_PAGE_SIZE,
+  InvalidCursorError,
+  MAX_PAGE_SIZE,
+  decodeCursor,
+  type CursorPayload,
+} from '../../lib/cursor.js';
 import { hashPassword } from '../../lib/password.js';
 import { prisma } from '../../lib/prisma.js';
 
@@ -45,38 +52,89 @@ const patchUserSchema = z
     message: '至少提供一个要修改的字段',
   });
 
+/** 检索关键词上限：进 `LIKE '%q%'`，过长会拖慢全表扫描。 */
+export const MAX_USER_QUERY_LENGTH = 200;
+
+/**
+ * 用户检索 query（FD-005）。`.strict()` —— 未知参数一律 400，
+ * 让编辑输错参数名时立刻看到，而不是以为已按某个条件筛选。
+ */
+const listUsersQuerySchema = z
+  .object({
+    q: z.string().trim().min(1).max(MAX_USER_QUERY_LENGTH).optional(),
+    role: z.enum(USER_ROLES).optional(),
+    status: z.enum(['enabled', 'disabled']).optional(),
+    limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
+    cursor: z
+      .string()
+      .min(1)
+      .max(512)
+      .transform((raw, ctx): CursorPayload => {
+        try {
+          return decodeCursor(raw);
+        } catch (error) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message:
+              error instanceof InvalidCursorError ? `游标不合法：${error.code}` : '游标不合法',
+          });
+          return z.NEVER;
+        }
+      })
+      .optional(),
+  })
+  .strict();
+
 @Controller('admin/users')
 export class UsersController {
   /** 显式 @Inject：见 auth.controller.ts 的同款说明（vitest 不产出 paramtypes）。 */
   constructor(@Inject(UsersService) private readonly users: UsersService) {}
 
-  /** GET /admin/users —— 列出用户。 */
+  /**
+   * GET /admin/users —— 检索用户（FD-005）。
+   *
+   * 游标分页：排序固定 `createdAt desc, id desc`，游标携带排序键。
+   */
   @Get()
   @RequireRoles('ADMIN')
-  async list(): Promise<{ data: unknown }> {
-    const rows = await this.users.list(100);
+  async list(@Query() rawQuery: unknown): Promise<{ data: unknown }> {
+    const query = listUsersQuerySchema.parse(rawQuery);
+    const page = await this.users.search({
+      ...(query.q !== undefined ? { q: query.q } : {}),
+      ...(query.role !== undefined ? { role: query.role } : {}),
+      ...(query.status !== undefined ? { status: query.status } : {}),
+      limit: query.limit,
+      ...(query.cursor !== undefined ? { cursor: query.cursor } : {}),
+    });
     return {
-      data: rows.map((user) => ({
-        id: user.id,
-        email: user.email,
-        displayName: user.displayName,
-        roles: user.roles,
-        disabledAt: user.disabledAt?.toISOString() ?? null,
-      })),
+      data: {
+        items: page.items.map((user) => ({
+          id: user.id,
+          email: user.email,
+          displayName: user.displayName,
+          roles: user.roles,
+          disabledAt: user.disabledAt?.toISOString() ?? null,
+        })),
+        nextCursor: page.nextCursor,
+        hasMore: page.hasMore,
+      },
     };
   }
 
   /** POST /admin/users —— 创建用户。 */
   @Post()
   @RequireRoles('ADMIN')
-  async create(@Body() rawBody: unknown): Promise<{ data: unknown }> {
+  async create(@Body() rawBody: unknown, @Req() req: Request): Promise<{ data: unknown }> {
     const body = createUserSchema.parse(rawBody);
+    const actor = requireUser(req);
     const passwordHash = await hashPassword(body.password);
     const created = await this.users.create({
       email: body.email,
       passwordHash,
       displayName: body.displayName,
       roles: body.roles,
+      actorId: actor.id,
+      requestId: req.requestId ?? 'unknown',
     });
     return {
       data: {
@@ -84,6 +142,7 @@ export class UsersController {
         email: created.email,
         displayName: created.displayName,
         roles: created.roles,
+        disabledAt: null,
       },
     };
   }

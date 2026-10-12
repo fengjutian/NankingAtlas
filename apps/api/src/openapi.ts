@@ -1108,7 +1108,18 @@ const SCHEMAS: Readonly<Record<string, SchemaObject>> = {
   CreateUserRequest: CreateUserRequestSchema,
   PatchUserRequest: PatchUserRequestSchema,
   UserResponse: dataEnvelope(ref('User'), '单个用户响应。'),
-  UserListResponse: dataListEnvelope(ref('User'), '用户列表响应。'),
+  UserListPage: {
+    type: 'object',
+    description: '游标分页的用户检索结果，按创建时间倒序。',
+    required: ['items', 'nextCursor', 'hasMore'],
+    additionalProperties: false,
+    properties: {
+      items: { type: 'array', items: ref('User') },
+      nextCursor: { type: ['string', 'null'], maxLength: 512 },
+      hasMore: { type: 'boolean' },
+    },
+  },
+  UserListResponse: dataEnvelope(ref('UserListPage'), '用户检索分页响应。'),
 
   // 内容
   ContentType: ContentTypeSchema,
@@ -2167,13 +2178,40 @@ const PATHS: Readonly<Record<string, PathItemObject>> = {
   '/api/v1/admin/users': {
     get: {
       operationId: 'listUsers',
-      summary: '列出用户',
-      description: '仅 Admin 可见；当前实现返回前 100 条。',
+      summary: '检索用户',
+      description:
+        '仅 Admin 可见。按 email / 显示名检索，可按角色与启用状态过滤；游标分页，排序固定为创建时间倒序。响应**不含**密码或密码哈希。',
       tags: ['users'],
       security: BEARER_SECURITY,
+      parameters: [
+        {
+          name: 'q',
+          in: 'query',
+          description: '同时匹配 email 与显示名的关键词。',
+          required: false,
+          schema: { type: 'string', minLength: 1, maxLength: 200 },
+        },
+        {
+          name: 'role',
+          in: 'query',
+          description: '按角色过滤。',
+          required: false,
+          schema: { type: 'string', enum: USER_ROLES },
+        },
+        {
+          name: 'status',
+          in: 'query',
+          description: '按启用状态过滤。',
+          required: false,
+          schema: { type: 'string', enum: ['enabled', 'disabled'] },
+        },
+        LIMIT_QUERY_PARAMETER,
+        CURSOR_QUERY_PARAMETER,
+      ],
       responses: {
-        '200': okResponse('UserListResponse', '用户列表。'),
+        '200': okResponse('UserListResponse', '用户检索结果分页。'),
         ...AUTH_ERRORS,
+        '400': errorResponse('检索参数或游标不合法。'),
         '500': errorResponse('服务内部错误。'),
       },
     },

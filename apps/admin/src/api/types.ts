@@ -176,6 +176,40 @@ export interface CurrentUserDto {
 }
 
 // ---------------------------------------------------------------------------
+// 用户与角色管理（FD-005）
+// ---------------------------------------------------------------------------
+
+/** 后台用户管理行。**不含**密码或密码哈希（服务端从不下发）。 */
+export interface AdminUserDto {
+  id: string;
+  email: string;
+  displayName: string;
+  roles: readonly UserRole[];
+  disabledAt: string | null;
+}
+
+export interface UserListPage {
+  items: AdminUserDto[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+export interface CreateUserInput {
+  email: string;
+  password: string;
+  displayName: string;
+  roles: readonly UserRole[];
+}
+
+export interface PatchUserInput {
+  displayName?: string;
+  roles?: readonly UserRole[];
+  disabled?: boolean;
+  /** 只在重置时输入；服务端不回显、不记审计明文。 */
+  password?: string;
+}
+
+// ---------------------------------------------------------------------------
 // 内容
 // ---------------------------------------------------------------------------
 
