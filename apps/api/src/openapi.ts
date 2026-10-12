@@ -1167,7 +1167,15 @@ const SCHEMAS: Readonly<Record<string, SchemaObject>> = {
     type: 'object',
     description:
       '版本快照的**安全摘要**：正文只给纯文本，不下发 Tiptap 结构；截断由 `bodyTextTruncated` 显式标记。',
-    required: ['title', 'subtitle', 'summary', 'slug', 'bodyText', 'bodyTextLength', 'bodyTextTruncated'],
+    required: [
+      'title',
+      'subtitle',
+      'summary',
+      'slug',
+      'bodyText',
+      'bodyTextLength',
+      'bodyTextTruncated',
+    ],
     additionalProperties: false,
     properties: {
       title: stringSchema('该版本的标题。'),

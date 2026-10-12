@@ -161,9 +161,7 @@ const historyQuerySchema = z
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              error instanceof InvalidCursorError
-                ? `游标不合法：${error.code}`
-                : '游标不合法',
+              error instanceof InvalidCursorError ? `游标不合法：${error.code}` : '游标不合法',
           });
           return z.NEVER;
         }
@@ -345,7 +343,10 @@ export class ContentController {
    */
   @Get('admin/contents/:id/revisions')
   @RequireRoles('EDITOR', 'REVIEWER', 'ADMIN')
-  async listRevisions(@Param('id') id: string, @Query() rawQuery: unknown): Promise<{ data: unknown }> {
+  async listRevisions(
+    @Param('id') id: string,
+    @Query() rawQuery: unknown,
+  ): Promise<{ data: unknown }> {
     const query = historyQuerySchema.parse(rawQuery);
     return { data: await listRevisions(id, query) };
   }

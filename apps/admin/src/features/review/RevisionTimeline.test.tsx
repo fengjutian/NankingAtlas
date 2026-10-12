@@ -1,7 +1,12 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
-import type { Revision, RevisionPage, ReviewActionRecord, ReviewActionPage } from '@nanking-atlas/api-contract';
+import type {
+  Revision,
+  RevisionPage,
+  ReviewActionRecord,
+  ReviewActionPage,
+} from '@nanking-atlas/api-contract';
 
 import { RevisionTimeline, type RevisionTimelineProps } from './RevisionTimeline';
 
@@ -69,9 +74,7 @@ describe('loading 状态', () => {
 
 describe('empty 状态', () => {
   it('没有版本记录时给出说明，且不渲染占位数据', () => {
-    const html = render(
-      baseProps({ revisions: revisionPage([]), reviewActions: reviewPage([]) }),
-    );
+    const html = render(baseProps({ revisions: revisionPage([]), reviewActions: reviewPage([]) }));
     expect(html).toContain('还没有版本记录');
     expect(html).toContain('不会填充占位数据');
   });
@@ -105,15 +108,19 @@ describe('error / forbidden 状态', () => {
     const html = render(
       baseProps({ state: 'forbidden', errorMessage: '角色不足', requestId: 'req-456' }),
     );
-    expect(html).toContain('无法读取版本历史');
-    expect(html).toContain('没有查看审核历史的权限');
+    // 服务端给出的原因照实显示，权限提示由 ErrorState 的 forbidden 分支补充。
+    expect(html).toContain('角色不足');
+    expect(html).toContain('没有执行该操作的权限');
     expect(html).toContain('req-456');
   });
 
+  it('forbidden 状态没有服务端原因时给出默认权限说明', () => {
+    const html = render(baseProps({ state: 'forbidden', errorMessage: null, requestId: null }));
+    expect(html).toContain('没有查看审核历史的权限');
+  });
+
   it('error 状态没有 requestId 时不渲染空占位', () => {
-    const html = render(
-      baseProps({ state: 'error', errorMessage: '网络中断', requestId: null }),
-    );
+    const html = render(baseProps({ state: 'error', errorMessage: '网络中断', requestId: null }));
     expect(html).toContain('网络中断');
     expect(html).not.toContain('requestId:');
   });
@@ -212,14 +219,19 @@ describe('success 状态：审核动作', () => {
     expect(html).not.toContain('理由：');
   });
 
-  it('未知动作名原样显示，不编造中文标签', () => {
+  it('服务端返回契约外的新动作时不崩溃，原样显示', () => {
+    // 契约已经把 action 收紧成枚举（OpenAPI `ReviewActionRecord.action`）。
+    // 这里显式绕过类型，模拟「部署的 admin 比 API 新」—— 例如 API 新增了
+    // 一个动作但 admin 还没跟上。UI 必须原样显示而不是渲染 undefined。
+    const futureAction = { ...action, action: 'SOME_FUTURE_ACTION' } as unknown as ReviewActionRecord;
     const html = render(
       baseProps({
         revisions: revisionPage([revision(1)]),
-        reviewActions: reviewPage([{ ...action, action: 'SOME_FUTURE_ACTION' }]),
+        reviewActions: reviewPage([futureAction]),
       }),
     );
     expect(html).toContain('SOME_FUTURE_ACTION');
+    expect(html).not.toContain('undefined');
   });
 });
 

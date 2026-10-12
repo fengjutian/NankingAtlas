@@ -4,11 +4,11 @@ import type { AdminContentDto, ContentAction, ReadinessResult } from '@/api/type
 import type { SessionUser } from '@/features/shared/session';
 import type { ActionContext } from '@/features/shared/workflow';
 
+import { RevisionTimeline, type RevisionTimelineProps } from '@/features/review/RevisionTimeline';
 import { StatusBadge } from '@/features/shared/Badge';
 import { Button, ButtonRow } from '@/features/shared/Button';
 import { Field } from '@/features/shared/Field';
 import { card, dangerBanner, inputStyle, mutedText, row, stack } from '@/features/shared/styles';
-import { RevisionTimeline, type RevisionTimelineProps } from '@/features/review/RevisionTimeline';
 import {
   ACTION_LABELS,
   availableActions,

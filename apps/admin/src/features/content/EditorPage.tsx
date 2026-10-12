@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type {
-  RevisionPage,
-  ReviewActionPage,
-} from '@nanking-atlas/api-contract';
+import type { RevisionPage, ReviewActionPage } from '@nanking-atlas/api-contract';
+
 import type {
   AdminContentDto,
   AdminContentPatch,
@@ -38,7 +36,6 @@ import {
   useUnsavedChangesWarning,
 } from '@/features/content/AutosaveStatus';
 import { ConflictDialog, readConflictVersions } from '@/features/content/ConflictDialog';
-import { formatDateTime } from '@/features/shared/datetime';
 import {
   BasicsSection,
   BodySection,
@@ -54,6 +51,7 @@ import {
 import { ReviewPanel } from '@/features/review/ReviewPanel';
 import { StatusBadge } from '@/features/shared/Badge';
 import { Button } from '@/features/shared/Button';
+import { formatDateTime } from '@/features/shared/datetime';
 import { navigate } from '@/features/shared/router';
 import { ErrorState, Loading } from '@/features/shared/States';
 import { card, dangerBanner, inputStyle, mutedText, row, stack } from '@/features/shared/styles';
@@ -236,9 +234,9 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
   // ---- 版本与审核历史（FD-001）----
   const [revisions, setRevisions] = useState<RevisionPage | null>(null);
   const [reviewActions, setReviewActions] = useState<ReviewActionPage | null>(null);
-  const [historyState, setHistoryState] = useState<
-    'loading' | 'ready' | 'error' | 'forbidden'
-  >('loading');
+  const [historyState, setHistoryState] = useState<'loading' | 'ready' | 'error' | 'forbidden'>(
+    'loading',
+  );
   const [historyError, setHistoryError] = useState<{ message: string; requestId: string | null }>({
     message: '',
     requestId: null,

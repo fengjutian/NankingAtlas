@@ -137,8 +137,8 @@ interface TextDiffInput {
  */
 export function diffRevisions(from: Revision, to: Revision): RevisionDiff {
   const fields: FieldDiff[] = SNAPSHOT_FIELDS.map((field) => {
-    const before = normalize(from.snapshot[field] as string | null);
-    const after = normalize(to.snapshot[field] as string | null);
+    const before = normalize(from.snapshot[field]);
+    const after = normalize(to.snapshot[field]);
     return {
       field,
       label: SNAPSHOT_FIELD_LABELS[field],

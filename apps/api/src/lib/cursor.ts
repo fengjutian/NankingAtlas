@@ -28,7 +28,8 @@ export interface CursorPayload {
   id: string;
 }
 
-export type CursorErrorCode = 'CURSOR_BASE64_INVALID' | 'CURSOR_JSON_INVALID' | 'CURSOR_PAYLOAD_INVALID';
+export type CursorErrorCode =
+  'CURSOR_BASE64_INVALID' | 'CURSOR_JSON_INVALID' | 'CURSOR_PAYLOAD_INVALID';
 
 /** 游标不合法。调用方（异常过滤器）应映射为 400 VALIDATION_FAILED。 */
 export class InvalidCursorError extends Error {

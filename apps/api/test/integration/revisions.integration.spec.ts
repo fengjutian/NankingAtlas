@@ -109,10 +109,7 @@ function uniqueSlug(prefix: string): string {
 }
 
 /** 建一份带 n 次编辑的内容，返回 content id；每次编辑产生一个 revision。 */
-async function createContentWithEdits(
-  editorId: string,
-  edits: string[],
-): Promise<string> {
+async function createContentWithEdits(editorId: string, edits: string[]): Promise<string> {
   const created = await request(serverOf(ensureApp()))
     .post('/api/v1/admin/contents')
     .set('Authorization', authHeader(editorId))
@@ -279,11 +276,9 @@ describe('FD-001: revision 分页与排序', () => {
     expect(thirdPage.nextCursor).toBeNull();
 
     // 三页合起来正好覆盖 1..6，不重不漏
-    const seen = [
-      ...firstPage.items,
-      ...secondPage.items,
-      ...thirdPage.items,
-    ].map((item) => item.revisionNo);
+    const seen = [...firstPage.items, ...secondPage.items, ...thirdPage.items].map(
+      (item) => item.revisionNo,
+    );
     expect(seen).toEqual([6, 5, 4, 3, 2, 1]);
   });
 
@@ -308,11 +303,7 @@ describe('FD-001: revision 分页与排序', () => {
     expect(badCursor.status).toBe(400);
     expect((badCursor.body as { error: { code: string } }).error.code).toBe('VALIDATION_FAILED');
 
-    const badReviewCursor = await fetchReviewActions(
-      contentId,
-      editorId,
-      '?cursor=%%%',
-    );
+    const badReviewCursor = await fetchReviewActions(contentId, editorId, '?cursor=%%%');
     expect(badReviewCursor.status).toBe(400);
   });
 });
@@ -374,7 +365,7 @@ describe('FD-001: 快照摘要的安全性', () => {
     const snapshot = page.data.items[0]?.snapshot;
     expect(snapshot?.bodyTextLength).toBe(longText.length);
     expect(snapshot?.bodyTextTruncated).toBe(true);
-    expect((snapshot?.bodyText.length ?? 0)).toBeLessThan(longText.length);
+    expect(snapshot?.bodyText.length ?? 0).toBeLessThan(longText.length);
 
     // 摘要里不得出现 Tiptap 结构标记
     expect(snapshot?.bodyText).not.toContain('"type"');
@@ -441,7 +432,11 @@ describe('FD-001: 状态流转后的追溯一致性', () => {
     const actions = await fetchReviewActions(contentId, reviewerId);
     expect(actions.status).toBe(200);
     const actionPage = actions.body as { data: { items: ReviewActionEntry[] } };
-    const mapped = actionPage.data.items.map((item) => [item.action, item.fromStatus, item.toStatus]);
+    const mapped = actionPage.data.items.map((item) => [
+      item.action,
+      item.fromStatus,
+      item.toStatus,
+    ]);
     expect(mapped).toEqual([
       ['REJECT', 'IN_REVIEW', 'DRAFT'],
       ['SUBMIT', 'DRAFT', 'IN_REVIEW'],
@@ -483,15 +478,17 @@ describe('FD-001: 状态流转后的追溯一致性', () => {
     }
 
     const first = await fetchReviewActions(contentId, reviewerId, '?limit=2');
-    const firstPage = (first.body as { data: { items: ReviewActionEntry[]; nextCursor: string | null } })
-      .data;
+    const firstPage = (
+      first.body as { data: { items: ReviewActionEntry[]; nextCursor: string | null } }
+    ).data;
     expect(firstPage.items.map((item) => item.action)).toEqual(['REJECT', 'SUBMIT']);
     expect(firstPage.nextCursor).toBeTruthy();
 
     const secondQuery = `?limit=2&cursor=${encodeURIComponent(firstPage.nextCursor ?? '')}`;
     const second = await fetchReviewActions(contentId, reviewerId, secondQuery);
-    const secondPage = (second.body as { data: { items: ReviewActionEntry[]; nextCursor: string | null } })
-      .data;
+    const secondPage = (
+      second.body as { data: { items: ReviewActionEntry[]; nextCursor: string | null } }
+    ).data;
     expect(secondPage.items.map((item) => item.action)).toEqual(['REJECT', 'SUBMIT']);
     expect(secondPage.nextCursor).toBeTruthy();
 
@@ -500,8 +497,9 @@ describe('FD-001: 状态流转后的追溯一致性', () => {
       reviewerId,
       `?limit=2&cursor=${encodeURIComponent(secondPage.nextCursor ?? '')}`,
     );
-    const thirdPage = (third.body as { data: { items: ReviewActionEntry[]; nextCursor: string | null } })
-      .data;
+    const thirdPage = (
+      third.body as { data: { items: ReviewActionEntry[]; nextCursor: string | null } }
+    ).data;
     expect(thirdPage.items.map((item) => item.action)).toEqual(['REJECT', 'SUBMIT']);
     expect(thirdPage.nextCursor).toBeNull();
 

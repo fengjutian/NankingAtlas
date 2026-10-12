@@ -92,10 +92,10 @@ describe('decodeCursor 拒绝非法输入（绝不静默退化成第一页）', 
 
 describe('encodeCursor 拒绝非法载荷', () => {
   it('缺少字段或时间格式不对时报 CURSOR_PAYLOAD_INVALID', () => {
-    expect(() => encodeCursor({ createdAt: 'nope', id: 'abc' })).toThrow(
+    expect(() => encodeCursor({ createdAt: 'nope', id: 'abc' })).toThrow(InvalidCursorError);
+    expect(() => encodeCursor({ createdAt: SAMPLE.createdAt } as never)).toThrow(
       InvalidCursorError,
     );
-    expect(() => encodeCursor({ createdAt: SAMPLE.createdAt } as never)).toThrow(InvalidCursorError);
   });
 });
 
@@ -134,9 +134,9 @@ describe('buildCursorPage', () => {
 
   it('limit 越界直接抛 RangeError，不静默截断', () => {
     expect(() => buildCursorPage({ items: [], limit: 0, toCursorItem })).toThrow(RangeError);
-    expect(() =>
-      buildCursorPage({ items: [], limit: MAX_PAGE_SIZE + 1, toCursorItem }),
-    ).toThrow(RangeError);
+    expect(() => buildCursorPage({ items: [], limit: MAX_PAGE_SIZE + 1, toCursorItem })).toThrow(
+      RangeError,
+    );
     expect(() => buildCursorPage({ items: [], limit: 1.5, toCursorItem })).toThrow(RangeError);
   });
 

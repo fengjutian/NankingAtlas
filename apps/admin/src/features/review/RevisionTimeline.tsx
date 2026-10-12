@@ -1,6 +1,13 @@
 import { useMemo, useState } from 'react';
 
-import type { Revision, RevisionPage, ReviewActionRecord, ReviewActionPage } from '@nanking-atlas/api-contract';
+import type {
+  Revision,
+  RevisionPage,
+  ReviewActionRecord,
+  ReviewActionPage,
+} from '@nanking-atlas/api-contract';
+
+import { diffRevisions, revisionActionLabel, type RevisionDiff } from './revisionDiff';
 
 import { StatusBadge } from '@/features/shared/Badge';
 import { Button } from '@/features/shared/Button';
@@ -9,7 +16,6 @@ import { EmptyState, ErrorState, Loading } from '@/features/shared/States';
 import { card, dangerBanner, mutedText, row, stack, tableStyle } from '@/features/shared/styles';
 import { statusLabel } from '@/features/shared/workflow';
 
-import { diffRevisions, revisionActionLabel, type RevisionDiff } from './revisionDiff';
 
 /**
  * 审核区版本时间线（FD-001）。
@@ -135,8 +141,7 @@ function RevisionList({ revisions, hasMore, loadingMore, onLoadMore }: RevisionL
     });
   }
 
-  const pickedCount =
-    diffPair === null ? 0 : diffPair.from === diffPair.to ? 1 : 2;
+  const pickedCount = diffPair === null ? 0 : diffPair.from === diffPair.to ? 1 : 2;
 
   if (revisions.length === 0) {
     return (
@@ -150,7 +155,9 @@ function RevisionList({ revisions, hasMore, loadingMore, onLoadMore }: RevisionL
   return (
     <div style={stack}>
       <div style={row}>
-        <strong>版本历史（{revisions.length} 条{hasMore ? '，还有更多' : ''}）</strong>
+        <strong>
+          版本历史（{revisions.length} 条{hasMore ? '，还有更多' : ''}）
+        </strong>
         <span style={mutedText}>
           {pickedCount === 0
             ? '选择两个版本可查看差异（版本只读，不能编辑或删除）'
@@ -158,9 +165,7 @@ function RevisionList({ revisions, hasMore, loadingMore, onLoadMore }: RevisionL
               ? '已选择 1 个版本，再选一个即可对比'
               : '已选择 2 个版本'}
         </span>
-        {diffPair === null ? null : (
-          <Button onClick={() => setDiffPair(null)}>清除选择</Button>
-        )}
+        {diffPair === null ? null : <Button onClick={() => setDiffPair(null)}>清除选择</Button>}
       </div>
 
       <table style={tableStyle}>
@@ -185,13 +190,13 @@ function RevisionList({ revisions, hasMore, loadingMore, onLoadMore }: RevisionL
                 <td>
                   <Button
                     variant={selected ? 'primary' : 'default'}
-                    aria-pressed={selected}
+                    ariaPressed={selected}
                     onClick={() => togglePick(revision.revisionNo)}
                   >
                     {selected ? '已选' : '选择'}
                   </Button>
                 </td>
-                <td>v{revision.revisionNo}</td>
+                <th scope="row">v{revision.revisionNo}</th>
                 <td>{revisionActionLabel(revision.action)}</td>
                 <td>{revision.actor.displayName}</td>
                 <td>{formatDateTime(revision.createdAt)}</td>
@@ -245,7 +250,9 @@ function DiffView({ diff }: { diff: RevisionDiff }) {
             {diff.fields.map((field) => (
               <tr key={field.field}>
                 <th scope="row">{field.label}</th>
-                <td>{field.before === '' ? <span style={mutedText}>（空）</span> : field.before}</td>
+                <td>
+                  {field.before === '' ? <span style={mutedText}>（空）</span> : field.before}
+                </td>
                 <td>
                   {field.after === '' ? (
                     <span style={mutedText}>（空）</span>
@@ -298,7 +305,11 @@ const SEGMENT_STYLE: Readonly<Record<string, React.CSSProperties>> = {
   },
 };
 
-function TextSegments({ segments }: { segments: readonly RevisionDiff['body']['segments'][number][] }) {
+function TextSegments({
+  segments,
+}: {
+  segments: readonly RevisionDiff['body']['segments'][number][];
+}) {
   if (segments.length === 0) {
     return <p style={mutedText}>（空）</p>;
   }
@@ -347,7 +358,9 @@ function ReviewActionList({
 
   return (
     <div style={stack}>
-      <strong>审核动作（{actions.length} 条{hasMore ? '，还有更多' : ''}）</strong>
+      <strong>
+        审核动作（{actions.length} 条{hasMore ? '，还有更多' : ''}）
+      </strong>
       <ul style={{ ...stack, listStyle: 'none', padding: 0, margin: 0 }}>
         {actions.map((action, index) => (
           <li key={`${action.createdAt}-${String(index)}`} style={card}>

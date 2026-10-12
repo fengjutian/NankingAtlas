@@ -13,7 +13,13 @@ import { MAX_SNAPSHOT_TEXT_LENGTH, toRevisionSnapshot } from './revision-history
  */
 
 function snapshot(bodyJson: string): string {
-  return JSON.stringify({ title: '标题', subtitle: null, summary: '摘要', slug: 'a-slug', bodyJson });
+  return JSON.stringify({
+    title: '标题',
+    subtitle: null,
+    summary: '摘要',
+    slug: 'a-slug',
+    bodyJson,
+  });
 }
 
 describe('toRevisionSnapshot 正常路径', () => {

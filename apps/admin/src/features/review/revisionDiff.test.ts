@@ -32,9 +32,7 @@ function revision(no: number, overrides: Partial<Revision['snapshot']> = {}): Re
 
 describe('diffText 基本行为', () => {
   it('完全相同 → 无 added / removed', () => {
-    expect(diffText('一样的正文', '一样的正文')).toEqual([
-      { kind: 'same', text: '一样的正文' },
-    ]);
+    expect(diffText('一样的正文', '一样的正文')).toEqual([{ kind: 'same', text: '一样的正文' }]);
   });
 
   it('两边都为空 → 空数组', () => {
@@ -131,7 +129,9 @@ describe('diffText 基本行为', () => {
     const long = '文'.repeat(4000);
     const segments = diffText(long, `${long.slice(0, 2000)}改${long.slice(2001)}`);
     expect(segments.length).toBeLessThanOrEqual(4);
-    expect(segments.reduce((sum, segment) => sum + segment.text.length, 0)).toBeLessThanOrEqual(4002);
+    expect(segments.reduce((sum, segment) => sum + segment.text.length, 0)).toBeLessThanOrEqual(
+      4002,
+    );
   });
 });
 

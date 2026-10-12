@@ -507,17 +507,10 @@ export const contentApi = {
     if (signal !== undefined) {
       options.signal = signal;
     }
-    return request<RevisionPage>(
-      `/admin/contents/${id}/revisions?${search.toString()}`,
-      options,
-    );
+    return request<RevisionPage>(`/admin/contents/${id}/revisions?${search.toString()}`, options);
   },
   /** 审核动作历史（FD-001）。与版本历史是两条独立序列。 */
-  listReviewActions(
-    id: string,
-    cursor?: string,
-    signal?: AbortSignal,
-  ): Promise<ReviewActionPage> {
+  listReviewActions(id: string, cursor?: string, signal?: AbortSignal): Promise<ReviewActionPage> {
     const search = new URLSearchParams();
     search.set('limit', String(HISTORY_PAGE_SIZE));
     if (cursor !== undefined) {
