@@ -2583,6 +2583,181 @@
       }
     },
     "/api/v1/admin/sources": {
+      "get": {
+        "operationId": "searchSources",
+        "summary": "检索来源库",
+        "description": "按标题 / 作者 / 出版方关键词检索来源，并可按类型过滤。供后台来源选择器使用，结果字段足以区分同名来源。数据层是 SQLite 的 LIKE 全表扫描（无中文分词索引），来源库为小表；如需索引应先出 ADR。",
+        "tags": ["sources"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "description": "同时匹配标题 / 作者 / 出版方的关键词（子串匹配）。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "description": "按来源类型精确过滤。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["ARCHIVE", "BOOK", "ARTICLE", "WEBSITE", "ORAL", "OTHER"]
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "description": "排序白名单：最新优先或标题升序。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": ["createdAt:desc", "title:asc"],
+              "default": "createdAt:desc"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "返回条数上限，默认 20，最大 100。",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "description": "上一页返回的 nextCursor，原样回传。必须与生成它时的 sort 一起使用，混用返回 400。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "检索结果分页。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceSearchResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "检索参数或游标不合法（含游标与 sort 不匹配）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或无法证明身份（凭据错误、token 过期或吊销）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "身份已知但无权（角色不足或账号被停用）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务内部错误。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          }
+        }
+      },
       "post": {
         "operationId": "createSource",
         "summary": "创建来源",
@@ -6274,6 +6449,128 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/Source"
+          }
+        }
+      },
+      "SourceSearchResult": {
+        "type": "object",
+        "description": "来源库检索结果。字段是**选择器用的最小集合**：足以区分同名来源（作者 / 出版方 / 出版日期 / 访问日期 / 核验备注），但不含 `citationText`（4000 字上限，不适合放在列表里）。",
+        "required": [
+          "id",
+          "kind",
+          "title",
+          "author",
+          "publisher",
+          "publicationDate",
+          "accessedAt",
+          "verificationNote"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "来源 ID。"
+          },
+          "kind": {
+            "type": "string",
+            "description": "来源类型。",
+            "enum": ["ARCHIVE", "BOOK", "ARTICLE", "WEBSITE", "ORAL", "OTHER"]
+          },
+          "title": {
+            "type": "string",
+            "description": "来源标题。",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "author": {
+            "type": ["string", "null"],
+            "maxLength": 200
+          },
+          "publisher": {
+            "type": ["string", "null"],
+            "maxLength": 200
+          },
+          "publicationDate": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "出版/发表时间。"
+          },
+          "accessedAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "访问时间。"
+          },
+          "verificationNote": {
+            "type": ["string", "null"],
+            "maxLength": 2000
+          }
+        }
+      },
+      "SourceSearchPage": {
+        "type": "object",
+        "description": "游标分页的来源检索结果，按白名单排序字段排序。",
+        "required": ["items", "nextCursor", "hasMore"],
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SourceSearchResult"
+            }
+          },
+          "nextCursor": {
+            "type": ["string", "null"],
+            "maxLength": 2048,
+            "description": "不透明游标，原样回传以取下一页。**必须与生成它时的 `sort` 一起使用**，混用返回 400。"
+          },
+          "hasMore": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SourceSearchQuery": {
+        "type": "object",
+        "description": "来源库检索条件。所有字段都是白名单，未知参数一律 400。",
+        "additionalProperties": false,
+        "properties": {
+          "q": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200,
+            "description": "同时匹配标题 / 作者 / 出版方的关键词（子串匹配）。"
+          },
+          "kind": {
+            "type": "string",
+            "description": "按来源类型精确过滤。",
+            "enum": ["ARCHIVE", "BOOK", "ARTICLE", "WEBSITE", "ORAL", "OTHER"]
+          },
+          "sort": {
+            "type": "string",
+            "enum": ["createdAt:desc", "title:asc"],
+            "default": "createdAt:desc",
+            "description": "排序白名单。只有这两种：前者是最新优先（默认），后者按标题升序，便于在长列表里定位。"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 20
+          },
+          "cursor": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "上一页返回的 nextCursor，原样回传。"
+          }
+        }
+      },
+      "SourceSearchResponse": {
+        "type": "object",
+        "description": "来源检索分页响应。",
+        "required": ["data"],
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/SourceSearchPage"
           }
         }
       },

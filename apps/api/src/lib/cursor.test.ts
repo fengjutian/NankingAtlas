@@ -178,9 +178,7 @@ describe('变序游标（keyset）', () => {
     const noSort = Buffer.from('{"sortValue":"x","id":"y"}', 'utf8').toString('base64url');
     expect(() => decodeKeysetCursor(noSort)).toThrow(/缺少合法的/);
 
-    const noId = Buffer.from('{"sort":"title:asc","sortValue":"x"}', 'utf8').toString(
-      'base64url',
-    );
+    const noId = Buffer.from('{"sort":"title:asc","sortValue":"x"}', 'utf8').toString('base64url');
     expect(() => decodeKeysetCursor(noId)).toThrow(/缺少合法的/);
   });
 

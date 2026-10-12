@@ -180,7 +180,10 @@ export function decodeKeysetCursor(cursor: string): KeysetCursorPayload {
 
   const validated = keysetCursorPayloadSchema.safeParse(parsed);
   if (!validated.success) {
-    throw new InvalidCursorError('CURSOR_PAYLOAD_INVALID', '游标载荷缺少合法的 sort / sortValue / id');
+    throw new InvalidCursorError(
+      'CURSOR_PAYLOAD_INVALID',
+      '游标载荷缺少合法的 sort / sortValue / id',
+    );
   }
   return validated.data;
 }

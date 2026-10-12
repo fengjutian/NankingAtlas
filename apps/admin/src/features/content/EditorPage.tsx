@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { RevisionPage, ReviewActionPage } from '@nanking-atlas/api-contract';
+import type { RevisionPage, ReviewActionPage, SourceSearchPage } from '@nanking-atlas/api-contract';
 
 import type {
   AdminContentDto,
@@ -25,6 +25,7 @@ import type {
   MediaIntake,
   NewSourceValue,
 } from '@/features/content/editorSections';
+import type { SourceSearchRequest } from '@/features/content/SourcePicker';
 import type { ReadinessState } from '@/features/review/ReviewPanel';
 import type { SessionUser } from '@/features/shared/session';
 
@@ -482,9 +483,31 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
     [onUnauthorized],
   );
 
+  /**
+   * 来源库检索（FD-002）。
+   *
+   * 刻意**不**走 `runSideTask`：那会劫持 `sideError` / `sideBusy`，
+   * 让一次检索失败覆盖掉整个来源区的错误提示。选择器自己管自己的状态。
+   * 会话失效仍然交给 `onUnauthorized` —— 那不是局部错误。
+   */
+  const searchSources = useCallback(
+    async (request: SourceSearchRequest, signal?: AbortSignal): Promise<SourceSearchPage> => {
+      try {
+        return await libraryApi.searchSources(request, signal);
+      } catch (cause) {
+        if (isApiAuthError(cause)) {
+          onUnauthorized();
+        }
+        throw cause;
+      }
+    },
+    [onUnauthorized],
+  );
+
   const createSource = useCallback(
     async (): Promise<string | null> =>
       runSideTask(async () => {
+        const raw = await libraryApi.createSource({
           kind: newSource.kind,
           title: newSource.title.trim(),
           ...(newSource.author.trim() === '' ? {} : { author: newSource.author.trim() }),

@@ -364,9 +364,7 @@ function isAbortLike(cause: unknown): boolean {
 
 function isForbidden(cause: unknown): boolean {
   return (
-    typeof cause === 'object' &&
-    cause !== null &&
-    (cause as { status?: unknown }).status === 403
+    typeof cause === 'object' && cause !== null && (cause as { status?: unknown }).status === 403
   );
 }
 

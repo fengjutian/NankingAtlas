@@ -409,9 +409,11 @@ describe('FD-002: 分页稳定性与游标一致性', () => {
     // **不是拼音序**。所以「丙(4E19) < 乙(4E59) < 甲(7532)」才是正确结果。
     // 这里断言码点序而不是语义序：排序必须是确定的、可复现的，
     // 但中文按拼音排需要额外的分词/排序规则，那是数据层 ADR 的范围。
-    expect([...items].map((item) => item.title.slice(prefix.length + 1)).sort()).toEqual(
-      ['丙', '乙', '甲'],
-    );
+    expect([...items].map((item) => item.title.slice(prefix.length + 1)).sort()).toEqual([
+      '丙',
+      '乙',
+      '甲',
+    ]);
     const titles = items.map((item) => item.title);
     expect(titles).toEqual([...titles].sort());
     expect(titles).toHaveLength(3);

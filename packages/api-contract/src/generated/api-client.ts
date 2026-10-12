@@ -31,7 +31,7 @@ export const NLA_API_PATHS = {
   '/api/v1/admin/contents/{id}/readiness': ['GET'] as const,
   '/api/v1/admin/contents/{id}/revisions': ['GET'] as const,
   '/api/v1/admin/contents/{id}/review-actions': ['GET'] as const,
-  '/api/v1/admin/sources': ['POST'] as const,
+  '/api/v1/admin/sources': ['GET', 'POST'] as const,
   '/api/v1/admin/contents/{id}/sources': ['POST', 'GET'] as const,
   '/api/v1/admin/tags': ['POST'] as const,
   '/api/v1/admin/contents/{id}/tags': ['POST', 'GET'] as const,
@@ -408,6 +408,33 @@ export type AttachSourceRequest = {
 };
 
 export type SourceResponse = { readonly data: Source };
+
+export type SourceSearchResult = {
+  readonly id: string;
+  readonly kind: 'ARCHIVE' | 'BOOK' | 'ARTICLE' | 'WEBSITE' | 'ORAL' | 'OTHER';
+  readonly title: string;
+  readonly author: string | null | null;
+  readonly publisher: string | null | null;
+  readonly publicationDate: string | null | null;
+  readonly accessedAt: string | null | null;
+  readonly verificationNote: string | null | null;
+};
+
+export type SourceSearchPage = {
+  readonly items: readonly SourceSearchResult[];
+  readonly nextCursor: string | null | null;
+  readonly hasMore: boolean;
+};
+
+export type SourceSearchQuery = {
+  readonly q?: string;
+  readonly kind?: 'ARCHIVE' | 'BOOK' | 'ARTICLE' | 'WEBSITE' | 'ORAL' | 'OTHER';
+  readonly sort?: 'createdAt:desc' | 'title:asc';
+  readonly limit?: number;
+  readonly cursor?: string;
+};
+
+export type SourceSearchResponse = { readonly data: SourceSearchPage };
 
 export type ContentSource = {
   readonly claimScope: string;
@@ -950,6 +977,53 @@ export interface NlaOperationMap {
       readonly '401': ErrorResponse;
       readonly '403': ErrorResponse;
       readonly '404': ErrorResponse;
+      readonly '500': ErrorResponse;
+    };
+  };
+  /** GET /api/v1/admin/sources */
+  searchSources: {
+    readonly method: 'GET';
+    readonly path: '/api/v1/admin/sources';
+    readonly tags: readonly ['sources'];
+    readonly security: 'bearer';
+    readonly parameters: readonly [
+      | {
+          readonly name: 'q';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: string;
+        }
+      | {
+          readonly name: 'kind';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: 'ARCHIVE' | 'BOOK' | 'ARTICLE' | 'WEBSITE' | 'ORAL' | 'OTHER';
+        }
+      | {
+          readonly name: 'sort';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: 'createdAt:desc' | 'title:asc';
+        }
+      | {
+          readonly name: 'limit';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: number;
+        }
+      | {
+          readonly name: 'cursor';
+          readonly in: 'query';
+          readonly required: false;
+          readonly type: string;
+        },
+    ];
+    readonly requestBody: undefined | undefined;
+    readonly response: SourceSearchResponse;
+    readonly errorResponses: {
+      readonly '400': ErrorResponse;
+      readonly '401': ErrorResponse;
+      readonly '403': ErrorResponse;
       readonly '500': ErrorResponse;
     };
   };

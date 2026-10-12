@@ -551,13 +551,13 @@ export const libraryApi = {
     });
   },
   /**
- * 来源库检索（FD-002）。
- *
- * 游标是服务端返回的不透明串，原样回传；`sort` 必须与生成它时一致，
- * 混用服务端会返回 400 —— 这里不做本地兜底或修正。
- */
-searchSources(
-    request: {
+   * 来源库检索（FD-002）。
+   *
+   * 游标是服务端返回的不透明串，原样回传；`sort` 必须与生成它时一致，
+   * 混用服务端会返回 400 —— 这里不做本地兜底或修正。
+   */
+  searchSources(
+    query: {
       q?: string;
       kind?: string;
       sort?: 'createdAt:desc' | 'title:asc';
@@ -566,21 +566,22 @@ searchSources(
     },
     signal?: AbortSignal,
   ): Promise<SourceSearchPage> {
+    // 参数名刻意不叫 `request`：那会遮蔽同模块的 `request()` 传输函数。
     const search = new URLSearchParams();
-    if (request.q !== undefined) {
-      search.set('q', request.q);
+    if (query.q !== undefined) {
+      search.set('q', query.q);
     }
-    if (request.kind !== undefined) {
-      search.set('kind', request.kind);
+    if (query.kind !== undefined) {
+      search.set('kind', query.kind);
     }
-    if (request.sort !== undefined) {
-      search.set('sort', request.sort);
+    if (query.sort !== undefined) {
+      search.set('sort', query.sort);
     }
-    if (request.limit !== undefined) {
-      search.set('limit', String(request.limit));
+    if (query.limit !== undefined) {
+      search.set('limit', String(query.limit));
     }
-    if (request.cursor !== undefined) {
-      search.set('cursor', request.cursor);
+    if (query.cursor !== undefined) {
+      search.set('cursor', query.cursor);
     }
     const suffix = search.toString();
     return request<SourceSearchPage>(

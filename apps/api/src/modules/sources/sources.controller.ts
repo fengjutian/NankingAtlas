@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { SOURCE_KINDS } from '@nanking-atlas/database';
 
 import { RelationsService } from './relations.service.js';
-import { SOURCE_SORTS, SourcesService, type SourceSort } from './sources.service.js';
+import { SOURCE_SORTS, SourcesService } from './sources.service.js';
 import { TagsService } from './tags.service.js';
 import { requireUser } from '../../common/auth/auth.guard.js';
 import { RequireRoles } from '../../common/auth/roles.decorator.js';
@@ -86,9 +86,7 @@ const sourceSearchQuerySchema = z
           ctx.addIssue({
             code: z.ZodIssueCode.custom,
             message:
-              error instanceof InvalidCursorError
-                ? `游标不合法：${error.code}`
-                : '游标不合法',
+              error instanceof InvalidCursorError ? `游标不合法：${error.code}` : '游标不合法',
           });
           return z.NEVER;
         }
@@ -125,7 +123,7 @@ export class SourcesController {
       data: await this.sources.search({
         ...(query.q !== undefined ? { q: query.q } : {}),
         ...(query.kind !== undefined ? { kind: query.kind } : {}),
-        sort: query.sort as SourceSort,
+        sort: query.sort,
         limit: query.limit,
         ...(query.cursor !== undefined ? { cursor: query.cursor } : {}),
       }),

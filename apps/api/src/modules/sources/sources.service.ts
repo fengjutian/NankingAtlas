@@ -391,9 +391,7 @@ export class DuplicateContentSourceError extends Error {
 /** Prisma 唯一约束冲突（`content_sources` 复合主键）。 */
 function isUniqueConstraintViolation(error: unknown): boolean {
   return (
-    typeof error === 'object' &&
-    error !== null &&
-    (error as { code?: unknown }).code === 'P2002'
+    typeof error === 'object' && error !== null && (error as { code?: unknown }).code === 'P2002'
   );
 }
 

@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react';
 
 import type { SourceSearchPage } from '@nanking-atlas/api-contract';
+
+import { SourcePicker, type SourceSearchRequest } from './SourcePicker';
+
 import type {
   ContentRelationDto,
   ContentSourceLink,
@@ -28,7 +31,6 @@ import { Badge } from '@/features/shared/Badge';
 import { Button, ButtonRow } from '@/features/shared/Button';
 import { Field } from '@/features/shared/Field';
 import { EmptyState } from '@/features/shared/States';
-import { SourcePicker, type SourceSearchRequest } from './SourcePicker';
 import {
   card,
   dangerBanner,
