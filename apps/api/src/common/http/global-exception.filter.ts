@@ -14,12 +14,12 @@ import { TiptapDocumentError } from '@nanking-atlas/validation';
 import { PasswordPolicyError } from '../../lib/password.js';
 import { AuthError } from '../../modules/auth/auth.service.js';
 import { IfMatchRequiredError } from '../../modules/contents/content.controller.js';
-import { InvalidHistoryCursorError } from '../../modules/contents/revision-history.js';
 import {
   ContentNotFoundError,
   ContentVersionConflictError,
   PublicationNotReadyError,
 } from '../../modules/contents/content.service.js';
+import { InvalidHistoryCursorError } from '../../modules/contents/revision-history.js';
 import { PublicContentNotFoundError } from '../../modules/homepage/public-content.controller.js';
 import {
   QueryValidationError,

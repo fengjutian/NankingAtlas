@@ -1,8 +1,8 @@
 import { extractPlainText, parseTiptapDocument } from '@nanking-atlas/validation';
-import { buildCursorPage, type CursorPage, type CursorPayload } from '../../lib/cursor.js';
-import { prisma } from '../../lib/prisma.js';
 
 import { ContentNotFoundError } from './content.service.js';
+import { buildCursorPage, type CursorPage, type CursorPayload } from '../../lib/cursor.js';
+import { prisma } from '../../lib/prisma.js';
 
 /**
  * FD-001：revision / review action 的只读历史查询。
@@ -73,7 +73,7 @@ export function toRevisionSnapshot(rawSnapshotJson: string): RevisionSnapshot {
   try {
     const decoded: unknown = JSON.parse(rawSnapshotJson);
     if (typeof decoded === 'object' && decoded !== null) {
-      parsed = decoded as SnapshotJson;
+      parsed = decoded;
     }
   } catch {
     parsed = {};

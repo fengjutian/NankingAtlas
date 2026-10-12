@@ -223,7 +223,10 @@ describe('success 状态：审核动作', () => {
     // 契约已经把 action 收紧成枚举（OpenAPI `ReviewActionRecord.action`）。
     // 这里显式绕过类型，模拟「部署的 admin 比 API 新」—— 例如 API 新增了
     // 一个动作但 admin 还没跟上。UI 必须原样显示而不是渲染 undefined。
-    const futureAction = { ...action, action: 'SOME_FUTURE_ACTION' } as unknown as ReviewActionRecord;
+    const futureAction = {
+      ...action,
+      action: 'SOME_FUTURE_ACTION',
+    } as unknown as ReviewActionRecord;
     const html = render(
       baseProps({
         revisions: revisionPage([revision(1)]),
