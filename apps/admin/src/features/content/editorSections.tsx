@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 
 import type { SourceSearchPage } from '@nanking-atlas/api-contract';
+import { parseTiptapDocument } from '@nanking-atlas/validation';
 
+import { RichTextEditor } from './RichTextEditor';
 import { SourcePicker, type SourceSearchRequest } from './SourcePicker';
 
 import type {
@@ -314,20 +316,33 @@ export function extensionToFormValues(extension: TypeExtension | null): Record<s
 
 export type BodyParseResult = { ok: true; value: unknown } | { ok: false; message: string };
 
+/**
+ * 正文 JSON 校验 —— 与**服务端完全同源**。
+ *
+ * 刻意调用 `@nanking-atlas/validation` 的 `parseTiptapDocument`，而不是本地
+ * `JSON.parse`：只做 JSON.parse 的话，危险结构（`javascript:` 链接、
+ * 白名单外节点、超限深度）要等到点保存、服务端返回 400 才会暴露。
+ * 同源校验让编辑在输入时就看到红字，服务端仍然是最终权威。
+ */
 export function parseBodyJson(text: string): BodyParseResult {
   const trimmed = text.trim();
   if (trimmed === '') {
     return { ok: false, message: '正文不能为空' };
   }
+  let parsed: unknown;
   try {
-    const parsed: unknown = JSON.parse(trimmed);
-    if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-      return { ok: false, message: '正文必须是 JSON 对象（Tiptap document）' };
-    }
-    return { ok: true, value: parsed };
+    parsed = JSON.parse(trimmed);
   } catch (cause) {
     const message = cause instanceof Error ? cause.message : '未知错误';
     return { ok: false, message: `JSON 解析失败：${message}` };
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    return { ok: false, message: '正文必须是 JSON 对象（Tiptap document）' };
+  }
+  try {
+    return { ok: true, value: parseTiptapDocument(parsed) };
+  } catch (cause) {
+    return { ok: false, message: cause instanceof Error ? cause.message : '正文结构校验失败' };
   }
 }
 
@@ -517,6 +532,13 @@ export function BasicsSection({ value, onChange, typeLocked, disabled }: BasicsS
 // 区 2：正文（JSON 模式）
 // ---------------------------------------------------------------------------
 
+/**
+ * 正文区（FD-003）：Tiptap 富文本编辑器。
+ *
+ * 保留一个折叠的 JSON 视图作为**逃生通道**：编辑器打不开某个历史文档时
+ * （旧 schema、脏数据），编辑还能看到原始 JSON 并手工修复，而不是被卡死。
+ * 默认折叠，正常编辑不会看到它。
+ */
 export function BodySection({
   value,
   onChange,
@@ -527,47 +549,55 @@ export function BodySection({
   disabled: boolean;
 }) {
   const parsed = useMemo(() => parseBodyJson(value), [value]);
+  const [showJson, setShowJson] = useState(false);
+
   return (
     <SectionShell
       index={2}
       title="正文"
-      description="当前为 JSON 模式：直接编辑 Tiptap document JSON。后续任务引入 Tiptap 后替换为富文本编辑器。"
-      actions={<Badge tone="review">JSON 模式</Badge>}
+      description="富文本编辑。产出结构受服务端 Tiptap 白名单约束：段落、H2/H3、引用、列表、代码块、链接、图片、分隔线。"
+      actions={<Badge tone="review">Tiptap</Badge>}
     >
-      <div style={dangerBanner}>
-        <strong>简化说明</strong> · 本区尚未接入 Tiptap 富文本编辑器，保存前会做
-        <code>JSON.parse</code> 校验，服务端仍会执行 Tiptap 节点白名单校验。
-      </div>
-      <Field
-        label="正文 JSON"
-        required
-        error={parsed.ok ? null : parsed.message}
-        hint='最小可用结构：{"type":"doc","content":[]}'
-      >
-        {({ id, describedBy, invalid }) => (
-          <textarea
-            id={id}
-            aria-describedby={describedBy}
-            aria-invalid={invalid}
-            disabled={disabled}
-            rows={16}
-            spellCheck={false}
-            value={value}
-            onChange={(event) => onChange(event.target.value)}
-            style={{ ...inputStyle, fontFamily: 'var(--nla-font-mono, monospace)' }}
-          />
-        )}
-      </Field>
+      <RichTextEditor
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        invalidReason={parsed.ok ? null : parsed.message}
+      />
+
       <ButtonRow>
-        <Button
-          disabled={disabled || parsed.ok}
-          onClick={() => onChange(formatBodyJson(value))}
-          title={parsed.ok ? undefined : '当前 JSON 无法解析，无法格式化'}
-        >
-          格式化 JSON
+        <Button onClick={() => setShowJson((prev) => !prev)}>
+          {showJson ? '隐藏 JSON' : '查看 JSON'}
         </Button>
-        <span style={mutedText}>{parsed.ok ? 'JSON 校验通过' : 'JSON 校验未通过'}</span>
+        <span style={mutedText}>
+          {showJson
+            ? 'JSON 视图仅用于排查；编辑请回到上方富文本区'
+            : '排查文档结构异常时可展开 JSON'}
+        </span>
       </ButtonRow>
+
+      {showJson ? (
+        <Field
+          label="正文 JSON"
+          required
+          error={parsed.ok ? null : parsed.message}
+          hint='最小可用结构：{"type":"doc","content":[]}'
+        >
+          {({ id, describedBy, invalid }) => (
+            <textarea
+              id={id}
+              aria-describedby={describedBy}
+              aria-invalid={invalid}
+              disabled={disabled}
+              rows={16}
+              spellCheck={false}
+              value={value}
+              onChange={(event) => onChange(event.target.value)}
+              style={{ ...inputStyle, fontFamily: 'var(--nla-font-mono, monospace)' }}
+            />
+          )}
+        </Field>
+      ) : null}
     </SectionShell>
   );
 }
