@@ -277,6 +277,14 @@ test.describe('管理后台：真实浏览器交互', () => {
     await uiLogin(page, 'admin@demo.local');
     await page.goto(`${ADMIN}/contents/${routeId}`);
 
+    // 监听浏览器实际发出的 PUT —— 先注册，再操作。
+    const stopPutBodies: string[] = [];
+    page.on('request', (request) => {
+      if (request.method() === 'PUT' && request.url().includes('/stops')) {
+        stopPutBodies.push(request.postData() ?? '');
+      }
+    });
+
     await expect(page.getByRole('heading', { name: '路线站点' })).toBeVisible();
 
     // 用表格的**可访问名称**定位，而不是 `hasText: '站点'`。
@@ -298,9 +306,28 @@ test.describe('管理后台：真实浏览器交互', () => {
     await expect(rows.nth(1)).toContainText(firstTitle);
 
     await page.getByRole('button', { name: '保存站点顺序' }).click();
-    await expect(page.getByText('已保存')).toBeVisible();
 
-    // 刷新后顺序保持 → 真的写进了服务端
+    // 先确认 PUT 真的发出了 —— 之前这里断言 `getByText('已保存')`，
+    // 结果匹配到的是**编辑器自动保存**的「已保存 17:19:00」，是个假通过：
+    // 点击根本没触发保存，测试却在后面以"顺序没变"的样子失败。
+    await expect.poll(() => stopPutBodies.length, { timeout: 15_000 }).toBeGreaterThan(0);
+
+    // 直接问服务端要一次站点列表，而不是刷新页面看 UI ——
+    // 这样能把「服务端没存」和「UI 重新加载没反映」两种情况区分开。
+    const afterSave = await fetch(`${API}${API_PREFIX}/admin/routes/${routeId}/stops`, {
+      headers: { authorization: `Bearer ${admin.accessToken}` },
+    });
+    expect(afterSave.status).toBe(200);
+    const serverStops = (await afterSave.json()) as {
+      data: { stops: { place: { contentId: string } | null }[] };
+    };
+    expect(
+      serverStops.data.stops.map((stop) => stop.place?.contentId),
+      `浏览器发出的 PUT：${stopPutBodies.join(' | ')}\n` +
+        `服务端保存后的顺序：${JSON.stringify(serverStops.data.stops)}`,
+    ).toEqual([placeIds[1], placeIds[0]]);
+
+    // 刷新后 UI 也应反映服务端顺序
     await page.reload();
     await expect(page.getByRole('heading', { name: '路线站点' })).toBeVisible();
     const reloadedRows = page.getByRole('table', { name: '路线站点列表' }).locator('tbody tr');
