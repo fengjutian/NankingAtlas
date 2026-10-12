@@ -277,11 +277,18 @@ test.describe('管理后台：真实浏览器交互', () => {
     await uiLogin(page, 'admin@demo.local');
     await page.goto(`${ADMIN}/contents/${routeId}`);
 
-    // 监听浏览器实际发出的 PUT —— 先注册，再操作。
+    // 监听浏览器实际发出的 PUT 及其**响应** ——
+    // 只看 request 会漏掉「请求发出但服务端拒绝」的情况，那正是当前的失败模式。
     const stopPutBodies: string[] = [];
+    const stopPutStatuses: string[] = [];
     page.on('request', (request) => {
       if (request.method() === 'PUT' && request.url().includes('/stops')) {
         stopPutBodies.push(request.postData() ?? '');
+      }
+    });
+    page.on('response', (response) => {
+      if (response.request().method() === 'PUT' && response.url().includes('/stops')) {
+        stopPutStatuses.push(String(response.status()));
       }
     });
 
@@ -324,6 +331,7 @@ test.describe('管理后台：真实浏览器交互', () => {
     expect(
       serverStops.data.stops.map((stop) => stop.place?.contentId),
       `浏览器发出的 PUT：${stopPutBodies.join(' | ')}\n` +
+        `PUT 响应状态：${stopPutStatuses.join(' | ')}\n` +
         `服务端保存后的顺序：${JSON.stringify(serverStops.data.stops)}`,
     ).toEqual([placeIds[1], placeIds[0]]);
 
