@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 
+import type { SourceSearchPage } from '@nanking-atlas/api-contract';
 import type {
   ContentRelationDto,
   ContentSourceLink,
@@ -27,6 +28,7 @@ import { Badge } from '@/features/shared/Badge';
 import { Button, ButtonRow } from '@/features/shared/Button';
 import { Field } from '@/features/shared/Field';
 import { EmptyState } from '@/features/shared/States';
+import { SourcePicker, type SourceSearchRequest } from './SourcePicker';
 import {
   card,
   dangerBanner,
@@ -708,6 +710,11 @@ export interface AttachSourceValue {
   isPrimary: boolean;
 }
 
+export type SourceSearchHandler = (
+  request: SourceSearchRequest,
+  signal?: AbortSignal,
+) => Promise<SourceSearchPage>;
+
 export function SourcesSection({
   links,
   newSource,
@@ -715,6 +722,7 @@ export function SourcesSection({
   onNewSourceChange,
   onAttachChange,
   onCreate,
+  onSearchSources,
   onAttach,
   busy,
   error,
@@ -726,6 +734,8 @@ export function SourcesSection({
   onAttachChange: (next: AttachSourceValue) => void;
   /** 创建来源；resolve 新建的来源 id（null 表示创建失败，错误由父级展示）。 */
   onCreate: () => Promise<string | null>;
+  /** 来源库检索（FD-002）；由编辑页注入真实 client。 */
+  onSearchSources: SourceSearchHandler;
   onAttach: () => void;
   busy: boolean;
   error: string | null;
@@ -897,34 +907,48 @@ export function SourcesSection({
             busy={busy}
             disabled={newSource.title.trim() === ''}
             onClick={() => {
-              void onCreate().then(setCreatedSourceId);
+              // 同一流程闭环：新建成功后直接选中，编辑不必再去检索框里找它的 ID。
+              void onCreate().then((created) => {
+                setCreatedSourceId(created);
+                if (created !== null) {
+                  onAttachChange({ ...attach, sourceId: created });
+                }
+              });
             }}
           >
             创建来源
           </Button>
           {createdSourceId === null ? null : (
             <span style={mutedText}>
-              已创建来源 id：<code>{createdSourceId}</code>，可填入下方「来源 ID」完成关联
+              已创建来源 <code>{createdSourceId}</code>，已自动选中，可在下方补「支撑论断」完成关联
             </span>
           )}
         </ButtonRow>
       </div>
 
+      <h3 style={{ fontSize: '0.95rem', margin: 0 }}>检索已有来源</h3>
+      <SourcePicker
+        onSearch={onSearchSources}
+        selectedSourceId={attach.sourceId}
+        disabled={busy}
+        onSelect={(sourceId) => onAttachChange({ ...attach, sourceId })}
+      />
+
       <h3 style={{ fontSize: '0.95rem', margin: 0 }}>关联到本内容</h3>
       <div style={stack}>
         <Field
-          label="来源 ID"
+          label="已选来源 ID"
           required
-          hint="填写刚创建的来源 ID；后端暂未提供来源检索端点，先用 ID 关联"
-          error={attach.sourceId.trim() === '' ? '来源 ID 不能为空' : null}
+          hint="由上方检索选择器填入；也可用上面的「新建来源」表单创建后再选"
+          error={attach.sourceId.trim() === '' ? '请先选择或新建一条来源' : null}
         >
           {({ id, describedBy }) => (
             <input
               id={id}
               aria-describedby={describedBy}
+              readOnly
               disabled={busy}
               value={attach.sourceId ?? ''}
-              onChange={(event) => onAttachChange({ ...attach, sourceId: event.target.value })}
               style={inputStyle}
             />
           )}

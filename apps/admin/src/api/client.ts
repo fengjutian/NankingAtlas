@@ -1,4 +1,4 @@
-import type { RevisionPage, ReviewActionPage } from '@nanking-atlas/api-contract';
+import type { RevisionPage, ReviewActionPage, SourceSearchPage } from '@nanking-atlas/api-contract';
 
 import type {
   AdminContentDto,
@@ -549,6 +549,44 @@ export const libraryApi = {
       method: 'POST',
       body: input,
     });
+  },
+  /**
+ * 来源库检索（FD-002）。
+ *
+ * 游标是服务端返回的不透明串，原样回传；`sort` 必须与生成它时一致，
+ * 混用服务端会返回 400 —— 这里不做本地兜底或修正。
+ */
+searchSources(
+    request: {
+      q?: string;
+      kind?: string;
+      sort?: 'createdAt:desc' | 'title:asc';
+      cursor?: string;
+      limit?: number;
+    },
+    signal?: AbortSignal,
+  ): Promise<SourceSearchPage> {
+    const search = new URLSearchParams();
+    if (request.q !== undefined) {
+      search.set('q', request.q);
+    }
+    if (request.kind !== undefined) {
+      search.set('kind', request.kind);
+    }
+    if (request.sort !== undefined) {
+      search.set('sort', request.sort);
+    }
+    if (request.limit !== undefined) {
+      search.set('limit', String(request.limit));
+    }
+    if (request.cursor !== undefined) {
+      search.set('cursor', request.cursor);
+    }
+    const suffix = search.toString();
+    return request<SourceSearchPage>(
+      `/admin/sources${suffix === '' ? '' : `?${suffix}`}`,
+      signal === undefined ? {} : { signal },
+    );
   },
   upsertTag(input: UpsertTagInput): Promise<unknown> {
     return request<unknown>('/admin/tags', { method: 'POST', body: input });

@@ -485,7 +485,6 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
   const createSource = useCallback(
     async (): Promise<string | null> =>
       runSideTask(async () => {
-        const raw = await libraryApi.createSource({
           kind: newSource.kind,
           title: newSource.title.trim(),
           ...(newSource.author.trim() === '' ? {} : { author: newSource.author.trim() }),
@@ -700,6 +699,7 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
         onNewSourceChange={setNewSource}
         onAttachChange={setAttach}
         onCreate={createSource}
+        onSearchSources={searchSources}
         onAttach={() =>
           void runSideTask(async () => {
             await libraryApi.attachSource(contentId, {
