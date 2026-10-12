@@ -16,6 +16,13 @@ export interface ButtonProps {
   title?: string | undefined;
   /** 切换型按钮的选中状态（会渲染成 aria-pressed）。 */
   ariaPressed?: boolean | undefined;
+  /**
+   * 可访问名称。
+   *
+   * 列表里的重复操作（「上移」「移除」出现 N 次）**必须**提供：否则读屏用户
+   * 只听到"上移，按钮"，不知道是哪一行。可见的短文字保持不变。
+   */
+  ariaLabel?: string | undefined;
 }
 
 function variantStyle(variant: ButtonVariant): CSSProperties {
@@ -52,6 +59,7 @@ export function Button({
   disabled = false,
   title,
   ariaPressed,
+  ariaLabel,
 }: ButtonProps) {
   const isDisabled = disabled || busy;
   return (
@@ -61,6 +69,7 @@ export function Button({
       disabled={isDisabled}
       aria-busy={busy ? true : undefined}
       {...(ariaPressed === undefined ? {} : { 'aria-pressed': ariaPressed })}
+      {...(ariaLabel === undefined ? {} : { 'aria-label': ariaLabel })}
       title={title}
       style={{
         ...variantStyle(variant),

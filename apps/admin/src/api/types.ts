@@ -338,6 +338,33 @@ export interface RelationTargetItem {
 }
 
 // ---------------------------------------------------------------------------
+// 路线站点（FD-009）
+// ---------------------------------------------------------------------------
+
+/**
+ * 编排视角的路线站点。
+ *
+ * `place: null` = 站点占位还在、但引用的内容已被删除（保留占位是为了不打乱站序）。
+ * `hasPoint: false` = 坐标未核验 → 站点仍在列表里，但**不会**画到地图上。
+ */
+export interface RouteStopAdminItem {
+  position: number;
+  note: string | null;
+  place: {
+    contentId: string;
+    title: string;
+    slug: string;
+    status: string;
+    /** 与 status 是两个独立维度：归档后 status 仍是 PUBLISHED。 */
+    archivedAt: string | null;
+    verificationStatus: string;
+    accuracy: string;
+    hasPoint: boolean;
+    pointNote: string | null;
+  } | null;
+}
+
+// ---------------------------------------------------------------------------
 // 内容
 // ---------------------------------------------------------------------------
 

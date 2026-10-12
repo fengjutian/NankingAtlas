@@ -24,6 +24,14 @@ import { defineConfig, devices } from '@playwright/test';
 const API_PORT = 4100;
 /** 与 apps/web 的 `next start --port 3000` 保持一致。 */
 const WEB_PORT = 3000;
+/**
+ * 管理后台的 E2E 端口。
+ *
+ * **不用 admin package.json 里 preview 脚本的 4173**：那个端口在本机被
+ * LibreOffice 内置的 `python -m http.server 4173` 占着（不属本项目，不能杀）。
+ * 所以 E2E 显式传 `--port`，与 web 那边「start 脚本固定端口」的约束不同处理。
+ */
+const ADMIN_PORT = 4175;
 /** API → web 的签名 revalidation 回调（两侧必须用同一个 secret）。 */
 const REVALIDATION_SECRET = 'e2e-revalidation-secret-value-long-enough';
 
@@ -63,7 +71,9 @@ export default defineConfig({
         // E2E 会多次登录（三个角色 + 重放场景），默认 5 次/分钟会误伤。
         AUTH_LOGIN_RATE_LIMIT: '1000',
         WEB_ORIGIN: `http://127.0.0.1:${String(WEB_PORT)}`,
-        ADMIN_ORIGIN: 'http://127.0.0.1:5199',
+        // 必须与下面第三个 webServer 的 admin 实际端口一致 ——
+        // 它是 API 的 CORS 白名单，写错会让 admin 的所有请求被浏览器拦下。
+        ADMIN_ORIGIN: `http://127.0.0.1:${String(ADMIN_PORT)}`,
         // 打通 P2-07 链路：归档后 API 签名回调 web 让缓存失效，
         // 否则详情页会继续命中 300s 的 fetch 缓存，撤回后仍返回 200。
         // 不配这一项，E2E 测到的就不是产品真实行为。
@@ -96,6 +106,36 @@ export default defineConfig({
         // 故意不给底图 Key：/map 会降级为纯列表，E2E 不依赖第三方瓦片。
         NEXT_PUBLIC_AMAP_KEY: '',
         REVALIDATION_SECRET,
+      },
+    },
+    {
+      // 管理后台（FD-003/005/006/007/008 的真实浏览器验证）。
+      //
+      // 用 `build && preview` 而不是 `dev`：
+      //   - dev 模式的模块加载 / 错误处理与生产不同，测出来的不可信
+      //     （web 那边也是因为同样的理由用 build + start）。
+      //
+      // 三个细节都不是随意写的：
+      //   1. `--host 127.0.0.1`：vite preview 默认只绑 localhost（IPv6 ::1），
+      //      而 Playwright 探测的是 127.0.0.1（IPv4），不指定就连不上、
+      //      最终以「Timed out waiting webServer」收场。
+      //   2. `--port 4175`：admin preview 脚本写死 4173，而该端口在本机被
+      //      LibreOffice 内置的 python http.server 占用（不属本项目，不能杀）。
+      //   3. 超时给到 420s：`tsc --noEmit && vite build` 本身就要一两分钟，
+      //      与 preview 串行后 300s 不够。
+      command:
+        'pnpm --filter @nanking-atlas/admin build && pnpm --filter @nanking-atlas/admin exec vite preview' +
+        ' --host 127.0.0.1 --port ' +
+        String(ADMIN_PORT) +
+        ' --strictPort',
+      url: `http://127.0.0.1:${String(ADMIN_PORT)}`,
+      timeout: 420_000,
+      reuseExistingServer: false,
+      env: {
+        NODE_ENV: 'production',
+        // 构建期内联：给 preview 传无效，必须让 build 那一步就带上。
+        VITE_APP_ENV: 'test',
+        VITE_API_BASE_URL: `http://127.0.0.1:${String(API_PORT)}`,
       },
     },
   ],

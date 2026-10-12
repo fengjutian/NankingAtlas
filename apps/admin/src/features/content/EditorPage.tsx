@@ -51,6 +51,7 @@ import {
   buildExtension,
   parseBodyJson,
 } from '@/features/content/editorSections';
+import { RouteStopEditor } from '@/features/content/RouteStopEditor';
 import { ReviewPanel } from '@/features/review/ReviewPanel';
 import { StatusBadge } from '@/features/shared/Badge';
 import { Button } from '@/features/shared/Button';
@@ -739,6 +740,11 @@ export function EditorPage({ contentId, user, onUnauthorized }: EditorPageProps)
         onChange={(next) => markDirty({ ...draft, extensionValues: next })}
         disabled={readOnly}
       />
+
+      {/* 路线站点编排（FD-009）：只有 ROUTE 类型才有站点概念。 */}
+      {draft.type === 'ROUTE' && content !== null ? (
+        <RouteStopEditor key={`stops-${content.id}`} routeId={content.id} user={user} />
+      ) : null}
 
       <SourcesSection
         links={links}

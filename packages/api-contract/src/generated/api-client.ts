@@ -37,6 +37,7 @@ export const NLA_API_PATHS = {
   '/api/v1/admin/contents/{id}/tags': ['POST', 'GET'] as const,
   '/api/v1/admin/contents/{id}/relations': ['POST', 'GET'] as const,
   '/api/v1/admin/relation-targets': ['GET'] as const,
+  '/api/v1/admin/routes/{id}/stops': ['GET', 'PUT'] as const,
   '/api/v1/admin/media/upload-intents': ['POST'] as const,
   '/api/v1/admin/media/{id}/complete': ['POST'] as const,
   '/api/v1/admin/users': ['GET', 'POST'] as const,
@@ -587,6 +588,39 @@ export type TagWithUsage = {
 export type TagWithUsageList = { readonly items: readonly TagWithUsage[] };
 
 export type TagWithUsageListResponse = { readonly data: TagWithUsageList };
+
+export type RouteStopAdminItem = {
+  readonly position: number;
+  readonly note: string | null | null;
+  readonly place: unknown;
+};
+
+export type RouteStopAdminPlace = {
+  readonly contentId: string;
+  readonly title: string;
+  readonly slug: string;
+  readonly status: 'DRAFT' | 'IN_REVIEW' | 'APPROVED' | 'PUBLISHED' | 'ARCHIVED';
+  readonly archivedAt: string | null | null;
+  readonly verificationStatus: 'UNVERIFIED' | 'PARTIAL' | 'VERIFIED' | 'DISPUTED';
+  readonly accuracy: string;
+  readonly hasPoint: boolean;
+  readonly pointNote: string | null | null;
+};
+
+export type RouteStopAdminList = { readonly stops: readonly RouteStopAdminItem[] };
+
+export type RouteStopAdminListResponse = { readonly data: RouteStopAdminList };
+
+export type ReplaceRouteStopsRequest = {
+  readonly stops: readonly {
+    readonly placeContentId: string;
+    readonly note?: string | null | null;
+  }[];
+};
+
+export type RouteStopWriteResult = { readonly stopCount: number };
+
+export type RouteStopWriteResultResponse = { readonly data: RouteStopWriteResult };
 
 export type UploadIntent = {
   readonly mediaId: string;
@@ -1376,6 +1410,49 @@ export interface NlaOperationMap {
       readonly '400': ErrorResponse;
       readonly '401': ErrorResponse;
       readonly '403': ErrorResponse;
+      readonly '500': ErrorResponse;
+    };
+  };
+  /** GET /api/v1/admin/routes/{id}/stops */
+  listRouteStops: {
+    readonly method: 'GET';
+    readonly path: '/api/v1/admin/routes/{id}/stops';
+    readonly tags: readonly ['routes'];
+    readonly security: 'bearer';
+    readonly parameters: readonly [
+      { readonly name: 'id'; readonly in: 'path'; readonly required: true; readonly type: string },
+    ];
+    readonly requestBody: undefined | undefined;
+    readonly response: RouteStopAdminListResponse;
+    readonly errorResponses: {
+      readonly '401': ErrorResponse;
+      readonly '403': ErrorResponse;
+      readonly '500': ErrorResponse;
+    };
+  };
+  /** PUT /api/v1/admin/routes/{id}/stops */
+  replaceRouteStops: {
+    readonly method: 'PUT';
+    readonly path: '/api/v1/admin/routes/{id}/stops';
+    readonly tags: readonly ['routes'];
+    readonly security: 'bearer';
+    readonly parameters: readonly [
+      | { readonly name: 'id'; readonly in: 'path'; readonly required: true; readonly type: string }
+      | {
+          readonly name: 'Idempotency-Key';
+          readonly in: 'header';
+          readonly required: false;
+          readonly type: string;
+        },
+    ];
+    readonly requestBody: ReplaceRouteStopsRequest | undefined;
+    readonly response: RouteStopWriteResultResponse;
+    readonly errorResponses: {
+      readonly '401': ErrorResponse;
+      readonly '403': ErrorResponse;
+      readonly '404': ErrorResponse;
+      readonly '422': ErrorResponse;
+      readonly '429': ErrorResponse;
       readonly '500': ErrorResponse;
     };
   };

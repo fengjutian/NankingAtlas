@@ -1,4 +1,5 @@
-import { Controller, Get, Inject, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Post, Put, Query, Req } from '@nestjs/common';
+import { type Request } from 'express';
 import { z } from 'zod';
 
 import { CONTENT_TYPES } from '@nanking-atlas/database';
@@ -10,8 +11,9 @@ import {
   pointDisplay,
   validateBbox,
 } from './places-query.service.js';
-import { RoutesService } from './routes.service.js';
+import { MAX_ROUTE_STOPS, RoutesService } from './routes.service.js';
 import { searchPublicContent } from './search.service.js';
+import { requireUser } from '../../common/auth/auth.guard.js';
 import { Public, RequireRoles } from '../../common/auth/roles.decorator.js';
 
 /**
@@ -28,6 +30,27 @@ const bboxQuerySchema = z.object({
   q: z.string().max(100).optional(),
   limit: z.coerce.number().int().min(1).max(MAX_PLACE_RESULTS).default(100),
 });
+
+/**
+ * 站点整条替换的请求体（FD-009）。
+ *
+ * `stops` **允许为空数组** —— 那是"清空这条路线的站点"，
+ * 不是参数错误；要求非空会让"删光所有站点"这个正常操作无法表达。
+ */
+const replaceStopsSchema = z
+  .object({
+    stops: z
+      .array(
+        z
+          .object({
+            placeContentId: z.string().min(1),
+            note: z.string().max(500).nullish(),
+          })
+          .strict(),
+      )
+      .max(MAX_ROUTE_STOPS),
+  })
+  .strict();
 
 const searchQuerySchema = z.object({
   q: z.string().min(1).max(100),
@@ -151,6 +174,52 @@ export class PlacesSearchController {
       throw new RouteNotFoundError(slug);
     }
     return { data: route };
+  }
+
+  // ---- 路线编排（FD-009）----
+
+  /**
+   * GET /admin/routes/:id/stops —— 读取路线站点（编排用）。
+   *
+   * 权限是编辑角色而非 ADMIN：编排路线是策展日常操作，锁到 ADMIN 会让
+   * 每次改路线都要找管理员。
+   */
+  @Get('admin/routes/:id/stops')
+  @RequireRoles('EDITOR', 'REVIEWER', 'ADMIN')
+  async listRouteStops(@Param('id') routeId: string): Promise<{ data: unknown }> {
+    return { data: { stops: await this.routes.listStopsForAdmin(routeId) } };
+  }
+
+  /**
+   * PUT /admin/routes/:id/stops —— 整条替换站点列表。
+   *
+   * 用 PUT 而不是 POST：语义是"把这条路线的站点集合设为这一组"，
+   * 天然幂等，且 position 由数组下标决定，不可能出现重复或空洞。
+   *
+   * `.strict()`：客户端**不许**自己传 position —— 那等于允许它绕过
+   * 服务端的连续性保证，制造出「第 1 站之后直接是第 3 站」的路线。
+   */
+  @Put('admin/routes/:id/stops')
+  @RequireRoles('EDITOR', 'REVIEWER', 'ADMIN')
+  async replaceRouteStops(
+    @Param('id') routeId: string,
+    @Body() rawBody: unknown,
+    @Req() req: Request,
+  ): Promise<{ data: unknown }> {
+    const body = replaceStopsSchema.parse(rawBody);
+    const user = requireUser(req);
+    const result = await this.routes.replaceStops({
+      routeId,
+      // 显式映射而不是整体透传：zod 的 `.nullish()` 会让 note 的类型带上
+      // `| undefined`，与 service 的入参签名对不上。
+      stops: body.stops.map((stop) => ({
+        placeContentId: stop.placeContentId,
+        note: stop.note ?? null,
+      })),
+      actorId: user.id,
+      requestId: req.requestId ?? 'unknown',
+    });
+    return { data: result };
   }
 
   /**

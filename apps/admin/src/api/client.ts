@@ -10,6 +10,7 @@ import type {
   HomepageSlotConfigInput,
   PatchUserInput,
   RelationTargetItem,
+  RouteStopAdminItem,
   TagWithUsage,
   UserListPage,
 } from './types';
@@ -71,7 +72,8 @@ const HISTORY_PAGE_SIZE = 20;
 /** base URL 兜底：env.API_BASE_URL 允许为 null（未配置时）。 */
 export const API_BASE_URL = env.API_BASE_URL ?? DEFAULT_API_BASE_URL;
 
-export type HttpMethod = 'GET' | 'POST' | 'PATCH' | 'DELETE';
+/** PUT 用于「整条替换」语义（如路线站点），语义上幂等。 */
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 // ---------------------------------------------------------------------------
 // 错误类型
@@ -648,6 +650,42 @@ export const homepageApi = {
     const suffix = search.toString();
     return request<{ items: HomepageCandidate[] }>(
       `/admin/homepage-slots/candidates${suffix === '' ? '' : `?${suffix}`}`,
+    );
+  },
+};
+
+export const routeApi = {
+  /** 路线站点（编排用）。排序按 position 升序。 */
+  listStops(routeId: string, signal?: AbortSignal): Promise<{ stops: RouteStopAdminItem[] }> {
+    return request<{ stops: RouteStopAdminItem[] }>(
+      `/admin/routes/${routeId}/stops`,
+      signal === undefined ? {} : { signal },
+    );
+  },
+  /**
+   * 整条替换站点。
+   *
+   * 请求体**没有 position** —— 顺序由数组下标决定，服务端负责写 position。
+   * 这样「客户端自己造跳号路线」在结构上不可能。
+   */
+  replaceStops(
+    routeId: string,
+    input: { stops: { placeContentId: string; note: string | null }[] },
+  ): Promise<{ stopCount: number }> {
+    return request<{ stopCount: number }>(`/admin/routes/${routeId}/stops`, {
+      method: 'PUT',
+      body: input,
+    });
+  },
+  /** 可作为站点的地点候选。 */
+  searchPlaceCandidates(query?: { q?: string }): Promise<{ items: RelationTargetItem[] }> {
+    const search = new URLSearchParams();
+    if (query?.q !== undefined) {
+      search.set('q', query.q);
+    }
+    const suffix = search.toString();
+    return request<{ items: RelationTargetItem[] }>(
+      `/admin/relation-targets${suffix === '' ? '' : `?${suffix}`}`,
     );
   },
 };

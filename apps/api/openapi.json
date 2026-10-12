@@ -53,6 +53,10 @@
       "description": "内容关联。"
     },
     {
+      "name": "routes",
+      "description": "路线与有序站点（管理端编排）。"
+    },
+    {
       "name": "media",
       "description": "图片上传与版权元数据。"
     },
@@ -4296,6 +4300,311 @@
         }
       }
     },
+    "/api/v1/admin/routes/{id}/stops": {
+      "get": {
+        "operationId": "listRouteStops",
+        "summary": "读取路线站点（编排用）",
+        "description": "按 position 升序返回站点。与公开视图不同：这里**不过滤发布状态**（编辑要能继续编排草稿路线），并额外返回 `verificationStatus` / `hasPoint` —— 让编排者知道哪些站点**不会**画到地图上。",
+        "tags": ["routes"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "内容 ID。",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "路线站点列表。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RouteStopAdminListResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或无法证明身份（凭据错误、token 过期或吊销）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "内容不是 ROUTE，或缺少路线扩展数据。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务内部错误。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "replaceRouteStops",
+        "summary": "整条替换路线站点",
+        "description": "把该路线的站点集合**整体**设为请求里的这一组，position 由数组下标决定（从 0 连续）。客户端**不能**自己传 position —— 那等于允许绕过连续性保证，制造跳号的路线。传空数组表示清空该路线的站点。",
+        "tags": ["routes"],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "内容 ID。",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "可选。技术方案 §7.1：写接口支持 Idempotency-Key。",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 255,
+              "pattern": "^[A-Za-z0-9._:-]+$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplaceRouteStopsRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "替换成功。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RouteStopWriteResultResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "缺少或无法证明身份（凭据错误、token 过期或吊销）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "站点不是有效地点，或路线缺少扩展数据。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "路线不存在。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求格式合法但校验失败（字段级错误见 `error.details`）。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "触发限流。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务内部错误；不返回堆栈或 SQL。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "请求关联 ID，与错误体内的 `error.requestId` 一致；报障时提供该值。",
+                "required": true,
+                "schema": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/admin/media/upload-intents": {
       "post": {
         "operationId": "createUploadIntent",
@@ -8301,6 +8610,164 @@
         "properties": {
           "data": {
             "$ref": "#/components/schemas/TagWithUsageList"
+          }
+        }
+      },
+      "RouteStopAdminItem": {
+        "type": "object",
+        "description": "编排视角的站点。`place: null` 表示站点占位还在、但引用的内容已删除；`hasPoint: false` 表示坐标未核验 —— 站点仍在列表里，但**不会**画到地图上。",
+        "required": ["position", "note", "place"],
+        "additionalProperties": false,
+        "properties": {
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "站序，从 0 连续。"
+          },
+          "note": {
+            "type": ["string", "null"],
+            "maxLength": 500
+          },
+          "place": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RouteStopAdminPlace"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "RouteStopAdminPlace": {
+        "type": "object",
+        "description": "站点引用的地点条目。",
+        "required": [
+          "contentId",
+          "title",
+          "slug",
+          "status",
+          "archivedAt",
+          "verificationStatus",
+          "accuracy",
+          "hasPoint",
+          "pointNote"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "contentId": {
+            "type": "string",
+            "description": "地点内容 ID。"
+          },
+          "title": {
+            "type": "string",
+            "description": "地点标题。",
+            "maxLength": 200
+          },
+          "slug": {
+            "type": "string",
+            "description": "地点 slug。",
+            "maxLength": 120
+          },
+          "status": {
+            "type": "string",
+            "enum": ["DRAFT", "IN_REVIEW", "APPROVED", "PUBLISHED", "ARCHIVED"]
+          },
+          "archivedAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "description": "归档时间；与 status 是两个独立维度。"
+          },
+          "verificationStatus": {
+            "type": "string",
+            "enum": ["UNVERIFIED", "PARTIAL", "VERIFIED", "DISPUTED"],
+            "description": "坐标核验状态；非 VERIFIED 时不画精确点。"
+          },
+          "accuracy": {
+            "type": "string",
+            "description": "坐标精度等级。"
+          },
+          "hasPoint": {
+            "type": "boolean",
+            "description": "是否有**可信**坐标可用于地图。"
+          },
+          "pointNote": {
+            "type": ["string", "null"],
+            "maxLength": 200
+          }
+        }
+      },
+      "RouteStopAdminList": {
+        "type": "object",
+        "required": ["stops"],
+        "additionalProperties": false,
+        "properties": {
+          "stops": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RouteStopAdminItem"
+            }
+          }
+        }
+      },
+      "RouteStopAdminListResponse": {
+        "type": "object",
+        "description": "路线站点列表响应。",
+        "required": ["data"],
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RouteStopAdminList"
+          }
+        }
+      },
+      "ReplaceRouteStopsRequest": {
+        "type": "object",
+        "description": "整条替换请求。**刻意不含 position** —— 顺序由数组下标决定，让客户端自己传位置就能造出跳号路线。",
+        "required": ["stops"],
+        "additionalProperties": false,
+        "properties": {
+          "stops": {
+            "type": "array",
+            "description": "按期望顺序排列的站点列表；空数组表示清空。",
+            "items": {
+              "type": "object",
+              "required": ["placeContentId"],
+              "additionalProperties": false,
+              "properties": {
+                "placeContentId": {
+                  "type": "string",
+                  "description": "地点内容 ID；必须是 PLACE 类型。"
+                },
+                "note": {
+                  "type": ["string", "null"],
+                  "maxLength": 500
+                }
+              }
+            }
+          }
+        }
+      },
+      "RouteStopWriteResult": {
+        "type": "object",
+        "required": ["stopCount"],
+        "additionalProperties": false,
+        "properties": {
+          "stopCount": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "RouteStopWriteResultResponse": {
+        "type": "object",
+        "description": "站点替换结果。",
+        "required": ["data"],
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/RouteStopWriteResult"
           }
         }
       },

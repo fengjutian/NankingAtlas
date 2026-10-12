@@ -1622,6 +1622,91 @@ const SCHEMAS: Readonly<Record<string, SchemaObject>> = {
   },
   TagWithUsageListResponse: dataEnvelope(ref('TagWithUsageList'), '标签列表响应。'),
 
+  // 路线站点（FD-009）
+  RouteStopAdminItem: {
+    type: 'object',
+    description:
+      '编排视角的站点。`place: null` 表示站点占位还在、但引用的内容已删除；' +
+      '`hasPoint: false` 表示坐标未核验 —— 站点仍在列表里，但**不会**画到地图上。',
+    required: ['position', 'note', 'place'],
+    additionalProperties: false,
+    properties: {
+      position: { type: 'integer', minimum: 0, description: '站序，从 0 连续。' },
+      note: nullableStringField(500),
+      place: {
+        anyOf: [{ $ref: '#/components/schemas/RouteStopAdminPlace' }, { type: 'null' }],
+      },
+    },
+  },
+  RouteStopAdminPlace: {
+    type: 'object',
+    description: '站点引用的地点条目。',
+    required: [
+      'contentId',
+      'title',
+      'slug',
+      'status',
+      'archivedAt',
+      'verificationStatus',
+      'accuracy',
+      'hasPoint',
+      'pointNote',
+    ],
+    additionalProperties: false,
+    properties: {
+      contentId: stringSchema('地点内容 ID。'),
+      title: stringSchema('地点标题。', { maxLength: 200 }),
+      slug: stringSchema('地点 slug。', { maxLength: 120 }),
+      status: { type: 'string', enum: CONTENT_STATUSES },
+      archivedAt: isoDateTimeField('归档时间；与 status 是两个独立维度。'),
+      verificationStatus: {
+        type: 'string',
+        enum: VERIFICATION_STATUSES,
+        description: '坐标核验状态；非 VERIFIED 时不画精确点。',
+      },
+      accuracy: { type: 'string', description: '坐标精度等级。' },
+      hasPoint: { type: 'boolean', description: '是否有**可信**坐标可用于地图。' },
+      pointNote: nullableStringField(200),
+    },
+  },
+  RouteStopAdminList: {
+    type: 'object',
+    required: ['stops'],
+    additionalProperties: false,
+    properties: { stops: { type: 'array', items: ref('RouteStopAdminItem') } },
+  },
+  RouteStopAdminListResponse: dataEnvelope(ref('RouteStopAdminList'), '路线站点列表响应。'),
+  ReplaceRouteStopsRequest: {
+    type: 'object',
+    description:
+      '整条替换请求。**刻意不含 position** —— 顺序由数组下标决定，' +
+      '让客户端自己传位置就能造出跳号路线。',
+    required: ['stops'],
+    additionalProperties: false,
+    properties: {
+      stops: {
+        type: 'array',
+        description: '按期望顺序排列的站点列表；空数组表示清空。',
+        items: {
+          type: 'object',
+          required: ['placeContentId'],
+          additionalProperties: false,
+          properties: {
+            placeContentId: stringSchema('地点内容 ID；必须是 PLACE 类型。'),
+            note: nullableStringField(500),
+          },
+        },
+      },
+    },
+  },
+  RouteStopWriteResult: {
+    type: 'object',
+    required: ['stopCount'],
+    additionalProperties: false,
+    properties: { stopCount: { type: 'integer', minimum: 0 } },
+  },
+  RouteStopWriteResultResponse: dataEnvelope(ref('RouteStopWriteResult'), '站点替换结果。'),
+
   // 媒体
   UploadIntent: UploadIntentSchema,
   CreateUploadIntentRequest: CreateUploadIntentRequestSchema,
@@ -2449,6 +2534,47 @@ const PATHS: Readonly<Record<string, PathItemObject>> = {
       },
     },
   },
+  // ---- 路线编排（FD-009）----
+  '/api/v1/admin/routes/{id}/stops': {
+    get: {
+      operationId: 'listRouteStops',
+      summary: '读取路线站点（编排用）',
+      description:
+        '按 position 升序返回站点。与公开视图不同：这里**不过滤发布状态**（编辑要能继续编排草稿路线），' +
+        '并额外返回 `verificationStatus` / `hasPoint` —— 让编排者知道哪些站点**不会**画到地图上。',
+      tags: ['routes'],
+      security: BEARER_SECURITY,
+      parameters: [ID_PATH_PARAMETER],
+      responses: {
+        '200': okResponse('RouteStopAdminListResponse', '路线站点列表。'),
+        ...AUTH_ERRORS,
+        '403': errorResponse('内容不是 ROUTE，或缺少路线扩展数据。'),
+        '500': errorResponse('服务内部错误。'),
+      },
+    },
+    put: {
+      operationId: 'replaceRouteStops',
+      summary: '整条替换路线站点',
+      description:
+        '把该路线的站点集合**整体**设为请求里的这一组，position 由数组下标决定（从 0 连续）。' +
+        '客户端**不能**自己传 position —— 那等于允许绕过连续性保证，制造跳号的路线。' +
+        '传空数组表示清空该路线的站点。',
+      tags: ['routes'],
+      security: BEARER_SECURITY,
+      parameters: [
+        ID_PATH_PARAMETER,
+        idempotencyKeyHeader('可选。技术方案 §7.1：写接口支持 Idempotency-Key。'),
+      ],
+      requestBody: jsonBody('ReplaceRouteStopsRequest', true),
+      responses: {
+        '200': okResponse('RouteStopWriteResultResponse', '替换成功。'),
+        ...WRITE_ERRORS,
+        '403': errorResponse('站点不是有效地点，或路线缺少扩展数据。'),
+        '404': errorResponse('路线不存在。'),
+      },
+    },
+  },
+
   // ---- 媒体 ----
   '/api/v1/admin/media/upload-intents': {
     post: {
@@ -2741,6 +2867,7 @@ export const openApiDocument: OpenApiDocument = {
     { name: 'sources', description: '史料来源与论断挂载。' },
     { name: 'tags', description: '标签。' },
     { name: 'relations', description: '内容关联。' },
+    { name: 'routes', description: '路线与有序站点（管理端编排）。' },
     { name: 'media', description: '图片上传与版权元数据。' },
     { name: 'users', description: '后台用户与角色管理。' },
     { name: 'audit', description: '审计日志查询（只读）。' },
