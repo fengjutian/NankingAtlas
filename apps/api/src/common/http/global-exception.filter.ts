@@ -20,6 +20,8 @@ import {
   PublicationNotReadyError,
 } from '../../modules/contents/content.service.js';
 import { InvalidHistoryCursorError } from '../../modules/contents/revision-history.js';
+import { DuplicateContentSourceError } from '../../modules/sources/sources.service.js';
+import { InvalidCursorError } from '../../lib/cursor.js';
 import { PublicContentNotFoundError } from '../../modules/homepage/public-content.controller.js';
 import {
   QueryValidationError,
@@ -123,6 +125,20 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         body: wrap('VALIDATION_FAILED', exception.message, requestId),
       };
     }
+    // 通用游标错误（FD-002 变序游标等）：同样是请求不合法，不是服务端故障。
+    if (exception instanceof InvalidCursorError) {
+      return {
+        status: HttpStatus.BAD_REQUEST,
+        body: wrap('VALIDATION_FAILED', exception.message, requestId),
+      };
+    }
+    // 重复挂载同一来源：用户的可修正操作，报 409 而不是 500。
+    if (exception instanceof DuplicateContentSourceError) {
+      return {
+        status: HttpStatus.CONFLICT,
+        body: wrap('CONFLICT', exception.message, requestId),
+      };
+    }
     // ---- 地图 / 搜索查询（P3）----
     if (exception instanceof QueryValidationError) {
       return {
@@ -214,6 +230,30 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       return {
         status: HttpStatus.PAYLOAD_TOO_LARGE,
         body: wrap('PAYLOAD_TOO_LARGE', '请求体过大，请减小提交内容后重试', requestId),
+      };
+    }
+
+    // ---- Prisma 已知请求错误 ----
+    // 外键 / 唯一约束冲突是**用户的可修正操作**（引用了不存在的对象、或重复挂载），
+    // 不是服务端故障。不映射的话一律掉进兜底分支变成 500：前端拿到的错误文案
+    // 是"服务器内部错误"，编辑会以为系统坏了，而不是"你引用的来源不存在"。
+    const prismaCode = prismaErrorCode(exception);
+    if (prismaCode === 'P2003') {
+      return {
+        status: HttpStatus.NOT_FOUND,
+        body: wrap('NOT_FOUND', '引用的对象不存在（内容或来源）', requestId),
+      };
+    }
+    if (prismaCode === 'P2025') {
+      return {
+        status: HttpStatus.NOT_FOUND,
+        body: wrap('NOT_FOUND', '目标记录不存在', requestId),
+      };
+    }
+    if (prismaCode === 'P2002') {
+      return {
+        status: HttpStatus.CONFLICT,
+        body: wrap('CONFLICT', '记录已存在，违反唯一约束', requestId),
       };
     }
 
@@ -312,4 +352,19 @@ function isPayloadTooLarge(exception: unknown): boolean {
     return true;
   }
   return record.status === 413 || record.statusCode === 413;
+}
+
+/**
+ * 取出 Prisma 已知请求错误的 code。
+ *
+ * 不用 `instanceof Prisma.PrismaClientKnownRequestError`：那样会把过滤器绑死在
+ * 某个 Prisma 实例身份上（多副本、依赖重复、测试里换 client 都会失效），
+ * 而 `code` 是它的稳定契约字段。
+ */
+function prismaErrorCode(exception: unknown): string | null {
+  if (typeof exception !== 'object' || exception === null) {
+    return null;
+  }
+  const code = (exception as { code?: unknown }).code;
+  return typeof code === 'string' && code.startsWith('P') ? code : null;
 }

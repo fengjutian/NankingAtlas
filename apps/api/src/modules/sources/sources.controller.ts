@@ -1,14 +1,22 @@
-import { Body, Controller, Get, Inject, Param, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Inject, Param, Post, Query, Req } from '@nestjs/common';
 import { type Request } from 'express';
 import { z } from 'zod';
 
 import { SOURCE_KINDS } from '@nanking-atlas/database';
 
 import { RelationsService } from './relations.service.js';
-import { SourcesService } from './sources.service.js';
+import { SOURCE_SORTS, SourcesService, type SourceSort } from './sources.service.js';
 import { TagsService } from './tags.service.js';
 import { requireUser } from '../../common/auth/auth.guard.js';
 import { RequireRoles } from '../../common/auth/roles.decorator.js';
+import {
+  DEFAULT_PAGE_SIZE,
+  InvalidCursorError,
+  MAX_KEYSET_CURSOR_LENGTH,
+  MAX_PAGE_SIZE,
+  decodeKeysetCursor,
+  type KeysetCursorPayload,
+} from '../../lib/cursor.js';
 
 /**
  * 来源 / 标签 / 关联控制器（P1-05）。
@@ -42,7 +50,52 @@ const upsertTagSchema = z
   .object({ slug: z.string().min(1).max(80), displayName: z.string().min(1).max(100) })
   .strict();
 
+/**
+ * 检索关键词上限。
+ *
+ * 上限不只是防滥用：关键词进 `LIKE '%q%'`，过长会拖慢全表扫描；而来源库的
+ * 真实用法（书名 / 篇名 / 出版社 / 作者片段）远短于这个长度。
+ */
+export const MAX_SOURCE_QUERY_LENGTH = 200;
+
 const attachTagSchema = z.object({ tagSlug: z.string().min(1).max(80) }).strict();
+
+/**
+ * 来源检索查询（FD-002）。
+ *
+ * 全部字段白名单：未知参数一律 400 而不是被静默忽略 —— 编辑输错参数名时
+ * 静默忽略会让他以为自己已经按某个条件筛选了。
+ *
+ * 游标在 zod 层解码成载荷：非法游标必须是 400 VALIDATION_FAILED，不能冒泡成
+ * 500，也不能悄悄退化成第一页（那会让翻页静默出错）。
+ */
+const sourceSearchQuerySchema = z
+  .object({
+    q: z.string().trim().min(1).max(MAX_SOURCE_QUERY_LENGTH).optional(),
+    kind: z.enum(SOURCE_KINDS).optional(),
+    sort: z.enum(SOURCE_SORTS).default('createdAt:desc'),
+    limit: z.coerce.number().int().min(1).max(MAX_PAGE_SIZE).default(DEFAULT_PAGE_SIZE),
+    cursor: z
+      .string()
+      .min(1)
+      .max(MAX_KEYSET_CURSOR_LENGTH)
+      .transform((raw, ctx): KeysetCursorPayload => {
+        try {
+          return decodeKeysetCursor(raw);
+        } catch (error) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message:
+              error instanceof InvalidCursorError
+                ? `游标不合法：${error.code}`
+                : '游标不合法',
+          });
+          return z.NEVER;
+        }
+      })
+      .optional(),
+  })
+  .strict();
 
 const createRelationSchema = z
   .object({
@@ -62,6 +115,22 @@ export class SourcesController {
   ) {}
 
   // ---- sources ----
+
+  /** GET /api/v1/admin/sources —— 来源库检索（FD-002）。 */
+  @Get('sources')
+  @RequireRoles('EDITOR', 'REVIEWER', 'ADMIN')
+  async searchSources(@Query() rawQuery: unknown): Promise<{ data: unknown }> {
+    const query = sourceSearchQuerySchema.parse(rawQuery);
+    return {
+      data: await this.sources.search({
+        ...(query.q !== undefined ? { q: query.q } : {}),
+        ...(query.kind !== undefined ? { kind: query.kind } : {}),
+        sort: query.sort as SourceSort,
+        limit: query.limit,
+        ...(query.cursor !== undefined ? { cursor: query.cursor } : {}),
+      }),
+    };
+  }
 
   @Post('sources')
   @RequireRoles('EDITOR', 'REVIEWER', 'ADMIN')

@@ -102,6 +102,89 @@ export interface CursorPage<T> {
   hasMore: boolean;
 }
 
+// ---------------------------------------------------------------------------
+// 变序游标（keyset）
+// ---------------------------------------------------------------------------
+
+/**
+ * 变序列表的游标载荷。
+ *
+ * 固定排序（永远 `createdAt desc`）用上面的 `CursorPayload` 就够；但一旦允许
+ * 按白名单字段排序，游标就必须**同时**携带：排序键的取值（否则服务端无法
+ * 还原"从哪一条之后继续"），以及产生它的排序方式。
+ *
+ * `sort` 字段不是为了省一次往返，而是为了**拒绝混用**：把按 title 排出来的
+ * 游标拿去请求按 createdAt 排的列表，两个序列的顺序完全不同，直接拿来当
+ * 偏移量会静默漏读或重读。带上 sort 就能在服务端比对并返回 400。
+ */
+export interface KeysetCursorPayload {
+  /** 产生该游标的排序方式，如 `createdAt:desc`；与请求不一致即拒绝。 */
+  sort: string;
+  /** 排序键在上一页最后一条记录上的取值（ISO 时间或原始字符串）。 */
+  sortValue: string;
+  /** 同一排序键内的兜底唯一键，保证全序。 */
+  id: string;
+}
+
+/**
+ * 变序游标的排序键上限。
+ *
+ * 中文在 UTF-8 下占 3 字节：排序键 300 字会编出约 1200 字符的 base64url，
+ * 远超固定游标的 512 上限。排序键超过这个长度时查询侧应当用前缀排序
+ * （见 sources 检索的 `substr` 处理），而不是放宽游标上限。
+ */
+export const MAX_KEYSET_SORT_VALUE_LENGTH = 400;
+
+/** 变序游标编码后的长度上限（载荷上限 × base64 膨胀 + JSON 结构开销）。 */
+export const MAX_KEYSET_CURSOR_LENGTH = 2048;
+
+const keysetCursorPayloadSchema = z.object({
+  sort: z.string().min(1).max(64),
+  sortValue: z.string().max(MAX_KEYSET_SORT_VALUE_LENGTH),
+  id: z.string().min(1).max(128),
+});
+
+/** 变序游标同样不透明：客户端只应原样回传。 */
+export function encodeKeysetCursor(payload: KeysetCursorPayload): string {
+  const validated = keysetCursorPayloadSchema.safeParse(payload);
+  if (!validated.success) {
+    throw new InvalidCursorError('CURSOR_PAYLOAD_INVALID', '游标载荷不合法，无法编码');
+  }
+  return Buffer.from(
+    JSON.stringify({
+      sort: validated.data.sort,
+      sortValue: validated.data.sortValue,
+      id: validated.data.id,
+    }),
+    'utf8',
+  ).toString('base64url');
+}
+
+export function decodeKeysetCursor(cursor: string): KeysetCursorPayload {
+  if (cursor.length < 1 || cursor.length > MAX_KEYSET_CURSOR_LENGTH) {
+    throw new InvalidCursorError('CURSOR_BASE64_INVALID', '游标长度不合法');
+  }
+  if (!/^[A-Za-z0-9_-]+$/.test(cursor)) {
+    throw new InvalidCursorError('CURSOR_BASE64_INVALID', '游标包含非 base64url 字符');
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8'));
+  } catch (error) {
+    if (error instanceof InvalidCursorError) {
+      throw error;
+    }
+    throw new InvalidCursorError('CURSOR_JSON_INVALID', '游标不是合法的 JSON');
+  }
+
+  const validated = keysetCursorPayloadSchema.safeParse(parsed);
+  if (!validated.success) {
+    throw new InvalidCursorError('CURSOR_PAYLOAD_INVALID', '游标载荷缺少合法的 sort / sortValue / id');
+  }
+  return validated.data;
+}
+
 /**
  * 组装游标页。
  *

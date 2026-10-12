@@ -1276,6 +1276,81 @@ const SCHEMAS: Readonly<Record<string, SchemaObject>> = {
   CreateSourceRequest: CreateSourceRequestSchema,
   AttachSourceRequest: AttachSourceRequestSchema,
   SourceResponse: dataEnvelope(ref('Source'), '来源详情响应。'),
+  SourceSearchResult: {
+    type: 'object',
+    description:
+      '来源库检索结果。字段是**选择器用的最小集合**：足以区分同名来源（作者 / 出版方 / 出版日期 / 访问日期 / 核验备注），但不含 `citationText`（4000 字上限，不适合放在列表里）。',
+    required: [
+      'id',
+      'kind',
+      'title',
+      'author',
+      'publisher',
+      'publicationDate',
+      'accessedAt',
+      'verificationNote',
+    ],
+    additionalProperties: false,
+    properties: {
+      id: stringSchema('来源 ID。'),
+      kind: { type: 'string', description: '来源类型。', enum: SOURCE_KINDS },
+      title: stringSchema('来源标题。', { minLength: 1, maxLength: 300 }),
+      author: nullableStringField(200),
+      publisher: nullableStringField(200),
+      publicationDate: isoDateTimeField('出版/发表时间。'),
+      accessedAt: isoDateTimeField('访问时间。'),
+      verificationNote: nullableStringField(2000),
+    },
+  },
+  SourceSearchPage: {
+    type: 'object',
+    description: '游标分页的来源检索结果，按白名单排序字段排序。',
+    required: ['items', 'nextCursor', 'hasMore'],
+    additionalProperties: false,
+    properties: {
+      items: { type: 'array', items: ref('SourceSearchResult') },
+      nextCursor: {
+        type: ['string', 'null'],
+        maxLength: 2048,
+        description:
+          '不透明游标，原样回传以取下一页。**必须与生成它时的 `sort` 一起使用**，混用返回 400。',
+      },
+      hasMore: { type: 'boolean' },
+    },
+  },
+  SourceSearchQuery: {
+    type: 'object',
+    description: '来源库检索条件。所有字段都是白名单，未知参数一律 400。',
+    additionalProperties: false,
+    properties: {
+      q: {
+        type: 'string',
+        minLength: 1,
+        maxLength: 200,
+        description: '同时匹配标题 / 作者 / 出版方的关键词（子串匹配）。',
+      },
+      kind: { type: 'string', description: '按来源类型精确过滤。', enum: SOURCE_KINDS },
+      sort: {
+        type: 'string',
+        enum: ['createdAt:desc', 'title:asc'],
+        default: 'createdAt:desc',
+        description:
+          '排序白名单。只有这两种：前者是最新优先（默认），后者按标题升序，便于在长列表里定位。',
+      },
+      limit: {
+        type: 'integer',
+        minimum: 1,
+        maximum: MAX_PAGE_SIZE,
+        default: DEFAULT_PAGE_SIZE,
+      },
+      cursor: {
+        type: 'string',
+        maxLength: 2048,
+        description: '上一页返回的 nextCursor，原样回传。',
+      },
+    },
+  },
+  SourceSearchResponse: dataEnvelope(ref('SourceSearchPage'), '来源检索分页响应。'),
   ContentSource: ContentSourceSchema,
   ContentSourceListResponse: dataListEnvelope(ref('ContentSource'), '内容的来源列表响应。'),
   Tag: TagSchema,
@@ -1442,6 +1517,29 @@ const CURSOR_QUERY_PARAMETER: ParameterObject = {
   description: '上一页返回的 nextCursor，原样回传以取下一页。省略则从第一页开始。',
   required: false,
   schema: { type: 'string', minLength: 1, maxLength: 512 },
+};
+
+/**
+ * 变序列表的游标参数。
+ *
+ * 上限比固定游标宽：排序键（中文标题）编码后可能上千字符，窄上限会让长题名
+ * 无法分页。同时要求「必须与生成它的 sort 一起使用」——混用会静默读错数据。
+ */
+const KEYSET_CURSOR_QUERY_PARAMETER: ParameterObject = {
+  name: 'cursor',
+  in: 'query',
+  description: '上一页返回的 nextCursor，原样回传。必须与生成它时的 sort 一起使用，混用返回 400。',
+  required: false,
+  schema: { type: 'string', minLength: 1, maxLength: 2048 },
+};
+
+/** 来源检索关键词。长度上限同时是为了不让 LIKE 全表扫描被超长串拖慢。 */
+const SOURCE_QUERY_PARAMETER: ParameterObject = {
+  name: 'q',
+  in: 'query',
+  description: '同时匹配标题 / 作者 / 出版方的关键词（子串匹配）。',
+  required: false,
+  schema: { type: 'string', minLength: 1, maxLength: 200 },
 };
 
 /** bbox 查询参数。`required: true` —— 缺它就没有视口可言。 */
@@ -1862,6 +1960,43 @@ const PATHS: Readonly<Record<string, PathItemObject>> = {
 
   // ---- 来源 ----
   '/api/v1/admin/sources': {
+    get: {
+      operationId: 'searchSources',
+      summary: '检索来源库',
+      description:
+        '按标题 / 作者 / 出版方关键词检索来源，并可按类型过滤。供后台来源选择器使用，结果字段足以区分同名来源。数据层是 SQLite 的 LIKE 全表扫描（无中文分词索引），来源库为小表；如需索引应先出 ADR。',
+      tags: ['sources'],
+      security: BEARER_SECURITY,
+      parameters: [
+        SOURCE_QUERY_PARAMETER,
+        {
+          name: 'kind',
+          in: 'query',
+          description: '按来源类型精确过滤。',
+          required: false,
+          schema: { type: 'string', enum: SOURCE_KINDS },
+        },
+        {
+          name: 'sort',
+          in: 'query',
+          description: '排序白名单：最新优先或标题升序。',
+          required: false,
+          schema: {
+            type: 'string',
+            enum: ['createdAt:desc', 'title:asc'],
+            default: 'createdAt:desc',
+          },
+        },
+        LIMIT_QUERY_PARAMETER,
+        KEYSET_CURSOR_QUERY_PARAMETER,
+      ],
+      responses: {
+        '200': okResponse('SourceSearchResponse', '检索结果分页。'),
+        ...AUTH_ERRORS,
+        '400': errorResponse('检索参数或游标不合法（含游标与 sort 不匹配）。'),
+        '500': errorResponse('服务内部错误。'),
+      },
+    },
     post: {
       operationId: 'createSource',
       summary: '创建来源',
